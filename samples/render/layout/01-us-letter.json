@@ -1,0 +1,21 @@
+{
+  "title": "US Letter Page Size",
+  "blocks": [
+    { "type": "heading",   "text": "Standard Document Layout",  "level": 1 },
+    { "type": "paragraph", "text": "This document demonstrates standard page layout with typical margins and document structure." },
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Common Page Sizes",  "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "US Letter: 8.5 × 11 inches",
+        "A4: 210 × 297 millimeters",
+        "US Legal: 8.5 × 14 inches"
+    ]},
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Margins and Spacing",  "level": 2 },
+    { "type": "paragraph", "text": "Standard margins are typically 1 inch (72 points) on all sides, providing adequate space for page headers and footers." }
+  ],
+  "footerText": "Standard Document Layout — pdfnative-cli",
+  "metadata": {
+    "subject": "Standard page layout demonstration"
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "title": "All Block Types — Reference",
+  "blocks": [
+    { "type": "heading", "text": "Heading Level 1", "level": 1 },
+    { "type": "heading", "text": "Heading Level 2", "level": 2 },
+    { "type": "heading", "text": "Heading Level 3", "level": 3 },
+    { "type": "spacer", "height": 8 },
+
+    { "type": "paragraph", "text": "Default paragraph with no styling options set." },
+    { "type": "paragraph", "text": "Paragraph with fontSize 13 and left alignment.", "fontSize": 13, "align": "left" },
+    { "type": "paragraph", "text": "A centered paragraph — useful for callouts or highlights.", "fontSize": 11, "align": "center" },
+    { "type": "paragraph", "text": "A right-aligned paragraph for captions or labels.", "fontSize": 10, "align": "right" },
+    { "type": "spacer", "height": 12 },
+
+    { "type": "heading", "text": "Lists", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Bullet item one",
+        "Bullet item two",
+        "Bullet item three"
+    ]},
+    { "type": "spacer", "height": 8 },
+    { "type": "list", "style": "numbered", "items": [
+        "Step one: prepare the environment.",
+        "Step two: run the pipeline.",
+        "Step three: verify the output."
+    ]},
+    { "type": "spacer", "height": 12 },
+
+    { "type": "heading", "text": "Table Data (rendered as list)", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Product | Units | Revenue",
+        "Widget A | 1,200 | $14,400",
+        "Widget B | 850 | $9,350",
+        "Widget C | 2,000 | $20,000"
+    ]},
+    { "type": "spacer", "height": 12 },
+
+    { "type": "heading", "text": "Barcode (QR)", "level": 2 },
+    { "type": "barcode", "format": "qr", "data": "https://pdfnative.dev", "width": 100 },
+    { "type": "spacer", "height": 12 },
+
+    { "type": "heading", "text": "Link", "level": 2 },
+    { "type": "link", "text": "Visit pdfnative.dev", "url": "https://pdfnative.dev" },
+    { "type": "spacer", "height": 12 },
+
+    { "type": "pageBreak" },
+
+    { "type": "heading", "text": "Interactive Form Fields", "level": 2 },
+    { "type": "formField", "fieldType": "text",     "name": "firstName", "label": "First Name" },
+    { "type": "formField", "fieldType": "text",     "name": "lastName",  "label": "Last Name" },
+    { "type": "formField", "fieldType": "textarea", "name": "comments",  "label": "Comments" },
+    { "type": "formField", "fieldType": "checkbox", "name": "agree",     "label": "I agree to the terms" },
+    { "type": "formField", "fieldType": "dropdown", "name": "country",   "label": "Country",
+      "options": ["United States", "Canada", "United Kingdom", "France", "Germany"] },
+    { "type": "formField", "fieldType": "radio",    "name": "size",      "label": "T-Shirt Size",
+      "options": ["Small", "Medium", "Large", "X-Large"] },
+    { "type": "spacer", "height": 16 },
+
+    { "type": "paragraph", "text": "End of reference document.", "fontSize": 9, "align": "center" }
+  ],
+  "footerText": "Generated with pdfnative-cli",
+  "metadata": {
+    "author": "pdfnative-cli",
+    "subject": "Block types reference",
+    "keywords": "reference, blocks, all-types"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "title": "Technical Report — PDF/A-2b",
+  "blocks": [
+    { "type": "heading",   "text": "Technical Report — PDF/A-2b", "level": 1 },
+    { "type": "paragraph", "text": "PDF/A-2b (ISO 19005-2) is the recommended archival format for most modern documents. It extends PDF/A-1b with JPEG 2000 compression (not used here), embedded files, and PDF 1.7 features." },
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Comparison: PDF/A-1b vs PDF/A-2b", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Standard: PDF/A-1b = ISO 19005-1 | PDF/A-2b = ISO 19005-2",
+        "PDF version: PDF/A-1b = 1.4 | PDF/A-2b = 1.7",
+        "Transparency allowed: PDF/A-1b = No | PDF/A-2b = Yes",
+        "Annotations: PDF/A-1b = Limited | PDF/A-2b = Extended",
+        "Embedded files: PDF/A-1b = No | PDF/A-2b = No (use PDF/A-3b)",
+        "JPEG 2000: PDF/A-1b = No | PDF/A-2b = Yes",
+        "Layers (Optional Content): PDF/A-1b = No | PDF/A-2b = Yes"
+    ]},
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "When to Use", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Long-term document archival (contracts, legal, government)",
+        "Regulated industries (health, finance, public sector)",
+        "Documents that will be stored for 10+ years"
+    ]}
+  ],
+  "footerText": "Archived — PDF/A-2b — ISO 19005-2",
+  "layout": {
+    "tagged": "pdfa2b"
+  },
+  "metadata": {
+    "author": "pdfnative-cli",
+    "subject": "PDF/A-2b archival format demonstration",
+    "keywords": "pdfa, archival, iso19005, pdfa2b"
+  }
+}

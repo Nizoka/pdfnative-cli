@@ -1,0 +1,21 @@
+{
+  "title": "Wide Format Report",
+  "blocks": [
+    { "type": "heading",   "text": "Wide Format Layout Report", "level": 1 },
+    { "type": "paragraph", "text": "This document is designed for wide-format layouts with extended content suitable for landscape presentations." },
+    { "type": "spacer",    "height": 10 },
+    { "type": "heading",   "text": "Quarterly Performance", "level": 2 },
+    { "type": "list", "style": "numbered", "items": [
+        "Q1 Engineering: 131 FTE | Marketing: 59 FTE | Sales: 120 FTE | Operations: 41 FTE | Total: 351",
+        "Q2 Engineering: 162 FTE | Marketing: 73 FTE | Sales: 157 FTE | Operations: 46 FTE | Total: 438",
+        "Q3 Engineering: 175 FTE | Marketing: 82 FTE | Sales: 178 FTE | Operations: 52 FTE | Total: 487",
+        "Q4 Engineering: 198 FTE | Marketing: 91 FTE | Sales: 214 FTE | Operations: 61 FTE | Total: 564"
+    ]},
+    { "type": "spacer",    "height": 12 },
+    { "type": "paragraph", "text": "Year-to-date headcount: 1,840 full-time equivalents across all departments.", "fontSize": 9 }
+  ],
+  "footerText": "Wide Format Report — pdfnative-cli",
+  "metadata": {
+    "subject": "Wide format layout demonstration"
+  }
+}

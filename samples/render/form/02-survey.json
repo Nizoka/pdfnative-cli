@@ -1,0 +1,41 @@
+{
+  "title": "Customer Satisfaction Survey",
+  "blocks": [
+    { "type": "heading",   "text": "Customer Satisfaction Survey", "level": 1 },
+    { "type": "paragraph", "text": "Your feedback helps us improve. This survey takes approximately 2 minutes.", "fontSize": 10 },
+    { "type": "spacer",    "height": 16 },
+
+    { "type": "heading",   "text": "About You", "level": 2 },
+    { "type": "formField", "fieldType": "text", "name": "name",    "label": "Name (optional)" },
+    { "type": "formField", "fieldType": "dropdown", "name": "role", "label": "Your role",
+      "options": ["Individual", "Small Business", "Enterprise", "Developer", "Student"] },
+    { "type": "spacer",    "height": 12 },
+
+    { "type": "heading",   "text": "Product Experience", "level": 2 },
+    { "type": "formField", "fieldType": "radio",    "name": "overallSatisfaction", "label": "Overall satisfaction",
+      "options": ["Very Satisfied", "Satisfied", "Neutral", "Dissatisfied", "Very Dissatisfied"] },
+    { "type": "formField", "fieldType": "radio",    "name": "easeOfUse", "label": "Ease of use",
+      "options": ["Very Easy", "Easy", "Moderate", "Difficult", "Very Difficult"] },
+    { "type": "formField", "fieldType": "radio",    "name": "wouldRecommend", "label": "Would you recommend us?",
+      "options": ["Definitely Yes", "Probably Yes", "Not Sure", "Probably Not", "Definitely Not"] },
+    { "type": "spacer",    "height": 12 },
+
+    { "type": "heading",   "text": "Features Used", "level": 2 },
+    { "type": "formField", "fieldType": "checkbox", "name": "usedRender",  "label": "render command (JSON → PDF)" },
+    { "type": "formField", "fieldType": "checkbox", "name": "usedSign",    "label": "sign command (digital signature)" },
+    { "type": "formField", "fieldType": "checkbox", "name": "usedInspect", "label": "inspect command (metadata analysis)" },
+    { "type": "formField", "fieldType": "checkbox", "name": "usedStream",  "label": "streaming mode (--stream)" },
+    { "type": "spacer",    "height": 12 },
+
+    { "type": "heading",   "text": "Open Feedback", "level": 2 },
+    { "type": "formField", "fieldType": "textarea", "name": "improvements", "label": "What would you most like to see improved?",
+      "placeholder": "Your suggestions..." },
+    { "type": "formField", "fieldType": "textarea", "name": "otherFeedback", "label": "Any other comments?",
+      "placeholder": "Additional feedback..." }
+  ],
+  "footerText": "Thank you for completing this survey.",
+  "metadata": {
+    "subject": "Customer satisfaction survey",
+    "keywords": "survey, feedback, form, satisfaction"
+  }
+}

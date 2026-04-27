@@ -1,0 +1,56 @@
+{
+  "title": "Technical Guide — Table of Contents Demo",
+  "blocks": [
+    { "type": "heading",   "text": "Technical Guide — pdfnative-cli", "level": 1 },
+    { "type": "paragraph", "text": "This guide demonstrates the automatic table of contents (TOC) feature. The TOC block is placed near the top of the document and is auto-populated from all heading blocks that follow it." },
+    { "type": "spacer",    "height": 12 },
+
+    { "type": "toc", "title": "Contents", "maxLevel": 2 },
+    { "type": "spacer",    "height": 16 },
+
+    { "type": "heading",   "text": "1. Installation",       "level": 1 },
+    { "type": "paragraph", "text": "Install pdfnative-cli globally with npm or run it with npx." },
+    { "type": "list", "style": "numbered", "items": [
+        "Run: npm install --global pdfnative-cli",
+        "Verify: pdfnative --version"
+    ]},
+    { "type": "spacer", "height": 8 },
+
+    { "type": "heading",   "text": "1.1 Requirements",      "level": 2 },
+    { "type": "list", "style": "bullet", "items": ["Node.js ≥ 20", "npm ≥ 9"] },
+    { "type": "spacer", "height": 12 },
+
+    { "type": "heading",   "text": "2. render Command",     "level": 1 },
+    { "type": "paragraph", "text": "The render command converts a DocumentParams JSON object to a PDF file or stdout stream." },
+
+    { "type": "heading",   "text": "2.1 Basic Usage",       "level": 2 },
+    { "type": "paragraph", "text": "Run: pdfnative render --input doc.json --output report.pdf" },
+
+    { "type": "heading",   "text": "2.2 Streaming",         "level": 2 },
+    { "type": "paragraph", "text": "Use --stream for large documents to reduce peak memory usage." },
+    { "type": "spacer", "height": 12 },
+
+    { "type": "heading",   "text": "3. sign Command",       "level": 1 },
+    { "type": "paragraph", "text": "Applies an RSA-SHA256 digital signature (CMS/PKCS#7) to a PDF." },
+
+    { "type": "heading",   "text": "3.1 Key Loading",       "level": 2 },
+    { "type": "paragraph", "text": "Keys are loaded from env vars (PDFNATIVE_SIGN_KEY, PDFNATIVE_SIGN_CERT) or file paths (--key, --cert)." },
+    { "type": "spacer", "height": 12 },
+
+    { "type": "heading",   "text": "4. inspect Command",    "level": 1 },
+    { "type": "paragraph", "text": "Analyses an existing PDF and outputs metadata in JSON or human-readable text format." },
+
+    { "type": "heading",   "text": "4.1 Output Formats",    "level": 2 },
+    { "type": "paragraph", "text": "Use --format json (default) for machine-readable output, or --format text for a human-readable summary." },
+    { "type": "spacer", "height": 12 },
+
+    { "type": "heading",   "text": "5. Security",           "level": 1 },
+    { "type": "paragraph", "text": "Signing keys are never logged. All file paths are validated against path traversal. JSON input is capped at 50 MB." }
+  ],
+  "footerText": "pdfnative-cli — Technical Guide",
+  "metadata": {
+    "author": "pdfnative-cli",
+    "subject": "Table of contents demonstration",
+    "keywords": "toc, table of contents, guide, documentation"
+  }
+}

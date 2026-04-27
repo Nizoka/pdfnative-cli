@@ -1,0 +1,30 @@
+{
+  "title": "Resource Directory — Clickable Links",
+  "blocks": [
+    { "type": "heading",   "text": "Resource Directory", "level": 1 },
+    { "type": "paragraph", "text": "A collection of project links. In a PDF viewer, each entry below is a clickable hyperlink." },
+    { "type": "spacer",    "height": 12 },
+
+    { "type": "heading",   "text": "Documentation", "level": 2 },
+    { "type": "link",      "text": "pdfnative.dev — Official documentation and live demos", "url": "https://pdfnative.dev" },
+    { "type": "link",      "text": "pdfnative npm package",                                  "url": "https://www.npmjs.com/package/pdfnative" },
+    { "type": "link",      "text": "pdfnative-cli npm package",                              "url": "https://www.npmjs.com/package/pdfnative-cli" },
+    { "type": "spacer",    "height": 10 },
+
+    { "type": "heading",   "text": "Source Code", "level": 2 },
+    { "type": "link",      "text": "pdfnative — core library on GitHub",    "url": "https://github.com/Nizoka/pdfnative" },
+    { "type": "link",      "text": "pdfnative-cli — CLI on GitHub",         "url": "https://github.com/Nizoka/pdfnative-cli" },
+    { "type": "link",      "text": "pdfnative-mcp — MCP server on GitHub",  "url": "https://github.com/Nizoka/pdfnative-mcp" },
+    { "type": "spacer",    "height": 10 },
+
+    { "type": "heading",   "text": "Standards", "level": 2 },
+    { "type": "link",      "text": "ISO 32000-1 — PDF specification (1.7)", "url": "https://www.iso.org/standard/51502.html" },
+    { "type": "link",      "text": "ISO 19005-2 — PDF/A-2 specification",   "url": "https://www.iso.org/standard/50655.html" },
+    { "type": "link",      "text": "Model Context Protocol (MCP)",            "url": "https://modelcontextprotocol.io" }
+  ],
+  "footerText": "Generated with pdfnative-cli",
+  "metadata": {
+    "subject": "Clickable link blocks demonstration",
+    "keywords": "link, hyperlink, url, reference"
+  }
+}

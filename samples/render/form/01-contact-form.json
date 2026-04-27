@@ -1,0 +1,32 @@
+{
+  "title": "Contact Form",
+  "blocks": [
+    { "type": "heading",   "text": "Contact Us", "level": 1 },
+    { "type": "paragraph", "text": "Please fill in all required fields and return this form by email.", "fontSize": 10 },
+    { "type": "spacer",    "height": 16 },
+
+    { "type": "heading",   "text": "Personal Information", "level": 2 },
+    { "type": "formField", "fieldType": "text",  "name": "firstName",  "label": "First Name *",  "placeholder": "Jane" },
+    { "type": "formField", "fieldType": "text",  "name": "lastName",   "label": "Last Name *",   "placeholder": "Doe" },
+    { "type": "formField", "fieldType": "text",  "name": "email",      "label": "Email Address *", "placeholder": "jane@example.com" },
+    { "type": "formField", "fieldType": "text",  "name": "phone",      "label": "Phone Number",    "placeholder": "+1 212 555 0100" },
+    { "type": "spacer",    "height": 12 },
+
+    { "type": "heading",   "text": "Enquiry", "level": 2 },
+    { "type": "formField", "fieldType": "dropdown", "name": "subject", "label": "Subject *",
+      "options": ["General Enquiry", "Technical Support", "Billing", "Partnership", "Other"] },
+    { "type": "formField", "fieldType": "textarea",  "name": "message", "label": "Message *", "placeholder": "Describe your enquiry here..." },
+    { "type": "spacer",    "height": 12 },
+
+    { "type": "heading",   "text": "Preferences", "level": 2 },
+    { "type": "formField", "fieldType": "radio",    "name": "contactBy", "label": "Preferred contact method",
+      "options": ["Email", "Phone", "Post"] },
+    { "type": "formField", "fieldType": "checkbox", "name": "newsletter", "label": "Subscribe to monthly newsletter" },
+    { "type": "formField", "fieldType": "checkbox", "name": "consent",    "label": "I agree to the Privacy Policy *" }
+  ],
+  "footerText": "* Required fields",
+  "metadata": {
+    "subject": "Contact form",
+    "keywords": "form, contact, fillable"
+  }
+}

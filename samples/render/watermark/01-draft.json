@@ -1,0 +1,36 @@
+{
+  "title": "Draft Document Indicator",
+  "blocks": [
+    { "type": "heading",   "text": "Document Status: DRAFT", "level": 1 },
+    { "type": "paragraph", "text": "This document is marked as DRAFT with a diagonal watermark overlay. The status indicator appears both in the visual watermark and in the document metadata." },
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Document Information", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Status: Draft (not for distribution)",
+        "Purpose: Internal review and testing",
+        "Visibility: Marked with prominent watermark overlay",
+        "Next Step: Convert to final version after approval",
+        "Distribution: Limited to authorized reviewers only"
+    ]},
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Review Instructions", "level": 2 },
+    { "type": "paragraph", "text": "Before finalizing this document, please review all sections for accuracy and completeness. The DRAFT watermark indicates this document is not yet in its final form. Send feedback to the document owner." }
+  ],
+  "footerText": "DRAFT — For Review Only — Version 0.1",
+  "metadata": {
+    "subject": "Draft document with watermark indicator",
+    "keywords": "draft, review, watermark, internal"
+  },
+  "layout": {
+    "watermark": {
+      "text": {
+        "text": "DRAFT",
+        "opacity": 0.35,
+        "angle": -45,
+        "fontSize": 72,
+        "color": "#FF6B6B"
+      },
+      "position": "background"
+    }
+  }
+}

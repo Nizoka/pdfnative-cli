@@ -1,0 +1,68 @@
+{
+  "title": "pdfnative-cli — Technical Specification",
+  "blocks": [
+    { "type": "heading", "text": "pdfnative-cli — Technical Specification", "level": 1 },
+    { "type": "paragraph", "text": "Version 0.1.0 — April 2026" },
+    { "type": "spacer", "height": 12 },
+
+    { "type": "heading", "text": "1. Overview", "level": 2 },
+    { "type": "paragraph", "text": "pdfnative-cli is the official command-line interface for the pdfnative PDF generation library. It exposes three commands: render, sign, and inspect." },
+
+    { "type": "heading", "text": "2. Architecture", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "src/index.ts — entry point and command dispatcher",
+        "src/commands/render.ts — JSON → PDF",
+        "src/commands/sign.ts — digital signature",
+        "src/commands/inspect.ts — PDF metadata analysis",
+        "src/utils/ — argument parser, I/O helpers, error types",
+        "src/core-bridge/ — selective pdfnative re-exports"
+    ]},
+    { "type": "spacer", "height": 12 },
+
+    { "type": "heading", "text": "3. Block Types Supported", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "heading: text, level (1–3) — Section headings",
+        "paragraph: text, fontSize, align — Body copy",
+        "list: items, style (bullet|numbered) — Bullet or numbered",
+        "spacer: height — Vertical whitespace",
+        "pageBreak: — Force new page",
+        "barcode: format, data, width, height — QR, Code128, EAN-13, etc.",
+        "link: text, url — Clickable hyperlink",
+        "toc: title, maxLevel — Auto table of contents",
+        "formField: fieldType, name, label — Interactive AcroForm field"
+    ]},
+    { "type": "spacer", "height": 12 },
+
+    { "type": "heading", "text": "4. CLI Flags", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "[render] --input <file> — JSON file path (default: stdin)",
+        "[render] --output <file> — PDF output path (default: stdout)",
+        "[render] --stream — Use streaming output (AsyncGenerator)",
+        "[render] --conformance 1b|2b|3b — Set PDF/A conformance level",
+        "[sign] --input <file> — Input PDF path (required)",
+        "[sign] --output <file> — Signed PDF output path",
+        "[sign] --key <file> — PEM private key (or PDFNATIVE_SIGN_KEY)",
+        "[sign] --cert <file> — PEM certificate (or PDFNATIVE_SIGN_CERT)",
+        "[inspect] --input <file> — PDF file path (default: stdin)",
+        "[inspect] --format json|text — Output format (default: json)"
+    ]},
+    { "type": "spacer", "height": 12 },
+
+    { "type": "heading", "text": "5. Security Guarantees", "level": 2 },
+    { "type": "list", "style": "numbered", "items": [
+        "Signing keys are never logged — not in errors, not in debug output.",
+        "Path traversal prevention on all file path arguments.",
+        "JSON input is capped at 50 MB before parsing.",
+        "Signed NPM build via GitHub Actions OIDC (provenance)."
+    ]},
+    { "type": "spacer", "height": 20 },
+    { "type": "paragraph", "text": "See https://github.com/Nizoka/pdfnative-cli for full documentation.", "align": "center", "fontSize": 9 }
+  ],
+  "footerText": "pdfnative-cli — Technical Specification — v0.1.0",
+  "metadata": {
+    "author": "pdfnative-cli",
+    "subject": "Technical specification for pdfnative-cli",
+    "keywords": "technical, specification, CLI, pdfnative"
+
+  }
+}

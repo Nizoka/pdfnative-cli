@@ -1,0 +1,45 @@
+{
+  "title": "Financial Summary — Q1 2026",
+  "blocks": [
+    { "type": "heading", "text": "Financial Summary — Q1 2026", "level": 1 },
+    { "type": "spacer", "height": 8 },
+
+    { "type": "heading", "text": "Revenue by Region", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "North America: Q1 2025 = $1,200,000 | Q1 2026 = $1,416,000 | YoY = +18.0%",
+        "Europe: Q1 2025 = $880,000 | Q1 2026 = $1,001,200 | YoY = +13.8%",
+        "Asia-Pacific: Q1 2025 = $640,000 | Q1 2026 = $806,400 | YoY = +26.0%",
+        "Latin America: Q1 2025 = $210,000 | Q1 2026 = $241,500 | YoY = +15.0%",
+        "Total: Q1 2025 = $2,930,000 | Q1 2026 = $3,465,100 | YoY = +18.3%"
+    ]},
+    { "type": "spacer", "height": 16 },
+
+    { "type": "heading", "text": "Operating Expenses", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Personnel: Budget = $1,800,000 | Actual = $1,745,000 | Variance = -$55,000",
+        "Cloud & Infra: Budget = $320,000 | Actual = $298,500 | Variance = -$21,500",
+        "Marketing: Budget = $450,000 | Actual = $512,000 | Variance = +$62,000",
+        "R&D: Budget = $600,000 | Actual = $587,000 | Variance = -$13,000",
+        "G&A: Budget = $180,000 | Actual = $172,000 | Variance = -$8,000",
+        "Total OpEx: Budget = $3,350,000 | Actual = $3,314,500 | Variance = -$35,500"
+    ]},
+    { "type": "spacer", "height": 16 },
+
+    { "type": "heading", "text": "Key Metrics", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Gross Margin: 61.2% (Benchmark: 58.0%)",
+        "EBITDA Margin: 22.4% (Benchmark: 20.0%)",
+        "Customer Count: 4,820 (Benchmark: 4,600)",
+        "ARR: $13.9M (Benchmark: $13.0M)",
+        "Net Revenue Retention: 114% (Benchmark: 110%)"
+    ]},
+    { "type": "spacer", "height": 12 },
+    { "type": "paragraph", "text": "All figures are unaudited. Subject to final review.", "fontSize": 9, "align": "center" }
+  ],
+  "footerText": "Confidential — Finance Dept — Q1 2026",
+  "metadata": {
+    "author": "Finance Department",
+    "subject": "Q1 2026 Financial Summary",
+    "keywords": "financial, report, revenue, expenses, Q1, 2026"
+  }
+}

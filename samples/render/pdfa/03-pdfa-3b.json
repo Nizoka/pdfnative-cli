@@ -1,0 +1,40 @@
+{
+  "title": "Records Archive — PDF/A-3b",
+  "blocks": [
+    { "type": "heading",   "text": "Records Archive — PDF/A-3b", "level": 1 },
+    { "type": "paragraph", "text": "PDF/A-3b (ISO 19005-3) extends PDF/A-2b by allowing arbitrary file attachments to be embedded in the PDF. This makes it ideal for machine-readable invoices, e-signature packages, and hybrid document workflows." },
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Key Features of PDF/A-3b", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "All PDF/A-2b features included",
+        "Arbitrary file format attachments allowed (XML, JSON, CSV, ZIP, …)",
+        "Widely used for ZUGFeRD and Factur-X e-invoicing",
+        "Accepted by EU electronic invoicing regulations"
+    ]},
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Conformance Levels", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "A (Accessible): Tagged PDF, full accessibility — Documents read by assistive technology",
+        "B (Basic): Minimal visual reproduction — Archival of existing PDFs",
+        "U (Unicode): All text has Unicode equivalents — Text extraction and search"
+    ]},
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Archive Record", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Document ID: REC-2025-001234",
+        "Category: Technical Specification",
+        "Retention: 10 Years",
+        "Archived By: Document Management System",
+        "Archival Date: 2025-01-01"
+    ]}
+  ],
+  "footerText": "Archived — PDF/A-3b — ISO 19005-3",
+  "layout": {
+    "tagged": "pdfa3b"
+  },
+  "metadata": {
+    "author": "pdfnative-cli",
+    "subject": "PDF/A-3b archival format demonstration",
+    "keywords": "pdfa, archival, iso19005, pdfa3b, einvoice"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "title": "Shipping Label — Code 128",
+  "blocks": [
+    { "type": "heading",   "text": "Shipping Label",             "level": 1 },
+    { "type": "paragraph", "text": "Order:   ORD-2026-98712",    "fontSize": 11 },
+    { "type": "paragraph", "text": "Carrier: Express Freight",   "fontSize": 11 },
+    { "type": "paragraph", "text": "Dest:    New York, NY 10001","fontSize": 11 },
+    { "type": "spacer",    "height": 12 },
+    { "type": "barcode",   "format": "code128", "data": "ORD2026-98712-XP", "width": 300, "height": 80 },
+    { "type": "spacer",    "height": 8 },
+    { "type": "paragraph", "text": "ORD2026-98712-XP", "align": "center", "fontSize": 9 }
+  ],
+  "footerText": "Express Freight — Handle with Care",
+  "metadata": {
+    "subject": "Code 128 barcode sample — shipping label"
+  }
+}

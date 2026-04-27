@@ -1,0 +1,14 @@
+{
+  "title": "QR Code — Website Link",
+  "blocks": [
+    { "type": "heading",   "text": "Scan to Visit pdfnative.dev", "level": 2 },
+    { "type": "spacer",    "height": 8 },
+    { "type": "barcode",   "format": "qr", "data": "https://pdfnative.dev", "width": 160 },
+    { "type": "spacer",    "height": 8 },
+    { "type": "paragraph", "text": "https://pdfnative.dev", "align": "center", "fontSize": 10 }
+  ],
+  "footerText": "Generated with pdfnative-cli",
+  "metadata": {
+    "subject": "QR code sample"
+  }
+}

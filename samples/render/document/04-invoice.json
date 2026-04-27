@@ -1,0 +1,42 @@
+{
+  "title": "Invoice #INV-2026-0042",
+  "blocks": [
+    { "type": "heading",   "text": "Invoice",         "level": 1 },
+    { "type": "paragraph", "text": "Invoice #: INV-2026-0042", "fontSize": 11 },
+    { "type": "paragraph", "text": "Date: April 27, 2026",     "fontSize": 11 },
+    { "type": "paragraph", "text": "Due: May 27, 2026",        "fontSize": 11 },
+    { "type": "spacer",    "height": 16 },
+
+    { "type": "heading", "text": "Bill To", "level": 2 },
+    { "type": "paragraph", "text": "Acme Corporation\n123 Main Street\nNew York, NY 10001\nUnited States" },
+    { "type": "spacer", "height": 16 },
+
+    { "type": "heading", "text": "Line Items", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Professional Services — April 2026 | 40 h | $150.00 | $6,000.00",
+        "Platform licence (monthly) | 1 | $499.00 | $499.00",
+        "Cloud infrastructure | 1 | $120.00 | $120.00"
+    ]},
+    { "type": "spacer", "height": 12 },
+
+    { "type": "paragraph", "text": "Subtotal:  $6 619.00", "align": "right", "fontSize": 11 },
+    { "type": "paragraph", "text": "Tax (8%):  $529.52",   "align": "right", "fontSize": 11 },
+    { "type": "paragraph", "text": "Total:     $7 148.52", "align": "right", "fontSize": 13 },
+    { "type": "spacer", "height": 20 },
+
+    { "type": "heading", "text": "Payment Instructions", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Bank transfer to IBAN: GB29 NWBK 6016 1331 9268 19",
+        "Reference: INV-2026-0042",
+        "Payment terms: Net 30"
+    ]},
+    { "type": "spacer", "height": 12 },
+    { "type": "paragraph", "text": "Thank you for your business.", "align": "center", "fontSize": 10 }
+  ],
+  "footerText": "Acme Corp — accounts@acme.example — +1 212 555 0100",
+  "metadata": {
+    "author": "Acme Corp",
+    "subject": "Invoice INV-2026-0042",
+    "keywords": "invoice, billing, accounting"
+  }
+}

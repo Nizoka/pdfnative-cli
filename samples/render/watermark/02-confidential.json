@@ -1,0 +1,42 @@
+{
+  "title": "Confidential Report",
+  "blocks": [
+    { "type": "heading",   "text": "CONFIDENTIAL — Restricted Distribution", "level": 1 },
+    { "type": "paragraph", "text": "This document contains confidential information with prominent watermark overlay. Access is strictly limited to authorized recipients only. The diagonal CONFIDENTIAL watermark indicates sensitive content." },
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Executive Summary", "level": 2 },
+    { "type": "paragraph", "text": "Strategic planning document for FY2026 organizational initiatives. Classification: CONFIDENTIAL." },
+    { "type": "spacer",    "height": 8 },
+    { "type": "list", "style": "bullet", "items": [
+        "Initiative 1: Digital transformation strategy",
+        "Initiative 2: Market expansion plan",
+        "Initiative 3: Operational efficiency improvements"
+    ]},
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Distribution & Security", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Recipients: Executive leadership only",
+        "Sharing: Prohibited without written approval",
+        "Physical security: Keep in locked storage",
+        "Digital security: Do not forward by email without encryption",
+        "Retention period: Destroy 5 years after document date"
+    ]}
+  ],
+  "footerText": "CONFIDENTIAL — Authorized Distribution Only",
+  "metadata": {
+    "subject": "Confidential Report",
+    "keywords": "confidential, restricted"
+  },
+  "layout": {
+    "watermark": {
+      "text": {
+        "text": "CONFIDENTIAL",
+        "opacity": 0.7,
+        "angle": -30,
+        "fontSize": 88,
+        "color": "#CC0000"
+      },
+      "position": "background"
+    }
+  }
+}

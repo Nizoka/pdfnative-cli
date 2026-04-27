@@ -1,0 +1,27 @@
+{
+  "title": "Project Status Report",
+  "blocks": [
+    { "type": "heading", "text": "Project Status Report", "level": 1 },
+    { "type": "paragraph", "text": "Week ending April 27, 2026" },
+    { "type": "spacer", "height": 12 },
+    { "type": "heading", "text": "Task Plan", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Database migration (Alice) — Done — Due Apr 15",
+        "API redesign (Bob) — In Progress — Due Apr 30",
+        "Frontend integration (Carol) — Blocked — Due May 05",
+        "Load testing (Dave) — Not Started — Due May 10",
+        "Security audit (Eve) — In Progress — Due May 15",
+        "Documentation update (Frank) — Done — Due Apr 20",
+        "Deployment to staging (Alice) — In Progress — Due Apr 28",
+        "Stakeholder demo (Bob) — Not Started — Due May 01"
+    ]},
+    { "type": "spacer", "height": 16 },
+    { "type": "paragraph", "text": "Legend: Done = completed, In Progress = active, Blocked = awaiting dependency, Not Started = scheduled.", "fontSize": 9 }
+  ],
+  "footerText": "Project Report — Week 17 — April 27, 2026",
+  "metadata": {
+    "author": "Project Management Office",
+    "subject": "Weekly project status",
+    "keywords": "project, status, tasks, report"
+  }
+}

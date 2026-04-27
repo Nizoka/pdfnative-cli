@@ -1,0 +1,31 @@
+{
+  "title": "Policy Document — PDF/A-1b",
+  "blocks": [
+    { "type": "heading",   "text": "Archival Policy Document — PDF/A-1b", "level": 1 },
+    { "type": "paragraph", "text": "This document is generated in PDF/A-1b format (ISO 19005-1), the baseline archival PDF standard. PDF/A-1b ensures that the document can be faithfully reproduced at any point in the future, even without the original authoring application." },
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "What PDF/A-1b Guarantees", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "All fonts are fully embedded in the file.",
+        "No external content or encrypted streams.",
+        "Colour spaces are device-independent (ICC-based).",
+        "PDF version: 1.4."
+    ]},
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "How to Generate", "level": 2 },
+    { "type": "paragraph", "text": "Use the CLI --conformance 1b flag, or set layout.tagged to 'pdfa1b' in the JSON input." },
+    { "type": "list", "style": "numbered", "items": [
+        "CLI: pdfnative render --input doc.json --output archived.pdf --conformance 1b",
+        "JSON: set \\\"layout\\\": { \\\"tagged\\\": \\\"pdfa1b\\\" } in your DocumentParams"
+    ]}
+  ],
+  "footerText": "Archived — PDF/A-1b — ISO 19005-1",
+  "layout": {
+    "tagged": "pdfa1b"
+  },
+  "metadata": {
+    "author": "pdfnative-cli",
+    "subject": "PDF/A-1b archival format demonstration",
+    "keywords": "pdfa, archival, iso19005, pdfa1b"
+  }
+}

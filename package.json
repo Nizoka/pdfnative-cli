@@ -1,0 +1,77 @@
+{
+  "name": "pdfnative-cli",
+  "version": "0.1.0",
+  "description": "Official CLI for pdfnative — render JSON to PDF, sign, and inspect. Zero extra runtime dependencies.",
+  "type": "module",
+  "bin": {
+    "pdfnative": "./dist/cli.cjs"
+  },
+  "main": "./dist/cli.cjs",
+  "module": "./dist/cli.js",
+  "types": "./dist/cli.d.ts",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc --project tsconfig.test.json --noEmit",
+    "typecheck:all": "npm run typecheck && npm run typecheck:tests",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "pdf",
+    "pdf-generation",
+    "cli",
+    "pdfnative",
+    "pdf-render",
+    "pdf-sign",
+    "pdf-inspect",
+    "zero-dependency",
+    "typescript",
+    "pdf-a",
+    "digital-signature",
+    "command-line"
+  ],
+  "author": "Nizoka <hello@pdfnative.dev> (https://pdfnative.dev)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Nizoka/pdfnative-cli.git"
+  },
+  "homepage": "https://github.com/Nizoka/pdfnative-cli#readme",
+  "bugs": {
+    "url": "https://github.com/Nizoka/pdfnative-cli/issues"
+  },
+  "funding": {
+    "type": "individual",
+    "url": "https://plika.app"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "dependencies": {
+    "pdfnative": "^1.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.1.9",
+    "eslint": "^9.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "typescript-eslint": "^8.57.2",
+    "vitest": "^2.1.9"
+  }
+}

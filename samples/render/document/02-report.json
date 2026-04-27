@@ -1,0 +1,25 @@
+{
+  "title": "Quarterly Report — Q1 2026",
+  "blocks": [
+    { "type": "heading", "text": "Quarterly Report", "level": 1 },
+    { "type": "paragraph", "text": "This report summarises the key financial and operational results for Q1 2026." },
+    { "type": "spacer", "height": 12 },
+    { "type": "heading", "text": "Key Findings", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Revenue increased by 18% year-over-year.",
+        "Customer acquisition cost decreased by 7%.",
+        "Net promoter score reached an all-time high of 72."
+    ]},
+    { "type": "spacer", "height": 12 },
+    { "type": "heading", "text": "Methodology", "level": 2 },
+    { "type": "paragraph", "text": "Data was collected from all regional offices between January and March. Figures are reported in USD and exclude extraordinary items." },
+    { "type": "spacer", "height": 8 },
+    { "type": "paragraph", "text": "Full details are available in the appendix.", "fontSize": 10 }
+  ],
+  "footerText": "Confidential — Q1 2026",
+  "metadata": {
+    "author": "Finance Team",
+    "subject": "Quarterly Business Review",
+    "keywords": "report, Q1, 2026, finance"
+  }
+}

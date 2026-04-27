@@ -1,0 +1,20 @@
+{
+  "title": "A5 Portrait Booklet",
+  "blocks": [
+    { "type": "heading",   "text": "Compact Document Format",  "level": 1 },
+    { "type": "paragraph", "text": "This document is designed with compact formatting suitable for booklets, handouts, and portable references." },
+    { "type": "spacer",    "height": 10 },
+    { "type": "heading",   "text": "Content Reflow", "level": 2 },
+    { "type": "paragraph", "text": "Smaller page formats provide excellent readability for concise content. Text and blocks automatically adapt to available width." },
+    { "type": "spacer",    "height": 8 },
+    { "type": "list", "style": "bullet", "items": [
+        "Optimized for pocket guides",
+        "Ideal for printed flyers and brochures",
+        "Reduces paper consumption"
+    ]}
+  ],
+  "footerText": "Compact Format — pdfnative-cli",
+  "metadata": {
+    "subject": "Compact page format demonstration"
+  }
+}
