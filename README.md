@@ -11,28 +11,38 @@
 [![pdfnative](https://img.shields.io/npm/v/pdfnative?label=pdfnative&color=0066FF)](https://www.npmjs.com/package/pdfnative)
 [![website](https://img.shields.io/badge/pdfnative.dev-0066FF?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxyZWN0IHg9IjMiIHk9IjIiIHdpZHRoPSIxNCIgaGVpZ2h0PSIxOCIgcng9IjIiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMS41Ii8+PHBhdGggZD0iTTcgN2g2TTcgMTFoOE03IDE1aDQiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=)](https://pdfnative.dev)
 
-Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library — render JSON to PDF, apply digital signatures, and inspect PDF conformance, directly from the terminal. Zero extra runtime dependencies.
+Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library — render JSON to PDF, apply digital signatures, verify them, and inspect PDF conformance, directly from the terminal. Zero extra runtime dependencies.
+
+> **What's new in v0.2.0** — full coverage of the `pdfnative` v1.0.5 surface: encryption, watermarks, headers/footers with placeholders, PDF/A-3 attachments, multilingual fonts, table-variant rendering, signing metadata + cert chains, `inspect --verbose / --pages / --check`, and a brand-new `verify` command. **100 % backward-compatible** with v0.1.0 — see [release notes](release-notes/v0.2.0.md).
 
 ## Highlights
 
-- **`render`** — pipe a JSON document definition into a production-ready PDF (streaming supported)
-- **`sign`** — apply RSA or ECDSA digital signatures (CMS/PKCS#7) using key files or environment variables
-- **`inspect`** — analyse any PDF: version, page count, encryption, PDF/A conformance, signature count, metadata
-- **Zero extra dependencies** — `pdfnative` is the only runtime dependency; all PDF logic lives there
-- **Streaming output** — `--stream` on render emits PDF chunks progressively for large documents
-- **Stdin / stdout** — every command reads from stdin and writes to stdout by default, composable in shell pipelines
-- **Secret-safe** — signing keys are loaded from env vars (`PDFNATIVE_SIGN_KEY`/`PDFNATIVE_SIGN_CERT`) and never logged
-- **ESM-first, TypeScript strict** — built with tsup, typed declarations included
-- **NPM provenance** — signed builds via GitHub Actions OIDC
+- **`render`** — pipe a JSON document into a production-ready PDF. Encryption (AES-128/256),
+  watermarks (text + image), page templates, PDF/A archival, multilingual fonts, streaming,
+  and a hybrid `flags + --layout file.json` model for the full `PdfLayoutOptions` surface.
+- **`sign`** — CMS/PKCS#7 digital signatures with full metadata (`--reason`, `--name`,
+  `--location`, `--contact`, `--signing-time`) and intermediate CA chains via
+  `--cert-chain` (repeatable). Keys loaded from env vars or files; never logged.
+- **`inspect`** — PDF version, page count, encryption, PDF/A conformance, signature count,
+  metadata. `--verbose`, `--pages`, and `--check pdfa|signed|encrypted` for CI assertions.
+- **`verify`** _(new in v0.2.0)_ — verify integrity, certificate chains, and trust roots
+  of every CMS/PKCS#7 signature embedded in a PDF. JSON & text output, `--strict` mode.
+- **Zero extra dependencies** — `pdfnative` is the sole runtime dependency.
+- **Stdin / stdout by default** — every command is shell-pipeline friendly.
+- **Secret-safe** — signing keys, certs, encryption passwords never appear in error
+  output or stderr. PEM material redacted; layout-file `attachments[].data` injection blocked.
+- **ESM-first, TypeScript strict** — built with tsup, typed declarations included.
+- **NPM provenance** — signed builds via GitHub Actions OIDC.
 
 ## Supported Features
 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | **Commands** | | |
-| `render` JSON → PDF | ✅ | Streaming, PDF/A conformance, stdin/stdout |
-| `sign` digital signatures | ✅ | RSA + ECDSA,  CMS/PKCS#7, env var secrets |
-| `inspect` PDF metadata | ✅ | Version, pages, encryption, signatures, PDFA |
+| `render` JSON → PDF | ✅ | Streaming, hybrid layout model, multilingual fonts |
+| `sign` digital signatures | ✅ | RSA (CMS/PKCS#7), metadata fields, cert chains |
+| `inspect` PDF metadata | ✅ | `--verbose`, `--pages`, `--check pdfa\|signed\|encrypted` |
+| `verify` signature verification (v0.2.0) | ✅ | Integrity + chain + trust; `--strict`, `--trust` |
 | **Document Blocks** | | |
 | Headings, paragraphs, lists | ✅ | Full text styling support |
 | Tables | ✅ | Headers, rows, multi-page |
@@ -40,17 +50,35 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 | Hyperlinks | ✅ | URL validation, blue underlined text |
 | Form fields | ✅ | Text, checkbox, radio, dropdown, listbox |
 | Page breaks, spacers | ✅ | Explicit pagination control |
-| Table of contents | ✅ | Auto-generated with /GoTo links |
-| **Advanced Layouts** | | |
-| PDF/A archival (1b, 2b, 3b) | ✅ | `--conformance` flag |
+| Table of contents | ✅ | Auto-generated with `/GoTo` links |
+| **Advanced Layouts (v0.2.0)** | | |
+| PDF/A archival (1b, 2b, 2u, 3b) | ✅ | `--tagged pdfa<level>` (preferred) or `--conformance` (deprecated) |
 | Streaming output | ✅ | `--stream` for large documents |
-| Compression | ✅ | Via pdfnative API (50–90% reduction) |
-| Encryption (AES-128/256) | ⚠️ | Not exposed via CLI; use Node.js API |
-| Watermarks | ⚠️ | Not exposed via CLI; use Node.js API |
-| Custom headers/footers | ⚠️ | Not exposed via CLI; use `footerText` property |
-| Custom page sizes | ⚠️ | Not exposed via CLI; use Node.js API |
+| Compression | ✅ | `--compress` flag |
+| Encryption (AES-128/256) | ✅ | `--encrypt-*` flags + env-var precedence |
+| Watermarks (text + image) | ✅ | `--watermark-text`, `--watermark-image`, `--watermark-position` |
+| Headers / footers with placeholders | ✅ | `--header-{l,c,r}`, `--footer-{l,c,r}`, `{page}/{pages}/{date}/{title}` |
+| Custom page sizes | ✅ | `--page-size A4\|Letter\|…` or `WxH` in points |
+| Custom margins | ✅ | `--margin <N>` or `--margin <t,r,b,l>` |
+| PDF/A-3 attachments | ✅ | `--attachment <path>:<mime>:<rel>:<desc>` (repeatable) |
+| Multilingual fonts | ✅ | `--lang th,ja,ar` (requires `registerFontLoader()` in wrapper; Latin built-in) |
+| Table-centric variant (`PdfParams`) | ✅ | `--variant table` |
+| Full `PdfLayoutOptions` | ✅ | `--layout <file.json>` |
+| **Signing (v0.2.0)** | | |
+| RSA signatures (rsa-sha256) | ✅ | Default algorithm |
+| ECDSA signatures | ⚠️ | `--algorithm ecdsa-sha256` parsed; stub error pending pdfnative `parseEcPrivateKey` (v0.3.0) |
+| Signature metadata | ✅ | `--reason`, `--name`, `--location`, `--contact`, `--signing-time` |
+| Cert chains (intermediate CAs) | ✅ | `--cert-chain <pem>` (repeatable) or `PDFNATIVE_SIGN_CHAIN` env |
+| **Verification (v0.2.0)** | | |
+| Byte-range integrity (SHA-256) | ✅ | Recomputed and compared with CMS messageDigest attribute |
+| Certificate chain verification | ✅ | Via pdfnative `verifyCertSignature` |
+| Trust roots | ✅ | `--trust <root.pem>` (repeatable) + self-signed acceptance |
+| Full CMS signature-value | ⚠️ | Deferred to v0.3.0 (pending pdfnative API) |
+| OCSP / CRL revocation | ⚠️ | Deferred to v0.3.0+ |
+| RFC 3161 timestamps | ⚠️ | Deferred to v0.3.0+ |
 
-**Note:** Features marked **⚠️** are supported by `pdfnative` but not yet exposed through the CLI JSON interface. Use the `pdfnative` Node.js library directly for these features.
+**Note:** features marked **⚠️** are tracked in [ROADMAP.md](ROADMAP.md). Everything else
+works today.
 
 ## Installation
 
@@ -185,10 +213,29 @@ See [`samples/README.md`](samples/README.md) for full descriptions, block type r
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--input <file>` | stdin | Path to a JSON file containing `DocumentParams` |
+| `--input <file>` | stdin | Path to a JSON file (`DocumentParams` or `PdfParams` if `--variant table`) |
 | `--output <file>` | stdout | Output PDF path |
-| `--stream` | false | Use streaming output (AsyncGenerator) |
-| `--conformance <level>` | — | PDF/A conformance level: `1b`, `2b`, or `3b` |
+| `--stream` | false | Use streaming output (`AsyncGenerator`) |
+| `--variant <kind>` | `document` | `document` (default) or `table` (selects `buildPDFBytes`) |
+| `--layout <file.json>` | — | Load a `Partial<PdfLayoutOptions>` (CLI flags override) |
+| `--page-size <size>` | from layout file or pdfnative default | Named (`a4`, `letter`, `legal`, `a3`, `tabloid`, `a5`) or `WxH` in points |
+| `--margin <N>` or `--margin <t,r,b,l>` | from layout / default | Page margins in points |
+| `--compress` | false | Enable FlateDecode compression |
+| `--tagged <level>` | none | PDF/A: `none`, `pdfa1b`, `pdfa2b`, `pdfa2u`, `pdfa3b` |
+| `--conformance <1b\|2b\|3b>` | — | **Deprecated** — use `--tagged pdfa<level>` |
+| `--watermark-text <s>` / `--watermark-image <path>` | — | Text or image watermark |
+| `--watermark-opacity <0-1>` / `--angle <deg>` / `--color <#hex>` / `--font-size <pt>` | — | Watermark styling |
+| `--watermark-position background\|foreground` | `background` | Render order |
+| `--header-{left,center,right} <tpl>` | — | Header template; placeholders `{page}`, `{pages}`, `{date}`, `{title}` |
+| `--footer-{left,center,right} <tpl>` | — | Footer template; same placeholders |
+| `--encrypt-owner-pass <s>` | `$PDFNATIVE_ENCRYPT_OWNER_PASS` | Owner password (required for any `--encrypt-*`) |
+| `--encrypt-user-pass <s>` | `$PDFNATIVE_ENCRYPT_USER_PASS` | Optional user password |
+| `--encrypt-algorithm aes128\|aes256` | `aes128` | Encryption algorithm |
+| `--encrypt-permissions <list>` | _all denied_ | Comma list: `print,copy,modify,extractText` |
+| `--attachment <path>[:mime[:rel[:desc]]]` _(repeatable)_ | — | PDF/A-3 file attachment |
+| `--lang <code,code>` | — | Activate registered font loaders for non-Latin scripts (`th`, `ja`, `ar`, …); Latin is built-in |
+
+See `samples/render/` for a working example of every category.
 
 ### `pdfnative sign`
 
@@ -196,15 +243,39 @@ See [`samples/README.md`](samples/README.md) for full descriptions, block type r
 |------|---------|-------------|
 | `--input <file>` | — **(required)** | Path to the input PDF |
 | `--output <file>` | stdout | Output signed PDF path |
-| `--key <file>` | `PDFNATIVE_SIGN_KEY` env | Path to PEM private key (env var takes precedence) |
-| `--cert <file>` | `PDFNATIVE_SIGN_CERT` env | Path to PEM certificate (env var takes precedence) |
+| `--key <file>` | `$PDFNATIVE_SIGN_KEY` | Path to PEM private key (env var takes precedence) |
+| `--cert <file>` | `$PDFNATIVE_SIGN_CERT` | Path to PEM certificate (env var takes precedence) |
+| `--cert-chain <file>` _(repeatable)_ | `$PDFNATIVE_SIGN_CHAIN` | Intermediate CA PEMs |
+| `--algorithm rsa-sha256\|ecdsa-sha256` | `rsa-sha256` | Signature algorithm. _ECDSA stubbed in v0.2.0; tracked for v0.3.0._ |
+| `--reason <s>` | — | Reason for signing (PDF metadata) |
+| `--name <s>` | — | Signer name (PDF metadata) |
+| `--location <s>` | — | Signing location (PDF metadata) |
+| `--contact <s>` | — | Signer contact (PDF metadata) |
+| `--signing-time <ISO 8601>` | now | Explicit signing timestamp |
 
 ### `pdfnative inspect`
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--input <file>` | stdin | Path to the PDF to inspect |
-| `--format <fmt>` | `json` | Output format: `json` or `text` |
+| `--output <file>` | stdout | Output report path |
+| `--format json\|text` | `json` | Output format |
+| `--verbose` | false | Add trailer keys, catalog keys, object count, XMP |
+| `--pages` | false | Add per-page metadata array |
+| `--check pdfa\|signed\|encrypted` _(repeatable)_ | — | CI-friendly assertion; sets exit code (0 = pass, 1 = fail) |
+
+### `pdfnative verify` _(new in v0.2.0)_
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--input <file>` | stdin | Path to the (possibly signed) PDF |
+| `--format json\|text` | `json` | Output format |
+| `--strict` | false | Exit 1 on any failure or zero signatures (CI-friendly) |
+| `--trust <root.pem>` _(repeatable)_ | _self-signed only_ | Trusted root certificates (PEM) |
+
+**Scope (v0.2.0):** integrity (byte-range SHA-256) + certificate chain signatures + trust
+evaluation. Full CMS-signature-value verification, OCSP/CRL revocation, and RFC 3161
+timestamp validation are deferred — see [ROADMAP.md](ROADMAP.md).
 
 ## Security
 

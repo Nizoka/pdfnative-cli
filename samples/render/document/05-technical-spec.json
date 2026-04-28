@@ -6,7 +6,7 @@
     { "type": "spacer", "height": 12 },
 
     { "type": "heading", "text": "1. Overview", "level": 2 },
-    { "type": "paragraph", "text": "pdfnative-cli is the official command-line interface for the pdfnative PDF generation library. It exposes three commands: render, sign, and inspect." },
+    { "type": "paragraph", "text": "pdfnative-cli is the official command-line interface for the pdfnative PDF generation library. It exposes four commands: render, sign, inspect, and verify." },
 
     { "type": "heading", "text": "2. Architecture", "level": 2 },
     { "type": "list", "style": "bullet", "items": [

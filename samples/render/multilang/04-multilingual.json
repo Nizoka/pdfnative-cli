@@ -1,0 +1,108 @@
+{
+  "title": "Hello in Many Languages — pdfnative Multilingual Demo",
+  "blocks": [
+    { "type": "heading", "text": "Hello in Many Languages", "level": 1 },
+    {
+      "type": "paragraph",
+      "text": "This document demonstrates pdfnative's ability to render multiple writing systems in a single PDF. Each section below is written in a different language and script, all using Noto Sans font data bundled with pdfnative."
+    },
+    { "type": "spacer", "height": 16 },
+
+    { "type": "heading", "text": "English (Latin)", "level": 2 },
+    {
+      "type": "paragraph",
+      "text": "Hello, World! Welcome to pdfnative — a zero-dependency PDF generation library for Node.js, Bun, and Deno. Latin script uses the built-in Helvetica font; no loader registration required."
+    },
+    { "type": "spacer", "height": 8 },
+
+    { "type": "heading", "text": "ภาษาไทย (Thai)", "level": 2 },
+    {
+      "type": "paragraph",
+      "text": "สวัสดีชาวโลก! ยินดีต้อนรับสู่ pdfnative ระบบนี้รองรับการแสดงผลข้อความภาษาไทยโดยใช้ฟอนต์ Noto Sans Thai ซึ่งรองรับการเชื่อมต่อพยัญชนะและวรรณยุกต์อย่างถูกต้อง"
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "สวัสดี — Hello (สวัสดีครับ for men, สวัสดีค่ะ for women)",
+        "ขอบคุณ — Thank you (ขอบคุณมาก = thank you very much)",
+        "ใช่ / ไม่ใช่ — Yes / No",
+        "ฉันไม่เข้าใจ — I don't understand",
+        "พูดภาษาอังกฤษได้ไหม — Do you speak English?"
+      ]
+    },
+    { "type": "spacer", "height": 8 },
+
+    { "type": "heading", "text": "日本語 (Japanese)", "level": 2 },
+    {
+      "type": "paragraph",
+      "text": "こんにちは、世界！pdfnativeへようこそ。Noto Sans JPフォントを使用して、ひらがな・カタカナ・漢字を含む日本語テキストを正確にレンダリングします。"
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "こんにちは — Konnichiwa (Hello)",
+        "ありがとうございます — Arigatou gozaimasu (Thank you very much)",
+        "はい / いいえ — Hai / Iie (Yes / No)",
+        "わかりません — Wakarimasen (I don't understand)",
+        "英語を話せますか — Eigo wo hanasemasu ka (Do you speak English?)"
+      ]
+    },
+    { "type": "spacer", "height": 8 },
+
+    { "type": "heading", "text": "العربية (Arabic)", "level": 2 },
+    {
+      "type": "paragraph",
+      "text": "مرحباً بالعالم! أهلاً وسهلاً بكم في pdfnative. يدعم النظام الكتابة العربية من اليمين إلى اليسار مع تشكيل الحروف الكامل باستخدام خوارزمية GSUB."
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "مرحباً — Marhaba (Hello)",
+        "شكراً جزيلاً — Shukran jazilan (Thank you very much)",
+        "نعم / لا — Na'am / La (Yes / No)",
+        "لا أفهم — La afham (I don't understand)",
+        "هل تتكلم الإنجليزية — Do you speak English?"
+      ]
+    },
+    { "type": "spacer", "height": 8 },
+
+    { "type": "heading", "text": "Русский язык (Russian / Cyrillic)", "level": 2 },
+    {
+      "type": "paragraph",
+      "text": "Привет, мир! Добро пожаловать в pdfnative. Кириллица поддерживается через шрифт Noto Sans (кириллический набор), который включает полный русский алфавит."
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "Привет / Здравствуйте — Hello (informal / formal)",
+        "Спасибо большое — Thank you very much",
+        "Да / Нет — Yes / No",
+        "Я не понимаю — I don't understand",
+        "Вы говорите по-английски? — Do you speak English?"
+      ]
+    },
+    { "type": "spacer", "height": 16 },
+
+    { "type": "heading", "text": "Font Loader Summary", "level": 2 },
+    {
+      "type": "table",
+      "headers": ["Language", "Code", "pdfnative font package", "Script direction"],
+      "rows": [
+        { "cells": ["English",  "—",    "built-in Helvetica",                   "LTR"], "type": "normal", "pointed": false },
+        { "cells": ["Thai",     "`th`", "`pdfnative/fonts/noto-thai-data.js`",   "LTR"], "type": "normal", "pointed": false },
+        { "cells": ["Japanese", "`ja`", "`pdfnative/fonts/noto-jp-data.js`",     "LTR"], "type": "normal", "pointed": false },
+        { "cells": ["Arabic",   "`ar`", "`pdfnative/fonts/noto-arabic-data.js`", "RTL"], "type": "normal", "pointed": false },
+        { "cells": ["Russian",  "`ru`", "`pdfnative/fonts/noto-cyrillic-data.js`","LTR"],"type": "normal", "pointed": false }
+      ]
+    }
+  ],
+  "metadata": {
+    "author": "Nizoka Technologies",
+    "subject": "Multilingual PDF demo — Thai, Japanese, Arabic, Russian",
+    "keywords": "multilang, thai, japanese, arabic, russian, noto, pdfnative"
+  }
+}

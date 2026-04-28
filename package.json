@@ -1,7 +1,7 @@
 {
   "name": "pdfnative-cli",
-  "version": "0.1.0",
-  "description": "Official CLI for pdfnative — render JSON to PDF, sign, and inspect. Zero extra runtime dependencies.",
+  "version": "0.2.0",
+  "description": "Official CLI for pdfnative — render JSON to PDF, sign, inspect, and verify. Zero extra runtime dependencies.",
   "type": "module",
   "bin": {
     "pdfnative": "./dist/cli.cjs"
@@ -63,7 +63,7 @@
     "provenance": true
   },
   "dependencies": {
-    "pdfnative": "^1.0.4"
+    "pdfnative": "^1.0.5"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

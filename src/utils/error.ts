@@ -23,3 +23,17 @@ export function die(message: string, exitCode = 1): never {
     process.stderr.write(message + '\n');
     process.exit(exitCode);
 }
+
+/**
+ * Emit a single deprecation warning to stderr.
+ * Idempotent per (name) within a process — repeated calls produce one line.
+ *
+ * @param name        - Deprecated flag/feature name (without leading dashes).
+ * @param replacement - Suggested replacement (e.g. another flag name).
+ */
+const _deprecateSeen = new Set<string>();
+export function deprecate(name: string, replacement: string): void {
+    if (_deprecateSeen.has(name)) return;
+    _deprecateSeen.add(name);
+    process.stderr.write(`warning: --${name} is deprecated; use ${replacement} instead.\n`);
+}

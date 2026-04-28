@@ -40,6 +40,16 @@ export async function readFileOrStdin(filePath: string | undefined): Promise<Buf
 }
 
 /**
+ * Read a binary file by path. Used for image / attachment / cert payloads.
+ * Path-traversal validated before access.
+ */
+export async function readBinaryFile(filePath: string): Promise<Uint8Array> {
+    validatePath(filePath);
+    const buf = await readFile(filePath);
+    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+}
+
+/**
  * Enforce the 50 MB JSON input size limit on a buffer.
  * Throws CliError if the buffer exceeds the limit.
  */

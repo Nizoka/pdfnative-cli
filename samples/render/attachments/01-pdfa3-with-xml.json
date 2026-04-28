@@ -1,0 +1,24 @@
+{
+  "title": "Hybrid Invoice — PDF/A-3 with embedded XML",
+  "blocks": [
+    { "type": "heading",   "text": "Invoice INV-2026-001", "level": 1 },
+    { "type": "paragraph", "text": "This PDF/A-3b document embeds a structured XML payload (machine-readable invoice line items) as an attachment. The pattern is used by Factur-X and ZUGFeRD e-invoicing." },
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Line items", "level": 2 },
+    { "type": "table",
+      "headers": ["Description", "Qty", "Unit", "Total"],
+      "rows": [
+        { "cells": ["Annual licence",      "1", "$1,200.00", "$1,200.00"], "type": "normal", "pointed": false },
+        { "cells": ["Premium support",     "1",   "$300.00",   "$300.00"], "type": "normal", "pointed": false },
+        { "cells": ["Onboarding workshop", "2",   "$450.00",   "$900.00"], "type": "normal", "pointed": false }
+      ]
+    },
+    { "type": "spacer",    "height": 12 },
+    { "type": "paragraph", "text": "Total due: $2,400.00 — net 30." }
+  ],
+  "footerText": "PDF/A-3b — embedded invoice XML",
+  "metadata": {
+    "subject": "Hybrid invoice with embedded structured data",
+    "keywords": "pdfa3, attachment, einvoice, facturx, zugferd"
+  }
+}

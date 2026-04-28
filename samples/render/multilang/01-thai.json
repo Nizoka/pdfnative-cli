@@ -1,0 +1,21 @@
+{
+  "title": "Multilingual Font Support — Custom Loader Demo",
+  "blocks": [
+    { "type": "heading",   "text": "Multilingual Font Support", "level": 1 },
+    { "type": "paragraph", "text": "pdfnative-cli supports non-Latin scripts (Thai, Japanese, Arabic, Devanagari, etc.) via the --lang flag, which activates a programmatically registered font loader." },
+    { "type": "spacer",    "height": 8 },
+    { "type": "heading",   "text": "How to enable Thai (--lang th)", "level": 2 },
+    { "type": "paragraph", "text": "Font loaders for non-Latin scripts must be registered programmatically before building a PDF. Example: call registerFonts({ th: () => import('pdfnative/fonts/noto-thai-data.js') }) in a Node.js wrapper script, then call buildDocumentPDFBytes with fontEntries injected after awaiting loadFontData('th'). See 03-thai.js for a complete working example." },
+    { "type": "spacer",    "height": 8 },
+    { "type": "heading",   "text": "Supported script detection", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Latin (built-in Helvetica) — no loader required",
+        "Thai, Japanese, Arabic, Devanagari — call registerFonts({ lang: () => import('pdfnative/fonts/noto-<lang>-data.js') })",
+        "Automatic script detection: pdfnative picks the correct registered font per text run"
+    ]}
+  ],
+  "metadata": {
+    "subject": "Multilingual font support — loader registration pattern",
+    "keywords": "multilang, fonts, thai, japanese, noto, loader"
+  }
+}

@@ -5,10 +5,11 @@ message: >-
 title: "pdfnative-cli — Official CLI for the pdfnative PDF generation library"
 abstract: >-
   A zero-dependency command-line interface for pdfnative — a pure-TypeScript,
-  ISO 32000-1 compliant PDF generation library. pdfnative-cli exposes three
+  ISO 32000-1 compliant PDF generation library. pdfnative-cli exposes four
   composable commands: render (JSON → PDF, including PDF/A conformance and
   streaming output), sign (CMS/PKCS#7 digital signatures via RSA or ECDSA),
-  and inspect (structured PDF metadata analysis). Designed for shell
+  inspect (structured PDF metadata analysis), and verify (CMS/PKCS#7 signature
+  verification with certificate chain and trust evaluation). Designed for shell
   pipelines, CI/CD automation, and server-side document generation.
 type: software
 authors:
@@ -18,8 +19,8 @@ authors:
 repository-code: "https://github.com/Nizoka/pdfnative-cli"
 url: "https://pdfnative.dev"
 license: MIT
-version: 0.1.0
-date-released: "2026-04-27"
+version: 0.2.0
+date-released: "2026-04-28"
 keywords:
   - pdf
   - cli
