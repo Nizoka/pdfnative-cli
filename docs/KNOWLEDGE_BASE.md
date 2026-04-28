@@ -8,7 +8,7 @@
 ## 1. Context
 
 **What is pdfnative-cli?**
-The official command-line interface for [`pdfnative`](https://github.com/Nizoka/pdfnative) — a zero-dependency, ISO 32000-1 compliant PDF generation library. The CLI exposes three commands: `render`, `sign`, `inspect`.
+The official command-line interface for [`pdfnative`](https://github.com/Nizoka/pdfnative) — a zero-dependency, ISO 32000-1 compliant PDF generation library. The CLI exposes four commands: `render`, `sign`, `inspect`, `verify`.
 
 **Philosophy:**
 - Zero extra runtime dependencies — `pdfnative` is the *only* dependency.
@@ -31,11 +31,14 @@ src/
 ├── commands/
 │   ├── render.ts         # JSON → PDF (buildDocumentPDFBytes / streamDocumentPdf)
 │   ├── sign.ts           # PDF + key/cert → signPdfBytes
-│   └── inspect.ts        # PDF → PdfReader → metadata JSON/text
+│   ├── inspect.ts        # PDF → PdfReader → metadata JSON/text
+│   └── verify.ts         # PDF → CMS signature verification (integrity, chain, trust)
 ├── utils/
 │   ├── args.ts           # Zero-dep argument parser
 │   ├── io.ts             # stdin/stdout/file I/O helpers
-│   └── error.ts          # CliError class + die() helper
+│   ├── layout.ts         # Layout option composer (CLI flags + --layout file merge)
+│   ├── keys.ts           # PEM / PEM-chain loader (key-material redaction on error)
+│   └── error.ts          # CliError class + die() + deprecate() helpers
 └── core-bridge/
     └── index.ts          # Selective re-exports from pdfnative
 ```
@@ -68,6 +71,14 @@ src/index.ts
                     openPdf(bytes) → PdfReader
                     extract: version, pageCount, encrypted, pdfaConformance, signatures, metadata
                     JSON.stringify or text table → process.stdout.write
+    │
+    └── verify   → src/commands/verify.ts
+                    readFileOrStdin(--input) [PDF bytes]
+                    openPdf(bytes) → PdfReader
+                    extract CMS signatures → verify byte-range SHA-256
+                    verifyCertSignature() per signer → trust evaluation against --trust roots
+                    JSON.stringify or text table → process.stdout.write
+                    --strict → exit 1 on any failure or zero signatures
 ```
 
 ---
@@ -101,13 +112,15 @@ Re-exports the minimum pdfnative surface needed by commands:
 
 ```typescript
 // Render
-export { buildDocumentPDFBytes, buildDocumentPDFStream } from 'pdfnative';
+export { buildDocumentPDFBytes, buildDocumentPDFStream, buildPDFBytes, buildPDFStream } from 'pdfnative';
 // Sign
-export { signPdfBytes, parseRsaPrivateKey, parseCertificate } from 'pdfnative';
-// Inspect
-export { openPdf } from 'pdfnative';
+export { signPdfBytes, parseRsaPrivateKey, parseCertificate, pemToDer } from 'pdfnative';
+// Inspect / Verify
+export { openPdf, verifyCertSignature } from 'pdfnative';
+// Font loading (multilingual)
+export { registerFont, registerFonts, loadFontData, hasFontLoader } from 'pdfnative';
 // Types
-export type { DocumentParams, PdfSignOptions, PdfReader, RsaPrivateKey, X509Certificate } from 'pdfnative';
+export type { DocumentParams, PdfParams, PdfLayoutOptions, FontEntry, FontData, PdfSignOptions, PdfReader, RsaPrivateKey, X509Certificate } from 'pdfnative';
 ```
 
 This keeps the rest of the CLI decoupled from pdfnative internal paths.
@@ -218,6 +231,55 @@ See [`samples/`](../samples/) for complete working examples of every supported b
 **Security:** JSON buffer size is checked before parse. If > 50 MB → `CliError(exit 1)`.
 
 **Streaming behaviour:** When `--stream` is set, the command uses `streamDocumentPdf()` and writes each `Uint8Array` chunk immediately to the output. Compatible with piping to file compression tools.
+
+**Multilingual rendering (`--lang` flag):**
+
+The `--lang <code,code>` flag tells pdfnative which font loaders to activate. Because the CLI process starts fresh for every invocation, font loaders must be registered programmatically **before** the render call. The recommended pattern is a thin Node.js wrapper script:
+
+```js
+// myscript.js (Node.js >= 20, ESM)
+import { registerFonts, loadFontData, buildDocumentPDFBytes } from 'pdfnative';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readFileSync, writeFileSync } from 'node:fs';
+
+// Locate pdfnative's bundled fonts (works with npm / pnpm / Yarn)
+const fontsDir = join(dirname(fileURLToPath(import.meta.resolve('pdfnative'))), '..', 'fonts');
+const fontUrl  = (name) => pathToFileURL(join(fontsDir, name)).href;
+
+// Register the font loaders (lazy — loaded on first use, then cached)
+registerFonts({
+  th: () => import(fontUrl('noto-thai-data.js')),   // Thai
+  ja: () => import(fontUrl('noto-jp-data.js')),     // Japanese
+  ar: () => import(fontUrl('noto-arabic-data.js')), // Arabic (RTL)
+});
+
+// Load font data (async)
+const [thFont, jaFont, arFont] = await Promise.all([
+  loadFontData('th'), loadFontData('ja'), loadFontData('ar'),
+]);
+
+// Build fontEntries for DocumentParams
+const fontEntries = [
+  thFont && { fontData: thFont, fontRef: '/F3', lang: 'th' },
+  jaFont && { fontData: jaFont, fontRef: '/F4', lang: 'ja' },
+  arFont && { fontData: arFont, fontRef: '/F5', lang: 'ar' },
+].filter(Boolean);
+
+// Parse the JSON document and inject font entries
+const params = JSON.parse(readFileSync('my-doc.json', 'utf-8'));
+params.fontEntries = fontEntries;
+
+// Render (synchronous) — pdfnative automatically routes each text run to the correct font
+const pdf = buildDocumentPDFBytes(params);
+writeFileSync('output.pdf', pdf);
+```
+
+All Noto font data packages (`noto-thai-data.js`, `noto-jp-data.js`, `noto-arabic-data.js`, `noto-cyrillic-data.js`, `noto-devanagari-data.js`, and 11 others) are **bundled with pdfnative ≥ 1.0.5** — no external file downloads needed.
+
+See [`samples/render/multilang/`](../samples/render/multilang/) for complete working examples:
+- `03-thai.js` + `03-thai.json` — full Thai monthly report
+- `04-multilingual.js` + `04-multilingual.json` — English + Thai + Japanese + Arabic + Russian in one PDF
 
 ---
 
@@ -684,8 +746,9 @@ const pdf = buildDocumentPDFBytes(
 | `render` | Create a new PDF | JSON | PDF binary |
 | `inspect` | Analyze an existing PDF | PDF binary | JSON/text metadata |
 | `sign` | Add digital signature | Existing PDF | Signed PDF |
+| `verify` | Verify CMS/PKCS#7 signatures | Signed PDF | JSON/text report |
 
-Think of it as: **render** (create) → **sign** (secure) → **inspect** (verify)
+Think of it as: **render** (create) → **sign** (secure) → **inspect** (analyze) → **verify** (validate)
 
 ### How do I debug JSON parsing errors?
 

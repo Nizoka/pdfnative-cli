@@ -136,4 +136,61 @@ describe('sign', () => {
             expect(result.message).not.toContain('ENOENT');
         }
     });
+
+    // ──────────────────────────────────────────────────────────────────
+    // v0.2.0 — new flag coverage
+    // ──────────────────────────────────────────────────────────────────
+
+    it('rejects invalid --algorithm value', async () => {
+        const pdfPath = await makeTestPdf();
+        const err = await sign(parseArgs([
+            '--input', pdfPath,
+            '--algorithm', 'sha512-rsa',
+        ])).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(CliError);
+        expect((err as CliError).exitCode).toBe(2);
+    });
+
+    it('--algorithm ecdsa-sha256 throws clean stub error (not yet wired)', async () => {
+        const pdfPath = await makeTestPdf();
+        const err = await sign(parseArgs([
+            '--input', pdfPath,
+            '--algorithm', 'ecdsa-sha256',
+        ])).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(CliError);
+        expect((err as CliError).exitCode).toBe(2);
+        expect((err as CliError).message).toMatch(/ECDSA/i);
+        // Must never expose key material in the message.
+        expect((err as CliError).message).not.toMatch(/-----BEGIN/);
+    });
+
+    it('rejects invalid --signing-time', async () => {
+        const pdfPath = await makeTestPdf();
+        process.env['PDFNATIVE_SIGN_KEY'] = TEST_KEY_PEM;
+        process.env['PDFNATIVE_SIGN_CERT'] = TEST_CERT_PEM;
+        const err = await sign(parseArgs([
+            '--input', pdfPath,
+            '--signing-time', 'not-a-date',
+        ])).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(CliError);
+        expect((err as CliError).exitCode).toBe(2);
+    });
+
+    it('error messages never contain raw PEM body', async () => {
+        const pdfPath = await makeTestPdf();
+        const garbageKey = path.join(os.tmpdir(), `bad-key-${Date.now()}.pem`);
+        const garbageCert = path.join(os.tmpdir(), `bad-cert-${Date.now()}.pem`);
+        tmpFiles.push(garbageKey, garbageCert);
+        await fs.writeFile(garbageKey, '-----BEGIN RSA PRIVATE KEY-----\nSECRETBYTES==\n-----END RSA PRIVATE KEY-----', 'utf8');
+        await fs.writeFile(garbageCert, '-----BEGIN CERTIFICATE-----\nSECRETBYTES==\n-----END CERTIFICATE-----', 'utf8');
+
+        const err = await sign(parseArgs([
+            '--input', pdfPath,
+            '--key', garbageKey,
+            '--cert', garbageCert,
+        ])).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(CliError);
+        expect((err as CliError).message).not.toContain('SECRETBYTES');
+        expect((err as CliError).message).not.toMatch(/-----BEGIN/);
+    });
 });

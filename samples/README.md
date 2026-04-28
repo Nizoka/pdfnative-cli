@@ -61,9 +61,21 @@ samples/
 │   ├── link/                     Hyperlinks
 │   ├── watermark/                Draft / confidential watermarks
 │   ├── layout/                   Custom page sizes and orientations
-│   └── pdfa/                     PDF/A archival conformance
+│   ├── pdfa/                     PDF/A archival conformance
+│   ├── encryption/               (v0.2.0) AES-128/256 password protection
+│   ├── headers-footers/          (v0.2.0) Page templates with placeholders
+│   ├── attachments/              (v0.2.0) PDF/A-3 hybrid invoice (XML attachment)
+│   ├── multilang/                (v0.2.0) Real Thai + multilingual PDFs; font loader pattern
+│   │   ├── 01-thai.json          (guide) Font loader registration — how to enable Thai
+│   │   ├── 02-japanese.json      (guide) Font loader registration — how to enable Japanese
+│   │   ├── 03-thai.json          Real Thai monthly report (headings, list, table in Thai)
+│   │   ├── 03-thai.js            Node.js driver: registerFonts(th) → render 03-thai.json
+│   │   ├── 04-multilingual.json  Real multilingual doc (EN + Thai + Japanese + Arabic + Russian)
+│   │   └── 04-multilingual.js    Node.js driver: registerFonts(th,ja,ar,ru) → render 04-multilingual.json
+│   └── table-variant/            (v0.2.0) Table-centric PdfParams (--variant table)
 ├── sign/                         Digital signature shell / PowerShell scripts
 ├── inspect/                      PDF inspection shell / PowerShell scripts
+├── verify/                       (v0.2.0) Signature verification shell / PowerShell scripts
 └── streaming/                    Streaming render Node.js scripts
 ```
 
@@ -146,11 +158,146 @@ const pdf = buildDocumentPDFBytes(params, {
 | [02-pdfa-2b.json](render/pdfa/02-pdfa-2b.json) | PDF/A-2b | ISO 19005-2 — transparency, JPEG 2000 |
 | [03-pdfa-3b.json](render/pdfa/03-pdfa-3b.json) | PDF/A-3b | ISO 19005-3 — embedded file attachments |
 
-PDF/A conformance can also be set from the CLI via the `--conformance` flag instead of the JSON `layout.tagged` field:
+PDF/A conformance can also be set from the CLI via the `--tagged` flag (or the deprecated `--conformance` alias) instead of the JSON `layout.tagged` field:
 
 ```bash
-pdfnative render --input doc.json --output doc.pdf --conformance pdfa2b
+# Preferred (v0.2.0+)
+pdfnative render --input doc.json --output doc.pdf --tagged pdfa2b
+
+# Deprecated alias — still works, prints a stderr deprecation notice
+pdfnative render --input doc.json --output doc.pdf --conformance 2b
 ```
+
+### `render/encryption/` — Password Protection (v0.2.0)
+
+| File | Description |
+|------|-------------|
+| [01-aes128-protected.json](render/encryption/01-aes128-protected.json) | Document body for an AES-128 encrypted PDF |
+| [01-aes128-protected.sh](render/encryption/01-aes128-protected.sh) | Bash driver — sets `$PDFNATIVE_ENCRYPT_OWNER_PASS` / `$PDFNATIVE_ENCRYPT_USER_PASS` and calls `--encrypt-algorithm aes128 --encrypt-permissions print` |
+| [01-aes128-protected.ps1](render/encryption/01-aes128-protected.ps1) | PowerShell equivalent |
+
+**Security:** owner / user passwords are read from environment variables first, then `--encrypt-owner-pass` / `--encrypt-user-pass` flags. Encryption is mutually exclusive with `--tagged pdfa*` (ISO 19005 forbids encrypted PDF/A).
+
+### `render/headers-footers/` — Page Templates (v0.2.0)
+
+| File | Description |
+|------|-------------|
+| [01-page-numbers.json](render/headers-footers/01-page-numbers.json) | Multi-page document body |
+| [01-page-numbers.sh](render/headers-footers/01-page-numbers.sh) | Demonstrates `--header-left/-center/-right` and `--footer-*` with `{page}`, `{pages}`, `{date}`, `{title}` placeholders |
+| [01-page-numbers.ps1](render/headers-footers/01-page-numbers.ps1) | PowerShell equivalent |
+
+**Note:** the `{pages}` placeholder requires multi-pass pagination; it is rejected when combined with `--stream`.
+
+### `render/attachments/` — PDF/A-3 Hybrid Documents (v0.2.0)
+
+| File | Description |
+|------|-------------|
+| [01-pdfa3-with-xml.json](render/attachments/01-pdfa3-with-xml.json) | PDF/A-3b invoice body |
+| [invoice.xml](render/attachments/invoice.xml) | Structured payload to embed |
+| [01-pdfa3-with-xml.sh](render/attachments/01-pdfa3-with-xml.sh) | Renders with `--tagged pdfa3b --attachment <path>:<mime>:<rel>:<desc>` |
+| [01-pdfa3-with-xml.ps1](render/attachments/01-pdfa3-with-xml.ps1) | PowerShell equivalent |
+
+This is the Factur-X / ZUGFeRD pattern — a human-readable PDF/A-3 with a machine-readable XML attachment.
+
+### `render/multilang/` — Non-Latin Scripts & Multilingual PDFs (v0.2.0)
+
+pdfnative ships Noto Sans font data for 16 scripts inside the package itself
+(`pdfnative/dist/../fonts/noto-*-data.js`). No external font files, no network
+access, no extra dependencies. Font data is loaded lazily on first use and cached.
+
+Because the pdfnative CLI starts a fresh process per invocation, font loaders must
+be registered via `registerFonts()` **before** the render call — which is only
+possible from a programmatic Node.js context. The two `.js` driver scripts below
+do exactly that and then call `buildDocumentPDFBytes` directly.
+
+#### JSON samples (content + documentation)
+
+| File | Description |
+|------|-------------|
+| [01-thai.json](render/multilang/01-thai.json) | Guide: how to enable Thai rendering via `registerFonts({ th: () => import(...) })` |
+| [02-japanese.json](render/multilang/02-japanese.json) | Guide: how to enable Japanese / CJK rendering |
+| [03-thai.json](render/multilang/03-thai.json) | **Real Thai document** — monthly report with headings, paragraphs, list, table (all in Thai) |
+| [04-multilingual.json](render/multilang/04-multilingual.json) | **Real multilingual document** — English + Thai + Japanese + Arabic (RTL) + Russian in one PDF |
+
+#### Node.js driver scripts (Font loader + render)
+
+| File | Description |
+|------|-------------|
+| [03-thai.js](render/multilang/03-thai.js) | Registers Noto Thai → renders `03-thai.json` → `output/multilang/03-thai.pdf` |
+| [04-multilingual.js](render/multilang/04-multilingual.js) | Registers Thai + Japanese + Arabic + Russian → renders `04-multilingual.json` → `output/multilang/04-multilingual.pdf` |
+| [01-thai.sh](render/multilang/01-thai.sh) | Bash: runs `03-thai.js` then `04-multilingual.js` |
+| [01-thai.ps1](render/multilang/01-thai.ps1) | PowerShell equivalent |
+
+```bash
+# Run Thai sample only
+node samples/render/multilang/03-thai.js
+
+# Run multilingual sample (Thai + Japanese + Arabic + Russian)
+node samples/render/multilang/04-multilingual.js
+
+# Run both via the shell script
+bash samples/render/multilang/01-thai.sh
+```
+
+**Font loader pattern (how it works):**
+
+```js
+import { registerFonts, loadFontData, buildDocumentPDFBytes } from 'pdfnative';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+// Resolve pdfnative's bundled fonts directory (works with any package manager)
+const fontsDir = join(dirname(fileURLToPath(import.meta.resolve('pdfnative'))), '..', 'fonts');
+const fontUrl  = (name) => pathToFileURL(join(fontsDir, name)).href;
+
+// Register loaders (lazy — fonts are not loaded until first use)
+registerFonts({
+  th: () => import(fontUrl('noto-thai-data.js')),    // Thai
+  ja: () => import(fontUrl('noto-jp-data.js')),      // Japanese
+  ar: () => import(fontUrl('noto-arabic-data.js')),  // Arabic (RTL)
+  ru: () => import(fontUrl('noto-cyrillic-data.js')), // Russian
+});
+
+// Load font data (async, cached after first call)
+const thFont = await loadFontData('th');
+
+// Inject into DocumentParams
+const pdf = buildDocumentPDFBytes({
+  blocks: [{ type: 'paragraph', text: 'สวัสดีครับ Hello!' }],
+  fontEntries: thFont ? [{ fontData: thFont, fontRef: '/F3', lang: 'th' }] : [],
+});
+```
+
+**Supported font packages** (all bundled with pdfnative ≥ 1.0.5):
+
+| Language | Code | Font package |
+|----------|------|--------------|
+| Thai | `th` | `noto-thai-data.js` |
+| Japanese | `ja` | `noto-jp-data.js` |
+| Chinese Simplified | `zh` | `noto-sc-data.js` |
+| Korean | `ko` | `noto-kr-data.js` |
+| Arabic | `ar` | `noto-arabic-data.js` |
+| Russian / Cyrillic | `ru` | `noto-cyrillic-data.js` |
+| Hindi / Devanagari | `hi` | `noto-devanagari-data.js` |
+| Hebrew | `he` | `noto-hebrew-data.js` |
+| Greek | `el` | `noto-greek-data.js` |
+| Turkish | `tr` | `noto-turkish-data.js` |
+| Vietnamese | `vi` | `noto-vietnamese-data.js` |
+| Polish | `pl` | `noto-polish-data.js` |
+| Bengali | `bn` | `noto-bengali-data.js` |
+| Tamil | `ta` | `noto-tamil-data.js` |
+| Georgian | `ka` | `noto-georgian-data.js` |
+| Armenian | `hy` | `noto-armenian-data.js` |
+
+### `render/table-variant/` — Table-centric API (v0.2.0)
+
+| File | Description |
+|------|-------------|
+| [01-financial-transactions.json](render/table-variant/01-financial-transactions.json) | `PdfParams` payload — title, infoItems, headers, rows, balanceText, countText, footerText |
+| [01-financial-transactions.sh](render/table-variant/01-financial-transactions.sh) | Driver using `--variant table` |
+| [01-financial-transactions.ps1](render/table-variant/01-financial-transactions.ps1) | PowerShell equivalent |
+
+`--variant table` switches the renderer to `buildPDFBytes` / `buildPDFStream`, which accept the lower-level `PdfParams` shape (suitable for ledger / transactional reports).
 
 ---
 
@@ -162,6 +309,8 @@ Demonstrate the `pdfnative sign` command. Both Unix shell and PowerShell scripts
 |--------|-------------|
 | [sign/01-basic.sh](sign/01-basic.sh) | Render a PDF, generate a self-signed certificate, then sign it (Bash) |
 | [sign/01-basic.ps1](sign/01-basic.ps1) | Same workflow for Windows PowerShell |
+| [sign/02-with-metadata.sh](sign/02-with-metadata.sh) | (v0.2.0) Sign with `--reason`, `--name`, `--location`, `--contact`, `--signing-time` (Bash) |
+| [sign/02-with-metadata.ps1](sign/02-with-metadata.ps1) | (v0.2.0) PowerShell equivalent |
 
 **Prerequisites:** `openssl` on your PATH (ships with Git for Windows).
 
@@ -187,6 +336,25 @@ Demonstrate the `pdfnative inspect` command.
 | [inspect/01-json.ps1](inspect/01-json.ps1) | Same for Windows PowerShell |
 | [inspect/02-text.sh](inspect/02-text.sh) | Inspect a PDF/A document, print human-readable text to stdout (Bash) |
 | [inspect/02-text.ps1](inspect/02-text.ps1) | Same for Windows PowerShell |
+| [inspect/03-verbose-pages.sh](inspect/03-verbose-pages.sh) | (v0.2.0) `--verbose` + `--pages` deep inspection report |
+| [inspect/03-verbose-pages.ps1](inspect/03-verbose-pages.ps1) | (v0.2.0) PowerShell equivalent |
+| [inspect/04-check-pdfa.sh](inspect/04-check-pdfa.sh) | (v0.2.0) Assert PDF/A conformance via `--check pdfa` (CI-friendly exit code) |
+| [inspect/04-check-pdfa.ps1](inspect/04-check-pdfa.ps1) | (v0.2.0) PowerShell equivalent |
+
+---
+
+## Verify Samples (v0.2.0)
+
+Demonstrate the new `pdfnative verify` command — verifies CMS/PKCS#7 signatures embedded in a PDF (integrity, certificate chain, and trust evaluation).
+
+| Script | Description |
+|--------|-------------|
+| [verify/01-self-signed.sh](verify/01-self-signed.sh) | Verify a PDF signed with a self-signed certificate (Bash) |
+| [verify/01-self-signed.ps1](verify/01-self-signed.ps1) | PowerShell equivalent |
+| [verify/02-strict-mode.sh](verify/02-strict-mode.sh) | `--strict` mode — exits non-zero if any signature fails (CI-friendly) |
+| [verify/02-strict-mode.ps1](verify/02-strict-mode.ps1) | PowerShell equivalent |
+
+**Scope (v0.2.0):** verify checks **integrity** (byte-range SHA-256), **certificate chain signatures** (via pdfnative `verifyCertSignature`), and **trust** (against `--trust <root.pem>` PEM roots, or self-signed acceptance). Full CMS-signature-value verification, OCSP/CRL revocation, and RFC 3161 timestamp validation are deferred until pdfnative exposes the corresponding primitives — see [ROADMAP.md](../ROADMAP.md).
 
 ---
 

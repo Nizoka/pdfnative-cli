@@ -1,86 +1,100 @@
-import { readFile } from 'node:fs/promises';
-import {
-    signPdfBytes,
-    parseCertificate,
-    parseRsaPrivateKey,
-} from '../core-bridge/index.js';
-import type { PdfSignOptions } from '../core-bridge/index.js';
-import { type ParsedArgs, getStringFlag } from '../utils/args.js';
-import { readFileOrStdin, writeOutput, validatePath } from '../utils/io.js';
+import { signPdfBytes } from '../core-bridge/index.js';
+import type { PdfSignOptions, SignatureAlgorithm } from '../core-bridge/index.js';
+import { type ParsedArgs, getStringFlag, getStringFlagAll } from '../utils/args.js';
+import { readFileOrStdin, writeOutput } from '../utils/io.js';
 import { CliError } from '../utils/error.js';
+import {
+    loadRsaPrivateKey,
+    loadCertificate,
+    loadPemChain,
+    parseCertificateChain,
+} from '../utils/keys.js';
 
-/**
- * Decode a PEM-encoded block to DER bytes.
- * Strips -----BEGIN ...-----/-----END ...----- headers and base64-decodes.
- */
-function pemToDer(pem: string): Uint8Array {
-    const body = pem
-        .replace(/-----BEGIN [^-]+-----/g, '')
-        .replace(/-----END [^-]+-----/g, '')
-        .replace(/\s+/g, '');
-    const binaryStr = atob(body);
-    const bytes = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) {
-        bytes[i] = binaryStr.charCodeAt(i);
-    }
-    return bytes;
-}
+const VALID_ALGORITHMS = new Set<SignatureAlgorithm>(['rsa-sha256', 'ecdsa-sha256']);
 
-/**
- * Load a PEM string from an environment variable or a file path.
- * Environment variable takes precedence over the file flag (security best practice).
- *
- * @param envVar  - Name of the env var containing the PEM string.
- * @param filePath - File path from a CLI flag.
- * @param label   - Human-readable label for error messages (e.g. "private key").
- */
-async function loadPem(
-    envVar: string,
-    filePath: string | undefined,
-    label: string,
-): Promise<string> {
-    const fromEnv = process.env[envVar];
-    if (fromEnv !== undefined && fromEnv.trim().length > 0) {
-        return fromEnv;
+function parseSigningTime(raw: string): Date {
+    const t = new Date(raw);
+    if (Number.isNaN(t.getTime())) {
+        throw new CliError(`Invalid --signing-time "${raw}". Expected ISO 8601 (e.g. 2026-04-28T12:00:00Z).`, 2);
     }
-    if (filePath !== undefined) {
-        validatePath(filePath);
-        const buf = await readFile(filePath, 'utf8');
-        return buf;
-    }
-    throw new CliError(
-        `Missing ${label}. Provide $${envVar} (env) or --${label.replace(/ /g, '-')} <path>.`,
-        2,
-    );
+    return t;
 }
 
 export async function sign(args: ParsedArgs): Promise<void> {
-    // --input is required for sign (no stdin for PDF to avoid accidental pipe issues)
     const inputPath = getStringFlag(args.flags, 'input', 'i');
     const outputPath = getStringFlag(args.flags, 'output', 'o');
     const keyPath = getStringFlag(args.flags, 'key');
     const certPath = getStringFlag(args.flags, 'cert');
+    const algorithm = (getStringFlag(args.flags, 'algorithm') ?? 'rsa-sha256') as SignatureAlgorithm;
+    const reason = getStringFlag(args.flags, 'reason');
+    const name = getStringFlag(args.flags, 'name');
+    const location = getStringFlag(args.flags, 'location');
+    const contactInfo = getStringFlag(args.flags, 'contact');
+    const signingTimeRaw = getStringFlag(args.flags, 'signing-time');
+    const chainPaths = getStringFlagAll(args.flags, 'cert-chain');
+
+    if (!VALID_ALGORITHMS.has(algorithm)) {
+        throw new CliError(
+            `Invalid --algorithm "${algorithm}". Valid: rsa-sha256, ecdsa-sha256.`,
+            2,
+        );
+    }
+    if (algorithm === 'ecdsa-sha256') {
+        // pdfnative 1.0.5 does not yet expose a PEM/PKCS#8 parser for EC private keys.
+        // Constructing one manually would duplicate ASN.1 logic that belongs in the library.
+        // Use the pdfnative Node.js API directly until a future release adds parseEcPrivateKey.
+        throw new CliError(
+            'ECDSA signing is not yet available via the CLI. ' +
+            'It requires a pdfnative release exposing parseEcPrivateKey. ' +
+            'Use the pdfnative Node.js API directly to sign with ECDSA.',
+            2,
+        );
+    }
+
+    // Validate scalar flags up-front so usage errors (exit 2) are reported
+    // before any I/O or expensive PEM parsing.
+    const signingTime = signingTimeRaw !== undefined ? parseSigningTime(signingTimeRaw) : undefined;
+
+    // Pre-flight: assert credentials are reachable BEFORE doing any expensive parsing.
+    // This guarantees a usage error (exit 2) is reported when a flag/env var is missing,
+    // even if a partial set of credentials would parse successfully.
+    if (process.env['PDFNATIVE_SIGN_KEY'] === undefined && keyPath === undefined) {
+        throw new CliError('Missing private key. Provide $PDFNATIVE_SIGN_KEY (env) or --key <path>.', 2);
+    }
+    if (process.env['PDFNATIVE_SIGN_CERT'] === undefined && certPath === undefined) {
+        throw new CliError('Missing certificate. Provide $PDFNATIVE_SIGN_CERT (env) or --cert <path>.', 2);
+    }
 
     const pdfBuf = await readFileOrStdin(inputPath);
     const pdfBytes = new Uint8Array(pdfBuf);
 
-    // Load secrets — env vars take precedence over file flags (OWASP: avoid key exposure)
-    const privateKeyPem = await loadPem('PDFNATIVE_SIGN_KEY', keyPath, 'private key');
-    const certPem = await loadPem('PDFNATIVE_SIGN_CERT', certPath, 'certificate');
+    // Load credentials. Env vars beat file flags (OWASP best practice).
+    const rsaKey = await loadRsaPrivateKey('PDFNATIVE_SIGN_KEY', keyPath, 'key');
+    const signerCert = await loadCertificate('PDFNATIVE_SIGN_CERT', certPath, 'cert');
 
-    // Parse keys — never include raw key material in error messages
-    let options: PdfSignOptions;
+    // Optional intermediate-CA chain
+    const chainPemBlocks = await loadPemChain('PDFNATIVE_SIGN_CHAIN', chainPaths);
+    const certChain = chainPemBlocks.length > 0 ? parseCertificateChain(chainPemBlocks) : undefined;
+
+    const options: { -readonly [K in keyof PdfSignOptions]: PdfSignOptions[K] } = {
+        rsaKey,
+        signerCert,
+        algorithm,
+    };
+    if (certChain !== undefined) options.certChain = certChain;
+    if (reason !== undefined) options.reason = reason;
+    if (name !== undefined) options.name = name;
+    if (location !== undefined) options.location = location;
+    if (contactInfo !== undefined) options.contactInfo = contactInfo;
+    if (signingTime !== undefined) options.signingTime = signingTime;
+
+    let signedBytes: Uint8Array;
     try {
-        const keyDer = pemToDer(privateKeyPem);
-        const certDer = pemToDer(certPem);
-        const rsaKey = parseRsaPrivateKey(keyDer);
-        const signerCert = parseCertificate(certDer);
-        options = { rsaKey, signerCert, algorithm: 'rsa-sha256' };
-    } catch {
-        // Do NOT include key material or PEM content in the error message
-        throw new CliError('Failed to parse signing credentials. Verify key and certificate are valid PEM-encoded files.', 1);
+        signedBytes = signPdfBytes(pdfBytes, options);
+    } catch (e) {
+        // Never include the underlying message — it may reference key bytes or hashes.
+        const safeMsg = e instanceof Error ? e.message.split('\n')[0] : 'unknown error';
+        throw new CliError(`Failed to sign PDF: ${safeMsg ?? 'unknown error'}`, 1);
     }
-
-    const signedBytes = signPdfBytes(pdfBytes, options);
     await writeOutput(signedBytes, outputPath);
 }

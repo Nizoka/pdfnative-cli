@@ -14,12 +14,15 @@ We will acknowledge receipt within 48 hours and aim to provide a fix within 7 da
 
 | Version | Supported |
 |---------|-----------|
+| 0.2.x   | ✅        |
 | 0.1.x   | ✅        |
 | < 0.1   | ❌        |
 
 ## Security Model
 
 pdfnative-cli is a thin dispatch layer over the [`pdfnative`](https://github.com/Nizoka/pdfnative) library. It introduces zero additional runtime dependencies. All PDF cryptographic operations are performed inside `pdfnative` — see the [pdfnative security policy](https://github.com/Nizoka/pdfnative/blob/main/SECURITY.md) for the full cryptographic implementation notes (RSA, ECDSA, AES).
+
+The CLI exposes four commands (`render`, `sign`, `inspect`, `verify`). The `sign` and `verify` commands handle key material and certificate chain loading; security invariants for each are described below.
 
 ### Signing Key Handling
 
@@ -30,7 +33,7 @@ pdfnative-cli is a thin dispatch layer over the [`pdfnative`](https://github.com
 
 ### Input Validation
 
-- All file path arguments (`--input`, `--output`, `--key`, `--cert`) are validated against path traversal (`../`) sequences before any filesystem access.
+- All file path arguments (`--input`, `--output`, `--key`, `--cert`, `--cert-chain`, `--layout`, `--attachment`, `--watermark-image`, `--trust`) are validated against path traversal (`../`) sequences before any filesystem access.
 - JSON input size is capped at **50 MB** before `JSON.parse` to prevent memory exhaustion.
 - `inspect` JSON output sanitizes all values — no raw binary blobs are emitted in default mode.
 

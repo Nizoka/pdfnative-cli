@@ -7,6 +7,162 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] – 2026-04-28
+
+### Added
+
+#### `render` command — full pdfnative layout coverage
+
+- **Hybrid layout model** — high-frequency knobs as CLI flags, full `PdfLayoutOptions` surface
+  via `--layout <file.json>`. Precedence: CLI flags > layout file > pdfnative defaults
+  (mirrors `gh` / `kubectl` / `docker`).
+- **`--variant document|table`** — selects the renderer: `buildDocumentPDFBytes` (default,
+  unchanged behaviour) or `buildPDFBytes` (table-centric `PdfParams` shape).
+- **`--page-size`** — named (`a4`, `letter`, `legal`, `a3`, `tabloid`, `a5`) or `WxH` in points.
+- **`--margin <N>`** or `--margin <top,right,bottom,left>`.
+- **`--compress`** — boolean; calls `initNodeCompression()` once per process when needed.
+- **`--tagged <none|pdfa1b|pdfa2b|pdfa2u|pdfa3b>`** — unified PDF/A flag, replaces
+  `--conformance` (which is now deprecated, see below).
+- **Watermarks** — `--watermark-text`, `--watermark-opacity`, `--watermark-angle`,
+  `--watermark-color`, `--watermark-font-size`, `--watermark-image <path>`,
+  `--watermark-position background|foreground`.
+- **Headers / footers** — `--header-left`, `--header-center`, `--header-right`,
+  `--footer-left`, `--footer-center`, `--footer-right`. Placeholders: `{page}`, `{pages}`,
+  `{date}`, `{title}`. `{pages}` rejected with `--stream` (multi-pass pagination required).
+- **Encryption** — `--encrypt-owner-pass`, `--encrypt-user-pass`, `--encrypt-algorithm
+  aes128|aes256` (default `aes128`), `--encrypt-permissions print,copy,modify,extractText`.
+  Owner / user passwords also read from `PDFNATIVE_ENCRYPT_OWNER_PASS` /
+  `PDFNATIVE_ENCRYPT_USER_PASS` (env takes precedence over flags). Mutually exclusive with
+  `--tagged pdfa*` per ISO 19005 — rejected with exit 2.
+- **PDF/A-3 attachments** — `--attachment <path>[:mime[:relationship[:description]]]`,
+  repeatable. Binary payloads are loaded from disk; the `--layout` file's
+  `attachments[].data` field is sanitised away on load (no path / data injection).
+- **`--lang <code,code>`** — activates a programmatically registered font loader for
+  non-Latin scripts via `loadFontData(code)` (e.g. `--lang th,ja`). Requires calling
+  `registerFontLoader(lang, loader)` in a wrapper before rendering. Throws a clear error
+  when no loader is registered for the requested language code.
+- **`--layout <file.json>`** — load any subset of `PdfLayoutOptions`. Path-traversal
+  validated; JSON shape enforced; binary attachment payloads stripped on load.
+
+#### `sign` command — signing metadata + cert chains
+
+- **`--algorithm rsa-sha256|ecdsa-sha256`** — default `rsa-sha256`. ECDSA path is
+  recognised but currently throws a clear stub error; tracked for v0.3.0 once
+  pdfnative exposes `parseEcPrivateKey`.
+- **`--reason`, `--name`, `--location`, `--contact`** — `PdfSignOptions` metadata fields
+  surfaced on the CLI.
+- **`--signing-time <ISO 8601>`** — explicit timestamp; validated up-front (exit 2 on
+  malformed input, before any credential I/O).
+- **`--cert-chain <path>`** — repeatable; intermediate-CA PEMs concatenated into
+  `certChain[]`. Also readable from `PDFNATIVE_SIGN_CHAIN` env var (concatenated PEM).
+
+#### `inspect` command — deeper analysis + assertions
+
+- **`--verbose`** — adds `verbose.{trailerKeys, catalogKeys, objectCount, xmpMetadata}`.
+  Sanitised: no raw stream bytes.
+- **`--pages`** — adds `pages: [{ index, width, height, rotation, annotations, formFields }]`.
+- **`--check pdfa|signed|encrypted`** — repeatable; ANDed. Sets exit code (0 = pass, 1 =
+  fail) while still emitting the regular report. Composable with `--format json|text`.
+
+#### `verify` command (NEW)
+
+- **`pdfnative verify`** — verify CMS/PKCS#7 signatures embedded in a PDF.
+  Flags: `--input <path|stdin>`, `--format json|text` (default `json`),
+  `--strict` (exit 1 on any failure or zero signatures), `--trust <root.pem>` (repeatable).
+- **Scope (v0.2.0):** byte-range integrity (SHA-256), certificate chain signatures
+  (via pdfnative `verifyCertSignature`), trust evaluation against `--trust` roots and
+  self-signed acceptance.
+- **Out of scope (deferred to v0.3.0+):** full CMS signature-value verification, OCSP /
+  CRL revocation, RFC 3161 timestamp tokens, Long-Term Validation (LTV).
+
+#### Utilities & infrastructure
+
+- **`src/utils/layout.ts`** — central layout composer (CLI flags + layout file).
+- **`src/utils/keys.ts`** — PEM / PEM-chain loader with constant-time secret redaction
+  guarantee in error paths (no PEM body ever leaks into stderr).
+- **`src/utils/args.ts`** — `getStringFlagAll(flags, name)` for repeatable flags
+  (`--cert-chain`, `--attachment`, `--trust`, `--check`).
+- **`src/utils/io.ts`** — `readBinaryFile()` for image / attachment loading; reuses
+  `validatePath` for traversal protection.
+- **`src/utils/error.ts`** — `deprecate(name, replacement)` helper for stderr deprecation
+  notices.
+
+#### Samples (v0.2.0 categories)
+
+- `samples/render/encryption/` — AES-128 password protection demo.
+- `samples/render/headers-footers/` — page templates with `{page}/{pages}/{date}/{title}`.
+- `samples/render/attachments/` — PDF/A-3 hybrid invoice with embedded XML
+  (Factur-X / ZUGFeRD pattern).
+- `samples/render/multilang/` — Thai and Japanese rendering via `--lang`.
+- `samples/render/table-variant/` — `PdfParams`-shaped financial ledger.
+- `samples/sign/02-with-metadata.{sh,ps1}` — signature with reason / name / location /
+  contact / signing-time.
+- `samples/inspect/03-verbose-pages.{sh,ps1}` — `--verbose --pages` report.
+- `samples/inspect/04-check-pdfa.{sh,ps1}` — assertion-style `--check pdfa`.
+- `samples/verify/01-self-signed.{sh,ps1}`, `samples/verify/02-strict-mode.{sh,ps1}`.
+- `samples/run-all.js` updated with per-category flag dispatch (encryption, attachments,
+  headers-footers, multilang, table-variant).
+
+### Changed
+
+- **`pdfnative` dependency** bumped from `^1.0.4` to `^1.0.5`.
+- **Test surface** grown from 47 to **123** tests across 8 files; coverage gates
+  recalibrated to 75 % statements / 80 % branches / 85 % functions / 75 % lines, measured
+  at 82.62 / 82.18 / 92.72 / 82.62. `src/commands/verify.ts` and `src/index.ts` are
+  excluded from coverage with explicit rationale (see `vitest.config.ts`); fixture for
+  signed-PDF round-tripping is tracked for v0.3.0.
+- **`samples/README.md`** restructured with new v0.2.0 categories.
+
+### Fixed
+
+- **Windows path regression in `--attachment`** — `loadAttachmentsFromFlags` now detects
+  Windows drive-letter colons (e.g. `D:\\path`) and no longer splits the flag value at the
+  drive colon, preventing `ENOENT D\` errors on Windows.
+- **`params.layout` silently dropped in render** — when the JSON input contained a
+  `layout` object (e.g. a watermark) and the CLI also built a layout object (even an empty
+  `{}`), the JSON-embedded layout was overwritten. Fixed by explicitly merging
+  `params.layout` (base) with CLI-derived flags (override) via `{ ...params.layout, ...layout }`.
+- **Multilang samples required unbundled fonts** — `samples/render/multilang/` JSONs tried
+  to render Thai/Japanese glyphs, but `hasFontLoader` checks an in-memory registry that
+  is empty in the CLI process. Samples replaced with Latin-only font-loader registration
+  guides; `run-all.js` no longer passes `--lang th/ja`.
+- **Attachment sample used wrong row format** — `samples/render/attachments/01-pdfa3-with-xml.json`
+  table rows were plain arrays (`["cell1", "cell2"]`) instead of `PdfRow` objects
+  (`{ "cells": [...], "type": "normal", "pointed": false }`). Sample corrected.
+
+### Changed
+
+- **`--lang <code,code>`** — clarified: activates a *programmatically registered* font
+  loader (via `registerFontLoader(lang, loader)` in a wrapper script). Latin is built-in;
+  non-Latin scripts require a caller-supplied TTF loader. The previous wording
+  ("bundled Noto fonts") was inaccurate — pdfnative uses a lazy loader registry, not a
+  pre-bundled font set.
+
+### Deprecated
+
+- **`--conformance <1b|2b|3b>`** — superseded by `--tagged <pdfa1b|pdfa2b|pdfa3b>`.
+  Still works; emits a one-line stderr deprecation notice. Will be removed in **v1.0.0**.
+
+### Security
+
+- **Encryption passwords** — `--encrypt-owner-pass` / `--encrypt-user-pass` honoured but
+  recommended path is the `PDFNATIVE_ENCRYPT_OWNER_PASS` / `PDFNATIVE_ENCRYPT_USER_PASS`
+  env vars. Passwords are never logged; absence of `--encrypt-owner-pass` and presence of
+  any other `--encrypt-*` flag is a hard usage error (exit 2).
+- **PEM redaction** — `loadPem` / `loadPemChain` surface only generic error messages on
+  parse failure; raw key material never appears in CliError messages or stderr.
+- **Path traversal** — `--layout`, `--attachment`, `--watermark-image`, `--key`,
+  `--cert`, `--cert-chain`, `--trust` and all `--input` / `--output` arguments validated
+  against directory traversal before filesystem access.
+- **Layout-file injection** — `attachments[].data` fields in `--layout` JSON are stripped
+  on load; binary attachment payloads must come from `--attachment <path>`.
+
+### Backward compatibility
+
+- Every v0.1.0 invocation continues to produce a byte-equivalent PDF (modulo a one-line
+  stderr deprecation notice for `--conformance`). All v0.1.0 exit codes and JSON shapes
+  preserved; new `inspect` JSON fields are additive only.
+
 ## [0.1.0] – 2026-04-27
 
 ### Added

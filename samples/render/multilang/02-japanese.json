@@ -1,0 +1,22 @@
+{
+  "title": "Multilingual Font Support — Mixed-Script Document",
+  "blocks": [
+    { "type": "heading",   "text": "Mixed-Script Document Rendering", "level": 1 },
+    { "type": "paragraph", "text": "This sample demonstrates how pdfnative-cli handles multi-font documents. Each font entry maps a language tag to a registered TTF loader. Latin text falls back to the built-in Helvetica when no explicit font entry is present." },
+    { "type": "spacer",    "height": 8 },
+    { "type": "heading",   "text": "How to enable Japanese (--lang ja)", "level": 2 },
+    { "type": "paragraph", "text": "Register a CJK font loader before rendering: registerFonts({ ja: () => import('pdfnative/fonts/noto-jp-data.js') }). Then await loadFontData('ja') and pass the result in fontEntries when calling buildDocumentPDFBytes. See 04-multilingual.js for a complete working example using four scripts simultaneously." },
+    { "type": "spacer",    "height": 8 },
+    { "type": "heading",   "text": "Font fallback chain", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Latin (A-Z, diacritics): built-in Helvetica / Bold — zero configuration",
+        "CJK (Japanese, Chinese, Korean): requires a registered Noto Sans CJK TTF loader",
+        "Script detection is per-character — a single paragraph may use multiple fonts",
+        "Font subsetting: only referenced glyphs are embedded, keeping file size small"
+    ]}
+  ],
+  "metadata": {
+    "subject": "Multilingual font support — CJK loader registration pattern",
+    "keywords": "multilang, japanese, cjk, noto, fonts, loader"
+  }
+}

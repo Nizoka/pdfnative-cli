@@ -2,8 +2,9 @@
 
 ## Overview
 
-Official CLI companion to the `pdfnative` library. Exposes three commands:
-`render` (JSON → PDF), `sign` (digital signature), `inspect` (PDF analysis).
+Official CLI companion to the `pdfnative` library. Exposes four commands:
+`render` (JSON → PDF), `sign` (digital signature), `inspect` (PDF analysis),
+`verify` (CMS/PKCS#7 signature verification).
 
 **Philosophy:** Zero extra runtime dependencies. `pdfnative` is the only
 dependency — all PDF logic lives there. The CLI is a thin, composable

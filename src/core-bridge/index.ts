@@ -1,23 +1,52 @@
 // Selective re-exports from pdfnative — keeps the CLI surface minimal.
 // All PDF logic lives in pdfnative; this module is the only import point.
 
-// ── Render ───────────────────────────────────────────────────────────
-export { buildDocumentPDFBytes } from 'pdfnative';
-export { buildDocumentPDFStream } from 'pdfnative';
+// ── Render (free-form documents) ─────────────────────────────────────
+export { buildDocumentPDFBytes, buildDocumentPDFStream } from 'pdfnative';
+
+// ── Render (table-centric, --variant table) ──────────────────────────
+export { buildPDFBytes, buildPDFStream } from 'pdfnative';
+
+// ── Compression bootstrap (Node Flate) ───────────────────────────────
+export { initNodeCompression } from 'pdfnative';
 
 // ── Sign ─────────────────────────────────────────────────────────────
 export { signPdfBytes } from 'pdfnative';
-export { parseCertificate } from 'pdfnative';
-export { parseRsaPrivateKey } from 'pdfnative';
+export { parseRsaPrivateKey, parseCertificate } from 'pdfnative';
 
-// ── Inspect ──────────────────────────────────────────────────────────
-export { openPdf } from 'pdfnative';
+// ── Verify ───────────────────────────────────────────────────────────
+export { derDecode, verifyCertSignature, isSelfSigned } from 'pdfnative';
+
+// ── Inspect / Verify — PDF parser helpers ────────────────────────────
+export { openPdf, isRef, isName, isDict, isArray, nameValue } from 'pdfnative';
+
+// ── Fonts (multi-language --lang flag) ───────────────────────────────
+export { registerFont, registerFonts, loadFontData, hasFontLoader } from 'pdfnative';
 
 // ── Types ────────────────────────────────────────────────────────────
-export type { DocumentParams } from 'pdfnative';
-export type { PdfSignOptions, SignatureAlgorithm } from 'pdfnative';
-export type { X509Certificate, X509Name } from 'pdfnative';
-export type { RsaPrivateKey } from 'pdfnative';
-export type { EcPrivateKey } from 'pdfnative';
-export type { PdfReader } from 'pdfnative';
-export type { StreamOptions } from 'pdfnative';
+export type {
+    DocumentParams,
+    PdfParams,
+    PdfLayoutOptions,
+    PdfColor,
+    PdfColors,
+    PageTemplate,
+    WatermarkOptions,
+    EncryptionOptions,
+    PdfAttachment,
+    PdfAttachmentRelationship,
+    StreamOptions,
+    FontEntry,
+} from 'pdfnative';
+
+export type {
+    PdfSignOptions,
+    SignatureAlgorithm,
+    X509Certificate,
+    X509Name,
+    RsaPrivateKey,
+    Asn1Node,
+} from 'pdfnative';
+
+export type { PdfReader, PdfValue, PdfName, PdfRef, PdfStream } from 'pdfnative';
+export type { ParsedDict as PdfDict, ParsedArray as PdfArray } from 'pdfnative';

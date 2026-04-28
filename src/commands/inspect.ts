@@ -1,8 +1,19 @@
 import { openPdf } from '../core-bridge/index.js';
 import type { PdfReader } from '../core-bridge/index.js';
-import { type ParsedArgs, getStringFlag } from '../utils/args.js';
+import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../utils/args.js';
 import { readFileOrStdin } from '../utils/io.js';
 import { CliError } from '../utils/error.js';
+
+const VALID_CHECKS = new Set(['pdfa', 'signed', 'encrypted']);
+
+interface PageInfo {
+    readonly index: number;
+    readonly width: number | null;
+    readonly height: number | null;
+    readonly rotation: number;
+    readonly annotations: number;
+    readonly formFields: number;
+}
 
 interface InspectResult {
     readonly version: string;
@@ -17,44 +28,44 @@ interface InspectResult {
         readonly subject: string | null;
         readonly producer: string | null;
     };
+    readonly pages?: readonly PageInfo[];
+    readonly verbose?: {
+        readonly trailerKeys: readonly string[];
+        readonly catalogKeys: readonly string[];
+        readonly objectCount: number;
+        readonly xmpMetadata: string | null;
+    };
 }
 
-/**
- * Safely extract a string value from a PDF info dictionary entry.
- * Returns null if the value is not a plain string (e.g. hex strings, refs, binary blobs).
- */
+interface CheckResult {
+    readonly checks: readonly string[];
+    readonly allPassed: boolean;
+}
+
 function safeInfoString(value: unknown): string | null {
     if (typeof value !== 'string') return null;
-    // Strip surrounding PDF literal string parens if present
     const trimmed = value.trim();
     if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
         return trimmed.slice(1, -1);
     }
-    // Filter out binary/non-printable content (no raw bytes in output — OWASP)
     // eslint-disable-next-line no-control-regex
-    if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(trimmed)) {
-        return null;
-    }
-    return trimmed || null;
+    if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(trimmed)) return null;
+    return trimmed.length > 0 ? trimmed : null;
 }
 
 function extractVersion(reader: PdfReader): string {
-    // Version is in the %PDF-X.Y header (first bytes of the file)
     const header = new TextDecoder('ascii', { fatal: false }).decode(
         reader.bytes.slice(0, 20),
     );
     const match = /^%PDF-(\d+\.\d+)/.exec(header);
-    return match !== null ? match[1] : 'unknown';
+    return match !== null ? (match[1] as string) : 'unknown';
 }
 
 function extractEncrypted(reader: PdfReader): boolean {
-    const trailer = reader.trailer;
-    return trailer.get('Encrypt') !== undefined;
+    return reader.trailer.get('Encrypt') !== undefined;
 }
 
-function extractPdfaConformance(reader: PdfReader): string | null {
-    // PDF/A conformance is declared in XMP metadata.
-    // We check the catalog -> Metadata stream for pdfaid:conformance and pdfaid:part.
+function readXmp(reader: PdfReader): string | null {
     try {
         const catalog = reader.getCatalog();
         const metaRef = catalog.get('Metadata');
@@ -70,20 +81,24 @@ function extractPdfaConformance(reader: PdfReader): string | null {
         const decoded = reader.decodeStream(
             metaObj as Parameters<PdfReader['decodeStream']>[0],
         );
-        const xmp = new TextDecoder('utf-8', { fatal: false }).decode(decoded);
-        const partMatch = /pdfaid:part[^>]*>(\d+)</.exec(xmp);
-        const confMatch = /pdfaid:conformance[^>]*>([A-Za-z]+)</.exec(xmp);
-        if (partMatch !== null && confMatch !== null) {
-            return `${partMatch[1]}${confMatch[1].toLowerCase()}`;
-        }
+        return new TextDecoder('utf-8', { fatal: false }).decode(decoded);
     } catch {
-        // Non-critical — conformance detection is best-effort
+        return null;
+    }
+}
+
+function extractPdfaConformance(reader: PdfReader): string | null {
+    const xmp = readXmp(reader);
+    if (xmp === null) return null;
+    const partMatch = /pdfaid:part[^>]*>(\d+)</.exec(xmp);
+    const confMatch = /pdfaid:conformance[^>]*>([A-Za-z]+)</.exec(xmp);
+    if (partMatch !== null && confMatch !== null) {
+        return `${partMatch[1] as string}${(confMatch[1] as string).toLowerCase()}`;
     }
     return null;
 }
 
 function countSignatures(reader: PdfReader): number {
-    // Signatures are AcroForm fields with /FT /Sig
     try {
         const catalog = reader.getCatalog();
         const acroRef = catalog.get('AcroForm');
@@ -105,12 +120,91 @@ function countSignatures(reader: PdfReader): number {
     }
 }
 
+function inspectPages(reader: PdfReader): readonly PageInfo[] {
+    const out: PageInfo[] = [];
+    for (let i = 0; i < reader.pageCount; i++) {
+        const page = reader.getPage(i);
+        const mediaBox = page.get('MediaBox');
+        let width: number | null = null;
+        let height: number | null = null;
+        const box = Array.isArray(mediaBox) ? mediaBox : null;
+        if (box !== null && box.length === 4) {
+            const w = box[2];
+            const h = box[3];
+            if (typeof w === 'number') width = w;
+            if (typeof h === 'number') height = h;
+        }
+        const rotation = typeof page.get('Rotate') === 'number'
+            ? (page.get('Rotate') as number)
+            : 0;
+        const annots = page.get('Annots');
+        let annotations = 0;
+        let formFields = 0;
+        if (Array.isArray(annots)) {
+            for (const ref of annots) {
+                annotations++;
+                try {
+                    const annot = reader.resolveValue(ref as Parameters<PdfReader['resolveValue']>[0]);
+                    if (annot instanceof Map && annot.get('Subtype') === '/Widget') {
+                        formFields++;
+                    }
+                } catch {
+                    // best-effort — keep counting other annotations
+                }
+            }
+        }
+        out.push({ index: i, width, height, rotation, annotations, formFields });
+    }
+    return out;
+}
+
+function buildVerbose(reader: PdfReader): InspectResult['verbose'] {
+    const trailerKeys: string[] = [];
+    for (const k of reader.trailer.keys()) trailerKeys.push(k);
+    const catalogKeys: string[] = [];
+    try {
+        for (const k of reader.getCatalog().keys()) catalogKeys.push(k);
+    } catch {
+        // catalog not resolvable — leave empty
+    }
+    const objectCount = reader.xref?.entries?.size ?? 0;
+    const xmp = readXmp(reader);
+    return {
+        trailerKeys,
+        catalogKeys,
+        objectCount,
+        xmpMetadata: xmp,
+    };
+}
+
+function evaluateChecks(checks: readonly string[], result: InspectResult): CheckResult {
+    const out: { name: string; passed: boolean }[] = [];
+    for (const c of checks) {
+        if (!VALID_CHECKS.has(c)) {
+            throw new CliError(
+                `Invalid --check value "${c}". Valid: ${[...VALID_CHECKS].join(', ')}.`,
+                2,
+            );
+        }
+        if (c === 'pdfa') out.push({ name: c, passed: result.pdfaConformance !== null });
+        if (c === 'signed') out.push({ name: c, passed: result.signatures > 0 });
+        if (c === 'encrypted') out.push({ name: c, passed: result.encrypted });
+    }
+    return {
+        checks: out.map((x) => `${x.name}=${x.passed ? 'pass' : 'fail'}`),
+        allPassed: out.every((x) => x.passed),
+    };
+}
+
 export async function inspect(args: ParsedArgs): Promise<void> {
     const inputPath = getStringFlag(args.flags, 'input', 'i');
     const format = getStringFlag(args.flags, 'format', 'f') ?? 'json';
+    const verbose = hasFlag(args.flags, 'verbose');
+    const includePages = hasFlag(args.flags, 'pages');
+    const checks = getStringFlagAll(args.flags, 'check');
 
     if (format !== 'json' && format !== 'text') {
-        throw new CliError(`Invalid --format value "${format}". Valid values: json, text.`, 2);
+        throw new CliError(`Invalid --format value "${format}". Valid: json, text.`, 2);
     }
 
     const inputBuf = await readFileOrStdin(inputPath);
@@ -125,7 +219,7 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     }
 
     const info = reader.getInfo();
-    const result: InspectResult = {
+    const baseResult: InspectResult = {
         version: extractVersion(reader),
         pageCount: reader.pageCount,
         encrypted: extractEncrypted(reader),
@@ -140,10 +234,15 @@ export async function inspect(args: ParsedArgs): Promise<void> {
         },
     };
 
+    const result: InspectResult = {
+        ...baseResult,
+        ...(includePages ? { pages: inspectPages(reader) } : {}),
+        ...(verbose ? { verbose: buildVerbose(reader) } : {}),
+    };
+
     if (format === 'json') {
         process.stdout.write(JSON.stringify(result, null, 2) + '\n');
     } else {
-        // Human-readable text table
         const lines = [
             `Version:        ${result.version}`,
             `Pages:          ${result.pageCount}`,
@@ -156,6 +255,33 @@ export async function inspect(args: ParsedArgs): Promise<void> {
             `Subject:        ${result.metadata.subject ?? '—'}`,
             `Producer:       ${result.metadata.producer ?? '—'}`,
         ];
+        if (result.pages !== undefined) {
+            lines.push('Pages detail:');
+            for (const p of result.pages) {
+                lines.push(
+                    `  #${p.index + 1}: ${p.width ?? '?'}x${p.height ?? '?'}pt rot=${p.rotation}° annots=${p.annotations} fields=${p.formFields}`,
+                );
+            }
+        }
+        if (result.verbose !== undefined) {
+            lines.push(`Trailer keys:   ${result.verbose.trailerKeys.join(', ')}`);
+            lines.push(`Catalog keys:   ${result.verbose.catalogKeys.join(', ')}`);
+            lines.push(`Object count:   ${result.verbose.objectCount}`);
+            if (result.verbose.xmpMetadata !== null) {
+                lines.push(`XMP metadata:   (${result.verbose.xmpMetadata.length} chars)`);
+            }
+        }
         process.stdout.write(lines.join('\n') + '\n');
+    }
+
+    // --check semantics: if any check is given, exit code reflects the result.
+    if (checks.length > 0) {
+        const evaluation = evaluateChecks(checks, result);
+        if (!evaluation.allPassed) {
+            process.stderr.write(`check failed: ${evaluation.checks.join(', ')}\n`);
+            // exit 1 = check failure (semantic), distinct from a usage error (2) or runtime error (1).
+            // Reuse exit code 1 to keep the "failure" semantics consistent.
+            throw new CliError('', 1);
+        }
     }
 }

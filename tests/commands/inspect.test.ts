@@ -104,4 +104,102 @@ describe('inspect', () => {
         expect(err).toBeInstanceOf(CliError);
         expect((err as CliError).exitCode).toBe(1);
     });
+
+    // ──────────────────────────────────────────────────────────────────
+    // v0.2.0 — new flag coverage
+    // ──────────────────────────────────────────────────────────────────
+
+    it('--verbose adds trailerKeys / catalogKeys / objectCount', async () => {
+        const pdfPath = await generateTestPdf();
+        const chunks: string[] = [];
+        const original = process.stdout.write.bind(process.stdout);
+        process.stdout.write = (c: unknown) => {
+            chunks.push(String(c));
+            return true;
+        };
+        try {
+            await inspect(parseArgs(['--input', pdfPath, '--verbose']));
+        } finally {
+            process.stdout.write = original;
+        }
+        const result = JSON.parse(chunks.join('')) as InspectResult & { verbose: { trailerKeys: string[]; catalogKeys: string[]; objectCount: number } };
+        expect(Array.isArray(result.verbose.trailerKeys)).toBe(true);
+        expect(Array.isArray(result.verbose.catalogKeys)).toBe(true);
+        expect(typeof result.verbose.objectCount).toBe('number');
+    });
+
+    it('--pages emits per-page width/height/rotation', async () => {
+        const pdfPath = await generateTestPdf();
+        const chunks: string[] = [];
+        const original = process.stdout.write.bind(process.stdout);
+        process.stdout.write = (c: unknown) => {
+            chunks.push(String(c));
+            return true;
+        };
+        try {
+            await inspect(parseArgs(['--input', pdfPath, '--pages']));
+        } finally {
+            process.stdout.write = original;
+        }
+        const result = JSON.parse(chunks.join('')) as InspectResult & { pages: Array<{ index: number; width: number | null; height: number | null }> };
+        expect(Array.isArray(result.pages)).toBe(true);
+        expect(result.pages.length).toBe(result.pageCount);
+        expect(typeof result.pages[0]?.index).toBe('number');
+    });
+
+    it('--check encrypted exits 1 on plain PDF', async () => {
+        const pdfPath = await generateTestPdf();
+        const errStream: string[] = [];
+        const origStdout = process.stdout.write.bind(process.stdout);
+        const origStderr = process.stderr.write.bind(process.stderr);
+        process.stdout.write = () => true;
+        process.stderr.write = (c: unknown) => {
+            errStream.push(String(c));
+            return true;
+        };
+        try {
+            const err = await inspect(parseArgs(['--input', pdfPath, '--check', 'encrypted']))
+                .catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(1);
+            expect(errStream.join('')).toContain('encrypted=fail');
+        } finally {
+            process.stdout.write = origStdout;
+            process.stderr.write = origStderr;
+        }
+    });
+
+    it('--check pdfa,signed,encrypted runs all checks', async () => {
+        const pdfPath = await generateTestPdf();
+        const errStream: string[] = [];
+        const origStdout = process.stdout.write.bind(process.stdout);
+        const origStderr = process.stderr.write.bind(process.stderr);
+        process.stdout.write = () => true;
+        process.stderr.write = (c: unknown) => {
+            errStream.push(String(c));
+            return true;
+        };
+        try {
+            const err = await inspect(parseArgs([
+                '--input', pdfPath,
+                '--check', 'pdfa',
+                '--check', 'signed',
+            ])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(1);
+            expect(errStream.join('')).toContain('pdfa=fail');
+            expect(errStream.join('')).toContain('signed=fail');
+        } finally {
+            process.stdout.write = origStdout;
+            process.stderr.write = origStderr;
+        }
+    });
+
+    it('rejects invalid --check value', async () => {
+        const pdfPath = await generateTestPdf();
+        const err = await inspect(parseArgs(['--input', pdfPath, '--check', 'unknown']))
+            .catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(CliError);
+        expect((err as CliError).exitCode).toBe(2);
+    });
 });

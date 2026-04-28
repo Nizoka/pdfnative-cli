@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:demo:pdfnative-cli:invoice:1.0">
+  <Number>INV-2026-001</Number>
+  <IssueDate>2026-04-28</IssueDate>
+  <Currency>USD</Currency>
+  <LineItems>
+    <Item><Description>Annual licence</Description>      <Qty>1</Qty><Unit>1200.00</Unit><Total>1200.00</Total></Item>
+    <Item><Description>Premium support</Description>     <Qty>1</Qty><Unit>300.00</Unit> <Total>300.00</Total></Item>
+    <Item><Description>Onboarding workshop</Description> <Qty>2</Qty><Unit>450.00</Unit> <Total>900.00</Total></Item>
+  </LineItems>
+  <Total>2400.00</Total>
+</Invoice>

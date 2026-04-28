@@ -1,0 +1,20 @@
+{
+  "title": "Multi-page Report with Headers & Footers",
+  "blocks": [
+    { "type": "heading",   "text": "Quarterly Operations Review", "level": 1 },
+    { "type": "paragraph", "text": "This document showcases CLI-driven page templates. The header is set via --header-* flags and the footer via --footer-* flags. Placeholders {page}, {pages}, {date}, and {title} are interpolated at render time." },
+    { "type": "spacer",    "height": 16 },
+    { "type": "heading",   "text": "Section 1 — Operations", "level": 2 },
+    { "type": "paragraph", "text": "Quarterly throughput exceeded plan by 14%. Operations met SLAs across every tracked region. The page footer renders the global page counter — see the bottom of every printed page." },
+    { "type": "pageBreak" },
+    { "type": "heading",   "text": "Section 2 — Risk", "level": 2 },
+    { "type": "paragraph", "text": "Top 3 risk items are tracked in the risk register and reviewed monthly. The header tracks the document title across pages." },
+    { "type": "pageBreak" },
+    { "type": "heading",   "text": "Section 3 — Outlook", "level": 2 },
+    { "type": "paragraph", "text": "Bookings pipeline supports a 12% expansion in Q+1. Detailed forecast attached." }
+  ],
+  "metadata": {
+    "subject": "Headers & footers via CLI page templates",
+    "keywords": "headers, footers, page-templates, page-numbers"
+  }
+}

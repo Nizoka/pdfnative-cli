@@ -1,0 +1,23 @@
+{
+  "title": "Encrypted Internal Memo",
+  "blocks": [
+    { "type": "heading",   "text": "Confidential Internal Memo", "level": 1 },
+    { "type": "paragraph", "text": "This document is encrypted with AES-128 and protected by an owner password. Anyone opening it must supply the user password (or the owner password for unrestricted access)." },
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "How encryption was applied", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Algorithm: AES-128 (default for --encrypt-*)",
+        "Owner password sourced from $PDFNATIVE_ENCRYPT_OWNER_PASS",
+        "User password sourced from $PDFNATIVE_ENCRYPT_USER_PASS",
+        "Permissions: print, copy disabled — modify, extractText denied"
+    ]},
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Security note", "level": 2 },
+    { "type": "paragraph", "text": "Encryption is mutually exclusive with PDF/A modes per ISO 19005. The CLI rejects --encrypt-* combined with --tagged pdfa* with exit code 2." }
+  ],
+  "footerText": "CONFIDENTIAL — Encrypted",
+  "metadata": {
+    "subject": "Encrypted document demonstrating --encrypt-* CLI flags",
+    "keywords": "encryption, aes128, confidential, owner-password"
+  }
+}
