@@ -151,17 +151,18 @@ describe('sign', () => {
         expect((err as CliError).exitCode).toBe(2);
     });
 
-    it('--algorithm ecdsa-sha256 throws clean stub error (not yet wired)', async () => {
+    it('--algorithm ecdsa-sha256 requires an EC key (not RSA)', async () => {
         const pdfPath = await makeTestPdf();
+        // Provide an RSA key — should fail with a clean parse error, never leak key bytes.
+        process.env['PDFNATIVE_SIGN_KEY'] = TEST_KEY_PEM;
+        process.env['PDFNATIVE_SIGN_CERT'] = TEST_CERT_PEM;
         const err = await sign(parseArgs([
             '--input', pdfPath,
             '--algorithm', 'ecdsa-sha256',
         ])).catch((e: unknown) => e);
-        expect(err).toBeInstanceOf(CliError);
-        expect((err as CliError).exitCode).toBe(2);
-        expect((err as CliError).message).toMatch(/ECDSA/i);
+        expect(err).toBeInstanceOf(Error);
         // Must never expose key material in the message.
-        expect((err as CliError).message).not.toMatch(/-----BEGIN/);
+        expect((err as Error).message).not.toMatch(/-----BEGIN/);
     });
 
     it('rejects invalid --signing-time', async () => {
@@ -191,6 +192,27 @@ describe('sign', () => {
         ])).catch((e: unknown) => e);
         expect(err).toBeInstanceOf(CliError);
         expect((err as CliError).message).not.toContain('SECRETBYTES');
+        expect((err as CliError).message).not.toMatch(/-----BEGIN/);
+    });
+
+    it('rejects signing an encrypted PDF (placeholder injection fails)', async () => {
+        // Render an encrypted PDF first.
+        const inPath = path.join(os.tmpdir(), `sign-enc-${Date.now()}.json`);
+        const pdfPath = path.join(os.tmpdir(), `sign-enc-${Date.now()}.pdf`);
+        tmpFiles.push(inPath, pdfPath);
+        await fs.writeFile(inPath, minimalParams, 'utf8');
+        await render(parseArgs([
+            '--input', inPath,
+            '--output', pdfPath,
+            '--encrypt-owner-pass', 'secret',
+        ]));
+
+        process.env['PDFNATIVE_SIGN_KEY'] = TEST_KEY_PEM;
+        process.env['PDFNATIVE_SIGN_CERT'] = TEST_CERT_PEM;
+        const err = await sign(parseArgs(['--input', pdfPath])).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(CliError);
+        expect((err as CliError).exitCode).toBe(1);
+        // Generic message — must not leak crypto internals.
         expect((err as CliError).message).not.toMatch(/-----BEGIN/);
     });
 });

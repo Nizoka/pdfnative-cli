@@ -1,0 +1,14 @@
+{
+    "title": "Acme Corp Report Template",
+    "metadata": {
+        "author": "Acme Reports Bot",
+        "subject": "Quarterly results"
+    },
+    "blocks": [
+        {
+            "type": "heading",
+            "text": "(template heading — overridden by override.json)",
+            "level": 1
+        }
+    ]
+}

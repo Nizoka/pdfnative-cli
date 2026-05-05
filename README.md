@@ -13,7 +13,9 @@
 
 Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library — render JSON to PDF, apply digital signatures, verify them, and inspect PDF conformance, directly from the terminal. Zero extra runtime dependencies.
 
-> **What's new in v0.2.0** — full coverage of the `pdfnative` v1.0.5 surface: encryption, watermarks, headers/footers with placeholders, PDF/A-3 attachments, multilingual fonts, table-variant rendering, signing metadata + cert chains, `inspect --verbose / --pages / --check`, and a brand-new `verify` command. **100 % backward-compatible** with v0.1.0 — see [release notes](release-notes/v0.2.0.md).
+> **What's new in v0.3.0** — full digital-signature stack: ECDSA-SHA256 signing, end-to-end CMS/PKCS#7 cryptographic verification (RSA + ECDSA), RFC 3161 timestamp recognition, and an automatic AcroForm signature-placeholder injector that lets you sign any `pdfnative render` output in one command. `render` gains `--watch`, `--template`, and `--font latin|emoji` shortcuts. **100 % backward-compatible** with v0.2.0 — see [release notes](release-notes/v0.3.0.md).
+>
+> ⭐ Star [`pdfnative`](https://github.com/Nizoka/pdfnative) — the zero-dependency PDF engine that powers this CLI.
 
 ## Highlights
 
@@ -66,16 +68,22 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 | Full `PdfLayoutOptions` | ✅ | `--layout <file.json>` |
 | **Signing (v0.2.0)** | | |
 | RSA signatures (rsa-sha256) | ✅ | Default algorithm |
-| ECDSA signatures | ⚠️ | `--algorithm ecdsa-sha256` parsed; stub error pending pdfnative `parseEcPrivateKey` (v0.3.0) |
+| ECDSA signatures (ecdsa-sha256) | ✅ | P-256 SEC1 / PKCS#8 keys (v0.3.0) |
+| Auto signature-placeholder injection | ✅ | One-command sign of any rendered PDF (v0.3.0) |
 | Signature metadata | ✅ | `--reason`, `--name`, `--location`, `--contact`, `--signing-time` |
 | Cert chains (intermediate CAs) | ✅ | `--cert-chain <pem>` (repeatable) or `PDFNATIVE_SIGN_CHAIN` env |
-| **Verification (v0.2.0)** | | |
+| **Verification (v0.2.0+)** | | |
 | Byte-range integrity (SHA-256) | ✅ | Recomputed and compared with CMS messageDigest attribute |
+| CMS signature-value verification | ✅ | RSA-SHA256 + ECDSA-SHA256 (v0.3.0) |
 | Certificate chain verification | ✅ | Via pdfnative `verifyCertSignature` |
 | Trust roots | ✅ | `--trust <root.pem>` (repeatable) + self-signed acceptance |
-| Full CMS signature-value | ⚠️ | Deferred to v0.3.0 (pending pdfnative API) |
-| OCSP / CRL revocation | ⚠️ | Deferred to v0.3.0+ |
-| RFC 3161 timestamps | ⚠️ | Deferred to v0.3.0+ |
+| RFC 3161 timestamp recognition | ✅ | Reported as `timestampPresent` (v0.3.0); full TSA validation pending |
+| OCSP / CRL revocation | ⚠️ | Deferred to v0.4.0+ |
+| Full RFC 3161 token validation | ⚠️ | Deferred to v0.4.0+ |
+| **Render iteration (v0.3.0)** | | |
+| `--watch` re-render on file change | ✅ | 200 ms debounce, requires file `--output` |
+| `--template <file.json>` | ✅ | Deep-merge base under input (caller wins) |
+| `--font latin\|emoji` shortcuts | ✅ | Repeatable, allow-list bundled font names |
 
 **Note:** features marked **⚠️** are tracked in [ROADMAP.md](ROADMAP.md). Everything else
 works today.

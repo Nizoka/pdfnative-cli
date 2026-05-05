@@ -72,10 +72,21 @@ samples/
 │   │   ├── 03-thai.js            Node.js driver: registerFonts(th) → render 03-thai.json
 │   │   ├── 04-multilingual.json  Real multilingual doc (EN + Thai + Japanese + Arabic + Russian)
 │   │   └── 04-multilingual.js    Node.js driver: registerFonts(th,ja,ar,ru) → render 04-multilingual.json
-│   └── table-variant/            (v0.2.0) Table-centric PdfParams (--variant table)
+│   ├── table-variant/            (v0.2.0) Table-centric PdfParams (--variant table)
+│   ├── font/                     (v0.3.0) `--font` / `--lang` flag demo (latin preset)
+│   ├── template/                 (v0.3.0) `--template` deep-merge demo (base + override)
+│   └── watch/                    (v0.3.0) `--watch` interactive auto-rebuild demo
 ├── sign/                         Digital signature shell / PowerShell scripts
+│   ├── 01-basic.*                Self-signed RSA-SHA256 sign
+│   ├── 02-with-metadata.*        (v0.2.0) Sign with reason / location / signing-time
+│   ├── 03-ecdsa.*                (v0.3.0) P-256 ECDSA-SHA256 sign
+│   └── 04-roundtrip.*            (v0.3.0) render → sign → verify pipeline
 ├── inspect/                      PDF inspection shell / PowerShell scripts
-├── verify/                       (v0.2.0) Signature verification shell / PowerShell scripts
+├── verify/                       Signature verification shell / PowerShell scripts
+│   ├── 01-self-signed.*          (v0.2.0) Verify a self-signed PDF
+│   ├── 02-strict-mode.*          (v0.2.0) `--strict` exits non-zero on failure
+│   ├── 03-cms-rsa.*              (v0.3.0) Verify CMS RSA-SHA256 signature value
+│   └── 04-cms-ecdsa.*            (v0.3.0) Verify CMS ECDSA-SHA256 signature value
 └── streaming/                    Streaming render Node.js scripts
 ```
 
@@ -299,6 +310,36 @@ const pdf = buildDocumentPDFBytes({
 
 `--variant table` switches the renderer to `buildPDFBytes` / `buildPDFStream`, which accept the lower-level `PdfParams` shape (suitable for ledger / transactional reports).
 
+### `render/font/` — Font & Language Presets (v0.3.0)
+
+| File | Description |
+|------|-------------|
+| [01-latin.json](render/font/01-latin.json) | Plain Latin-1 document body |
+| [01-latin.sh](render/font/01-latin.sh) | Renders with `--font latin --lang latin` |
+| [01-latin.ps1](render/font/01-latin.ps1) | PowerShell equivalent |
+
+The `--font` and `--lang` flags select a preset from pdfnative's bundled font registry without requiring a `registerFonts` driver script. `latin` is the safe baseline; non-Latin presets still need a driver (see `render/multilang/`).
+
+### `render/template/` — `--template` Deep Merge (v0.3.0)
+
+| File | Description |
+|------|-------------|
+| [base.json](render/template/base.json) | Reusable base — common metadata, headers/footers |
+| [override.json](render/template/override.json) | Document-specific blocks; merged on top of the base |
+| [01-merge.sh](render/template/01-merge.sh) | `pdfnative render --template base.json --input override.json --output …` |
+| [01-merge.ps1](render/template/01-merge.ps1) | PowerShell equivalent |
+
+The CLI deep-merges `--template` into `--input` before rendering. Use this to share boilerplate across many documents (e.g. corporate header/footer templates). This category is **skipped by `run-all.js`** because both files are partial payloads.
+
+### `render/watch/` — `--watch` Auto-Rebuild (v0.3.0, interactive)
+
+| File | Description |
+|------|-------------|
+| [01-basic.sh](render/watch/01-basic.sh) | Starts `pdfnative render … --watch` and re-renders on JSON change (Bash) |
+| [01-basic.ps1](render/watch/01-basic.ps1) | PowerShell equivalent |
+
+`--watch` keeps the process running and rebuilds the PDF whenever the input JSON changes. **Skipped by `run-all.js`** because it never exits — run manually and Ctrl-C when done.
+
 ---
 
 ## Sign Samples
@@ -311,6 +352,10 @@ Demonstrate the `pdfnative sign` command. Both Unix shell and PowerShell scripts
 | [sign/01-basic.ps1](sign/01-basic.ps1) | Same workflow for Windows PowerShell |
 | [sign/02-with-metadata.sh](sign/02-with-metadata.sh) | (v0.2.0) Sign with `--reason`, `--name`, `--location`, `--contact`, `--signing-time` (Bash) |
 | [sign/02-with-metadata.ps1](sign/02-with-metadata.ps1) | (v0.2.0) PowerShell equivalent |
+| [sign/03-ecdsa.sh](sign/03-ecdsa.sh) | (v0.3.0) Generate a P-256 keypair and sign with `--algorithm ecdsa-sha256` (Bash) |
+| [sign/03-ecdsa.ps1](sign/03-ecdsa.ps1) | (v0.3.0) PowerShell equivalent |
+| [sign/04-roundtrip.sh](sign/04-roundtrip.sh) | (v0.3.0) Full **render → sign → verify** pipeline; asserts `signatureValid: true` via `jq` |
+| [sign/04-roundtrip.ps1](sign/04-roundtrip.ps1) | (v0.3.0) PowerShell equivalent |
 
 **Prerequisites:** `openssl` on your PATH (ships with Git for Windows).
 
@@ -343,9 +388,9 @@ Demonstrate the `pdfnative inspect` command.
 
 ---
 
-## Verify Samples (v0.2.0)
+## Verify Samples
 
-Demonstrate the new `pdfnative verify` command — verifies CMS/PKCS#7 signatures embedded in a PDF (integrity, certificate chain, and trust evaluation).
+Demonstrate the `pdfnative verify` command — verifies CMS/PKCS#7 signatures embedded in a PDF (integrity, certificate chain, trust evaluation, and CMS signature-value verification).
 
 | Script | Description |
 |--------|-------------|
@@ -353,8 +398,12 @@ Demonstrate the new `pdfnative verify` command — verifies CMS/PKCS#7 signature
 | [verify/01-self-signed.ps1](verify/01-self-signed.ps1) | PowerShell equivalent |
 | [verify/02-strict-mode.sh](verify/02-strict-mode.sh) | `--strict` mode — exits non-zero if any signature fails (CI-friendly) |
 | [verify/02-strict-mode.ps1](verify/02-strict-mode.ps1) | PowerShell equivalent |
+| [verify/03-cms-rsa.sh](verify/03-cms-rsa.sh) | (v0.3.0) Verify CMS **RSA-SHA256** signature value end-to-end |
+| [verify/03-cms-rsa.ps1](verify/03-cms-rsa.ps1) | (v0.3.0) PowerShell equivalent |
+| [verify/04-cms-ecdsa.sh](verify/04-cms-ecdsa.sh) | (v0.3.0) Verify CMS **ECDSA-SHA256 (P-256)** signature value end-to-end |
+| [verify/04-cms-ecdsa.ps1](verify/04-cms-ecdsa.ps1) | (v0.3.0) PowerShell equivalent |
 
-**Scope (v0.2.0):** verify checks **integrity** (byte-range SHA-256), **certificate chain signatures** (via pdfnative `verifyCertSignature`), and **trust** (against `--trust <root.pem>` PEM roots, or self-signed acceptance). Full CMS-signature-value verification, OCSP/CRL revocation, and RFC 3161 timestamp validation are deferred until pdfnative exposes the corresponding primitives — see [ROADMAP.md](../ROADMAP.md).
+**Scope (v0.3.0):** verify checks **integrity** (byte-range SHA-256), **CMS signature value** (RSA-PKCS#1 v1.5 SHA-256 and ECDSA-SHA256 over P-256), **certificate chain signatures**, and **trust** (against `--trust <root.pem>` PEM roots, or self-signed acceptance). RFC 3161 timestamp tokens are **detected and reported** but their cryptographic validation is deferred to v0.4.0. OCSP/CRL revocation and PAdES-B-LT/B-LTA are also v0.4.0 targets — see [ROADMAP.md](../ROADMAP.md) and [SECURITY.md](../SECURITY.md#cryptographic-verification-scope).
 
 ---
 
@@ -382,11 +431,19 @@ node samples/run-all.js [--category <name>] [--clean]
   --clean             Delete samples/output/ before running
 ```
 
+**Skipped categories:** `watch/` and `template/` are skipped by default — `watch/` runs forever, and `template/` contains partial payloads that must be merged via `--template`. Run them manually using the per-script `.sh` / `.ps1` drivers.
+
 Examples:
 
 ```bash
 # Render only barcode samples
 node samples/run-all.js --category barcode
+
+# Render the v0.3.0 font preset sample
+node samples/run-all.js --category font
+
+# Run the full render → sign → verify pipeline
+bash samples/sign/04-roundtrip.sh
 
 # Clean output and re-render everything
 node samples/run-all.js --clean

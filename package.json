@@ -1,7 +1,7 @@
 {
   "name": "pdfnative-cli",
-  "version": "0.2.0",
-  "description": "Official CLI for pdfnative — render JSON to PDF, sign, inspect, and verify. Zero extra runtime dependencies.",
+  "version": "0.3.0",
+  "description": "Official CLI for pdfnative — render JSON to PDF, sign (RSA + ECDSA), inspect, and verify CMS signatures. Zero extra runtime dependencies.",
   "type": "module",
   "bin": {
     "pdfnative": "./dist/cli.cjs"
@@ -34,11 +34,17 @@
     "pdfnative",
     "pdf-render",
     "pdf-sign",
+    "pdf-verify",
     "pdf-inspect",
     "zero-dependency",
     "typescript",
     "pdf-a",
     "digital-signature",
+    "cms",
+    "pkcs7",
+    "ecdsa",
+    "rfc3161",
+    "pdf-watch",
     "command-line"
   ],
   "author": "Nizoka <hello@pdfnative.dev> (https://pdfnative.dev)",
@@ -63,7 +69,7 @@
     "provenance": true
   },
   "dependencies": {
-    "pdfnative": "^1.0.5"
+    "pdfnative": "^1.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

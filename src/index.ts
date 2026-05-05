@@ -35,6 +35,10 @@ I/O:
   --output,  -o   Output PDF path (default: stdout)
   --stream        Stream output (large documents). Incompatible with TOC blocks
                   and with header/footer templates that contain {pages}.
+  --watch         Re-render on input file change (requires --input and a
+                  file --output; logs to stderr; debounce 200 ms).
+  --template      Path to JSON template file. Stdin / --input is deep-merged
+                  on top (caller wins; arrays replace).
 
 Variant:
   --variant       document (default) or table
@@ -47,6 +51,8 @@ Layout (flags override values from --layout file):
   --conformance   DEPRECATED — alias for --tagged pdfa{1b|2b|3b}
   --compress      Enable Flate compression (initialises Node compression)
   --lang          Comma-separated language packs (e.g. th,ja,ar)
+  --font          Register a bundled font shortcut (repeatable). Allowed:
+                  latin, emoji. The registered name is then usable via --lang.
 
 Header / Footer:
   --header-left, --header-center, --header-right
@@ -90,8 +96,7 @@ Credentials (env wins over file flags):
   --cert-chain    Path to PEM intermediate (repeatable; env: PDFNATIVE_SIGN_CHAIN)
 
 Algorithm:
-  --algorithm     rsa-sha256 (default). ecdsa-sha256 not yet wired (pdfnative
-                  does not yet expose parseEcPrivateKey).
+  --algorithm     rsa-sha256 (default) or ecdsa-sha256 (P-256 SEC1 keys).
 
 Signature metadata (optional):
   --reason        Reason text shown in signature panel
@@ -125,9 +130,11 @@ Reported per signature:
   - signer subject / issuer
   - certificate chain validity
   - chain root trust evaluation
+  - signature value cryptographic verification (RSA-SHA256 / ECDSA-SHA256)
+  - RFC 3161 timestamp token presence (full timestamp validation TBD)
 
-Out of scope (v0.2.0): full CMS-signature-value verification, OCSP/CRL,
-RFC 3161 timestamps, LTV. These require future pdfnative API additions.
+Out of scope (v0.3.0): OCSP/CRL revocation, full RFC 3161 token validation,
+LTV. These require future pdfnative API additions.
 `;
 
 const INSPECT_USAGE = `\
