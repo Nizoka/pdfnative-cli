@@ -23,21 +23,23 @@ import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../ut
 import { readFileOrStdin } from '../utils/io.js';
 import { CliError } from '../utils/error.js';
 import { loadPemChain, parseCertificateChain } from '../utils/keys.js';
+import { verifyCmsSignatureValue } from '../utils/cms-verify.js';
 
 /**
  * `pdfnative-cli verify` — verify CMS/PKCS#7 signatures embedded in a PDF.
  *
- * Scope (v0.2.0):
+ * Scope (v0.3.0):
  *   ✔ Enumerate signature fields and parse /ByteRange + /Contents
  *   ✔ Recompute SHA-256 of byte-range-covered bytes
  *   ✔ Compare with messageDigest attribute embedded in CMS SignedData (integrity)
  *   ✔ Walk certificate chain via pdfnative `verifyCertSignature`
  *   ✔ Trust evaluation against --trust roots (or self-signed acceptance)
+ *   ✔ FULL CMS signature-value verification (RSA + ECDSA over signedAttrs)
+ *   ✔ RFC 3161 signature-time-stamp-token recognition (presence flag)
  *
- * Out of scope (deferred until pdfnative exposes a verifier):
- *   ✘ Full CMS-signature-value verification (DER re-encoding of signedAttrs is fragile)
+ * Out of scope (deferred to v0.4.0):
+ *   ✘ RFC 3161 timestamp signature validation
  *   ✘ OCSP / CRL revocation
- *   ✘ RFC 3161 timestamp tokens
  *   ✘ Long-Term Validation (LTV)
  */
 
@@ -54,6 +56,9 @@ interface SignatureReport {
     readonly integrity: boolean;
     readonly chainValid: boolean;
     readonly trustedRoot: boolean;
+    readonly signatureValid: boolean;
+    readonly signatureAlgorithm: 'rsa-sha256' | 'ecdsa-sha256' | null;
+    readonly timestampPresent: boolean;
     readonly notes: readonly string[];
 }
 
@@ -372,6 +377,9 @@ export async function verify(args: ParsedArgs): Promise<void> {
         let signerIssuer: string | null = null;
         let chainValid = false;
         let trustedRoot = false;
+        let signatureValid = false;
+        let signatureAlgorithm: 'rsa-sha256' | 'ecdsa-sha256' | null = null;
+        let timestampPresent = false;
 
         if (sig.byteRange !== null) {
             digest = digestByteRange(pdfBytes, sig.byteRange);
@@ -417,6 +425,18 @@ export async function verify(args: ParsedArgs): Promise<void> {
                         trustedRoot = trustRoots.some((t) => certEquals(t, built.root));
                         if (!trustedRoot) notes.push('chain root not in --trust list');
                     }
+
+                    // Full CMS signature-value verification (NEW in v0.3.0).
+                    const cmsResult = verifyCmsSignatureValue(sig.contents, leaf);
+                    signatureValid = cmsResult.signatureValid;
+                    signatureAlgorithm = cmsResult.algorithm;
+                    timestampPresent = cmsResult.timestampPresent;
+                    if (!signatureValid && cmsResult.note !== null) {
+                        notes.push(`CMS signature: ${cmsResult.note}`);
+                    }
+                    if (timestampPresent) {
+                        notes.push('RFC 3161 timestamp token present (recognised, not validated)');
+                    }
                 }
             } catch (e) {
                 const msg = e instanceof Error ? e.message : String(e);
@@ -439,13 +459,16 @@ export async function verify(args: ParsedArgs): Promise<void> {
             integrity,
             chainValid,
             trustedRoot,
+            signatureValid,
+            signatureAlgorithm,
+            timestampPresent,
             notes,
         });
     });
 
     const allValid =
         reports.length > 0
-        && reports.every((r) => r.integrity && r.chainValid && r.trustedRoot);
+        && reports.every((r) => r.integrity && r.chainValid && r.trustedRoot && r.signatureValid);
 
     const result: VerifyResult = { signatures: reports, allValid };
 
@@ -459,9 +482,12 @@ export async function verify(args: ParsedArgs): Promise<void> {
                 + `    signer:    ${r.signerSubject ?? '—'}\n`
                 + `    issuer:    ${r.signerIssuer ?? '—'}\n`
                 + `    signed at: ${r.signingTime ?? '—'}\n`
+                + `    algorithm: ${r.signatureAlgorithm ?? '—'}\n`
                 + `    integrity: ${r.integrity ? 'OK' : 'FAIL'}\n`
+                + `    signature: ${r.signatureValid ? 'OK' : 'FAIL'}\n`
                 + `    chain:     ${r.chainValid ? 'valid' : 'invalid'}\n`
-                + `    trust:     ${r.trustedRoot ? 'trusted' : 'untrusted'}\n`,
+                + `    trust:     ${r.trustedRoot ? 'trusted' : 'untrusted'}\n`
+                + `    timestamp: ${r.timestampPresent ? 'present' : '—'}\n`,
             );
             if (r.notes.length > 0) {
                 process.stdout.write(`    notes:     ${r.notes.join('; ')}\n`);

@@ -15,12 +15,19 @@ export { signPdfBytes } from 'pdfnative';
 export { parseRsaPrivateKey, parseCertificate } from 'pdfnative';
 
 // ── Verify ───────────────────────────────────────────────────────────
-export { derDecode, verifyCertSignature, isSelfSigned } from 'pdfnative';
+export {
+    derDecode,
+    verifyCertSignature,
+    isSelfSigned,
+    rsaVerifyHash,
+    ecdsaVerify,
+    decodeEcPublicKey,
+} from 'pdfnative';
 
 // ── Inspect / Verify — PDF parser helpers ────────────────────────────
 export { openPdf, isRef, isName, isDict, isArray, nameValue } from 'pdfnative';
 
-// ── Fonts (multi-language --lang flag) ───────────────────────────────
+// ── Fonts (multi-language --lang flag, v1.1.0 latin/emoji modules) ──
 export { registerFont, registerFonts, loadFontData, hasFontLoader } from 'pdfnative';
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -45,6 +52,8 @@ export type {
     X509Certificate,
     X509Name,
     RsaPrivateKey,
+    EcPrivateKey,
+    EcPublicKey,
     Asn1Node,
 } from 'pdfnative';
 

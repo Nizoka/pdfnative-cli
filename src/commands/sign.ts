@@ -5,6 +5,7 @@ import { readFileOrStdin, writeOutput } from '../utils/io.js';
 import { CliError } from '../utils/error.js';
 import {
     loadRsaPrivateKey,
+    loadEcPrivateKey,
     loadCertificate,
     loadPemChain,
     parseCertificateChain,
@@ -39,17 +40,6 @@ export async function sign(args: ParsedArgs): Promise<void> {
             2,
         );
     }
-    if (algorithm === 'ecdsa-sha256') {
-        // pdfnative 1.0.5 does not yet expose a PEM/PKCS#8 parser for EC private keys.
-        // Constructing one manually would duplicate ASN.1 logic that belongs in the library.
-        // Use the pdfnative Node.js API directly until a future release adds parseEcPrivateKey.
-        throw new CliError(
-            'ECDSA signing is not yet available via the CLI. ' +
-            'It requires a pdfnative release exposing parseEcPrivateKey. ' +
-            'Use the pdfnative Node.js API directly to sign with ECDSA.',
-            2,
-        );
-    }
 
     // Validate scalar flags up-front so usage errors (exit 2) are reported
     // before any I/O or expensive PEM parsing.
@@ -69,7 +59,6 @@ export async function sign(args: ParsedArgs): Promise<void> {
     const pdfBytes = new Uint8Array(pdfBuf);
 
     // Load credentials. Env vars beat file flags (OWASP best practice).
-    const rsaKey = await loadRsaPrivateKey('PDFNATIVE_SIGN_KEY', keyPath, 'key');
     const signerCert = await loadCertificate('PDFNATIVE_SIGN_CERT', certPath, 'cert');
 
     // Optional intermediate-CA chain
@@ -77,10 +66,14 @@ export async function sign(args: ParsedArgs): Promise<void> {
     const certChain = chainPemBlocks.length > 0 ? parseCertificateChain(chainPemBlocks) : undefined;
 
     const options: { -readonly [K in keyof PdfSignOptions]: PdfSignOptions[K] } = {
-        rsaKey,
         signerCert,
         algorithm,
     };
+    if (algorithm === 'ecdsa-sha256') {
+        options.ecKey = await loadEcPrivateKey('PDFNATIVE_SIGN_KEY', keyPath, 'key');
+    } else {
+        options.rsaKey = await loadRsaPrivateKey('PDFNATIVE_SIGN_KEY', keyPath, 'key');
+    }
     if (certChain !== undefined) options.certChain = certChain;
     if (reason !== undefined) options.reason = reason;
     if (name !== undefined) options.name = name;

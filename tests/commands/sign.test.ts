@@ -151,17 +151,18 @@ describe('sign', () => {
         expect((err as CliError).exitCode).toBe(2);
     });
 
-    it('--algorithm ecdsa-sha256 throws clean stub error (not yet wired)', async () => {
+    it('--algorithm ecdsa-sha256 requires an EC key (not RSA)', async () => {
         const pdfPath = await makeTestPdf();
+        // Provide an RSA key — should fail with a clean parse error, never leak key bytes.
+        process.env['PDFNATIVE_SIGN_KEY'] = TEST_KEY_PEM;
+        process.env['PDFNATIVE_SIGN_CERT'] = TEST_CERT_PEM;
         const err = await sign(parseArgs([
             '--input', pdfPath,
             '--algorithm', 'ecdsa-sha256',
         ])).catch((e: unknown) => e);
-        expect(err).toBeInstanceOf(CliError);
-        expect((err as CliError).exitCode).toBe(2);
-        expect((err as CliError).message).toMatch(/ECDSA/i);
+        expect(err).toBeInstanceOf(Error);
         // Must never expose key material in the message.
-        expect((err as CliError).message).not.toMatch(/-----BEGIN/);
+        expect((err as Error).message).not.toMatch(/-----BEGIN/);
     });
 
     it('rejects invalid --signing-time', async () => {
