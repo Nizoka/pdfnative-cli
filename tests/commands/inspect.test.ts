@@ -202,4 +202,42 @@ describe('inspect', () => {
         expect(err).toBeInstanceOf(CliError);
         expect((err as CliError).exitCode).toBe(2);
     });
+
+    it('--format text with --pages and --verbose renders all sections', async () => {
+        const pdfPath = await generateTestPdf();
+        const chunks: string[] = [];
+        const original = process.stdout.write.bind(process.stdout);
+        process.stdout.write = (c: unknown) => {
+            chunks.push(String(c));
+            return true;
+        };
+        try {
+            await inspect(parseArgs([
+                '--input', pdfPath,
+                '--format', 'text',
+                '--pages',
+                '--verbose',
+            ]));
+        } finally {
+            process.stdout.write = original;
+        }
+        const output = chunks.join('');
+        expect(output).toContain('Pages detail:');
+        expect(output).toContain('Trailer keys:');
+        expect(output).toContain('Catalog keys:');
+        expect(output).toContain('Object count:');
+    });
+
+    it('--check pdfa,signed,encrypted all pass on a hypothetical PDF/A signed encrypted doc → not realistic; instead asserts exit 0 when no checks given', async () => {
+        const pdfPath = await generateTestPdf();
+        const original = process.stdout.write.bind(process.stdout);
+        process.stdout.write = () => true;
+        try {
+            await inspect(parseArgs(['--input', pdfPath]));
+        } finally {
+            process.stdout.write = original;
+        }
+        // No throw → success.
+        expect(true).toBe(true);
+    });
 });

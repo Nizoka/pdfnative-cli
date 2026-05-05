@@ -14,14 +14,19 @@ export default defineConfig({
             //   defensive parse-error branches are not unit-targeted.
             exclude: ['src/index.ts', 'src/commands/verify.ts'],
             thresholds: {
-                // v0.3.0: lowered branch threshold from 80→70 because the new CMS /
-                // ASN.1 / signature-placeholder code adds defensive error-branches
-                // that are exercised by integration tests (sign→verify roundtrip)
-                // but not by isolated unit branches. Keep statements/lines high.
-                statements: 75,
-                branches: 70,
-                functions: 85,
-                lines: 75,
+                // v0.3.0 hardening: thresholds raised to reflect added unit
+                // coverage for asn1-walk, cert-fix, sign-placeholder and EC
+                // key parsing. Branch coverage on `cms-verify.ts` and the
+                // streaming I/O paths is intentionally lower — those branches
+                // are exercised by the sign→verify integration test
+                // (tests/integration/sign-verify-roundtrip.test.ts) rather
+                // than by isolated unit tests, since they require valid CMS
+                // / encrypted PDF fixtures whose construction belongs in
+                // pdfnative itself.
+                statements: 79,
+                branches: 77,
+                functions: 95,
+                lines: 79,
             },
         },
     },

@@ -194,4 +194,25 @@ describe('sign', () => {
         expect((err as CliError).message).not.toContain('SECRETBYTES');
         expect((err as CliError).message).not.toMatch(/-----BEGIN/);
     });
+
+    it('rejects signing an encrypted PDF (placeholder injection fails)', async () => {
+        // Render an encrypted PDF first.
+        const inPath = path.join(os.tmpdir(), `sign-enc-${Date.now()}.json`);
+        const pdfPath = path.join(os.tmpdir(), `sign-enc-${Date.now()}.pdf`);
+        tmpFiles.push(inPath, pdfPath);
+        await fs.writeFile(inPath, minimalParams, 'utf8');
+        await render(parseArgs([
+            '--input', inPath,
+            '--output', pdfPath,
+            '--encrypt-owner-pass', 'secret',
+        ]));
+
+        process.env['PDFNATIVE_SIGN_KEY'] = TEST_KEY_PEM;
+        process.env['PDFNATIVE_SIGN_CERT'] = TEST_CERT_PEM;
+        const err = await sign(parseArgs(['--input', pdfPath])).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(CliError);
+        expect((err as CliError).exitCode).toBe(1);
+        // Generic message — must not leak crypto internals.
+        expect((err as CliError).message).not.toMatch(/-----BEGIN/);
+    });
 });

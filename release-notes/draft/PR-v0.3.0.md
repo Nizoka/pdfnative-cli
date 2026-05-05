@@ -2,7 +2,7 @@
 
 > **Branch:** `release/v0.3.0` → `main`
 > **Type:** Minor release (additive, fully backward-compatible with v0.2.0)
-> **pdfnative bump:** `^1.0.0` → `^1.1.0`
+> **pdfnative bump:** `^1.0.5` → `^1.1.0`
 
 ## Summary
 

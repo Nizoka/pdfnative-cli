@@ -27,22 +27,34 @@ This document outlines the planned development direction for pdfnative-cli. Prio
 - [x] **`--conformance` deprecated** in favour of `--tagged`.
 - [x] **`pdfnative` bumped** to `^1.0.5`.
 
+### v0.3.0 — Sign & Verify completeness _(released 2026-05-05)_
+
+- [x] **ECDSA-SHA256 signing** — full P-256 SEC1 / PKCS#8 key parsing in
+  [src/utils/keys.ts](src/utils/keys.ts); selectable via `sign --algorithm ecdsa-sha256`.
+- [x] **`verify` — full CMS signature-value verification** — RSA-SHA256 and
+  ECDSA-SHA256 cryptographic signature checks with re-encoded `signedAttrs`,
+  `messageDigest` integrity comparison, certificate-chain construction, and
+  trust-anchor evaluation.
+- [x] **Signed-PDF round-trip integration test** —
+  [tests/integration/sign-verify-roundtrip.test.ts](tests/integration/sign-verify-roundtrip.test.ts)
+  generates real PEM fixtures (RSA + EC) and asserts `signatureValid: true`.
+- [x] **`render --watch`** — watch input file and re-render on change (200 ms debounce).
+- [x] **`render --template`** — load a JSON template file, deep-merge with stdin/`--input`.
+- [x] **`render --font`** — register bundled `latin` / `emoji` font shortcuts.
+- [x] **RFC 3161 timestamp recognition** — `verify` reports `timestampPresent: true`
+  when a signature-timestamp attribute is found. **Validation deferred** — see v0.4.0.
+- [x] **`pdfnative` bumped** to `^1.1.0` (was `^1.0.5`).
+
 ## In Progress
 
-### v0.3.0 — Sign & Verify completeness
+### v0.4.0 — Long-Term Validation (LTV) & revocation
 
-- [ ] **ECDSA signing** — wire RSA path is shipped; ECDSA path currently stubbed pending
-  pdfnative `parseEcPrivateKey` (already prepared in `src/utils/keys.ts` import surface).
-- [ ] **`verify` — full CMS signature-value verification** — once pdfnative exposes a
-  CMS verifier or stable signed-attribute DER re-encoding API, complete `verify` so
-  signature value, not just integrity, is checked.
-- [ ] **Signed-PDF round-trip test fixture** — generate a real PKCS#8 RSA key + self-signed
-  X.509 cert (likely via a pinned dev-dependency that `node:crypto` cannot replace) so
-  `src/commands/verify.ts` regains coverage instead of being excluded.
-- [ ] **`render --watch`** — watch input file and re-render on change.
-- [ ] **`render --template`** — load a JSON template file, merge with stdin input.
-- [ ] **OCSP / CRL revocation** for `verify` (via pdfnative once available).
-- [ ] **RFC 3161 timestamp tokens** — recognition + validation in both `sign` and `verify`.
+- [ ] **Full RFC 3161 timestamp validation** — verify TSA-token signature, certificate
+  chain, and asserted time as part of `verify --strict`.
+- [ ] **OCSP responder support** — online and embedded responses inside `verify`.
+- [ ] **CRL support** — fetch / parse CRLs for offline revocation checks.
+- [ ] **PAdES-B-LT / B-LTA** — emit DSS dictionaries and document timestamps when signing.
+- [ ] **`verify --revocation-policy`** — strict / soft-fail / disabled selector.
 
 ## Future Considerations
 

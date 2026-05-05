@@ -7,6 +7,8 @@ import {
     splitPemBlocks,
     loadPem,
     loadPemChain,
+    parseEcPrivateKeyDer,
+    parseCertificateChain,
 } from '../../src/utils/keys.js';
 import { CliError } from '../../src/utils/error.js';
 
@@ -117,5 +119,60 @@ describe('loadPemChain', () => {
         await fs.writeFile(p, FAKE_PEM_2, 'utf8');
         const blocks = await loadPemChain('TEST_CHAIN_ENV', [p]);
         expect(blocks).toHaveLength(2);
+    });
+});
+
+describe('parseEcPrivateKeyDer — error paths', () => {
+    it('throws when DER is not a SEQUENCE', () => {
+        // INTEGER 0x05
+        expect(() => parseEcPrivateKeyDer(new Uint8Array([0x02, 0x01, 0x05])))
+            .toThrow(CliError);
+    });
+
+    it('throws when SEQUENCE has fewer than 2 children', () => {
+        // SEQUENCE { INTEGER 1 }
+        expect(() => parseEcPrivateKeyDer(new Uint8Array([0x30, 0x03, 0x02, 0x01, 0x01])))
+            .toThrow(CliError);
+    });
+
+    it('throws on an unrecognised second-child tag (not SEQUENCE/OCTET-STRING)', () => {
+        // SEQUENCE { INTEGER 1, INTEGER 2 } — second child INTEGER (not 0x30 / 0x04)
+        const der = new Uint8Array([0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02]);
+        expect(() => parseEcPrivateKeyDer(der)).toThrow(/Unrecognised|EC private key/);
+    });
+
+    it('throws on PKCS#8 wrapping with non-EC algorithm OID', () => {
+        // SEQUENCE { INTEGER 0,
+        //           SEQUENCE { OID 1.2.840.113549.1.1.1 (rsaEncryption), NULL },
+        //           OCTET STRING (empty) }
+        const oidRsa = [0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01];
+        const algId = [0x30, oidRsa.length + 2, ...oidRsa, 0x05, 0x00];
+        const inner = [0x04, 0x00];
+        const seq = [0x02, 0x01, 0x00, ...algId, ...inner];
+        const der = new Uint8Array([0x30, seq.length, ...seq]);
+        const err = (() => { try { parseEcPrivateKeyDer(der); return null; } catch (e) { return e; } })();
+        expect(err).toBeInstanceOf(CliError);
+        expect((err as CliError).message).toMatch(/id-ecPublicKey|EC private key/);
+    });
+});
+
+describe('parseCertificateChain', () => {
+    it('returns empty array for empty input', () => {
+        expect(parseCertificateChain([])).toEqual([]);
+    });
+
+    it('throws CliError when a chain block is not a valid certificate', () => {
+        const garbage = '-----BEGIN CERTIFICATE-----\nSGVsbG8=\n-----END CERTIFICATE-----';
+        expect(() => parseCertificateChain([garbage])).toThrow(CliError);
+    });
+
+    it('error message never echoes the PEM body', () => {
+        const garbage = '-----BEGIN CERTIFICATE-----\nU0VDUkVUU0VDUkVU\n-----END CERTIFICATE-----';
+        try {
+            parseCertificateChain([garbage]);
+        } catch (e) {
+            expect((e as Error).message).not.toContain('SECRETSECRET');
+            expect((e as Error).message).not.toContain('U0VDUkVU');
+        }
     });
 });

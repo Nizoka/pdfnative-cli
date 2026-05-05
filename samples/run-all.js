@@ -24,7 +24,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const RENDER_DIR = join(__dirname, 'render');
 const OUTPUT_DIR = join(__dirname, 'output');
 
-// Per-category extra CLI flags (v0.2.0). Categories not listed here render with
+// Per-category extra CLI flags (v0.2.0+). Categories not listed here render with
 // the default DocumentParams variant and no extra flags.
 const CATEGORY_FLAGS = {
   'table-variant':   ['--variant', 'table'],
@@ -43,7 +43,13 @@ const CATEGORY_FLAGS = {
                     + ':application/xml:Source:Structured invoice payload',
   ],
   multilang: [], // file-name-driven; resolved below
+  // v0.3.0 additions
+  font:     ['--font', 'latin', '--lang', 'latin'],
 };
+
+// Categories whose JSON samples are intentionally skipped by run-all because
+// they require multi-file orchestration or interactive input (e.g. --watch).
+const SKIP_CATEGORIES = new Set(['watch', 'template']);
 
 /** Per-file overrides (within a category). */
 // Note: --lang <code> requires a programmatic font loader registered before the
@@ -84,6 +90,7 @@ for (const category of readdirSync(RENDER_DIR, { withFileTypes: true })
     .map(d => d.name)) {
 
   if (categoryFilter && category !== categoryFilter) continue;
+  if (SKIP_CATEGORIES.has(category)) continue;
 
   const categoryDir = join(RENDER_DIR, category);
   const outCategoryDir = join(OUTPUT_DIR, category);

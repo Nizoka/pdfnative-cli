@@ -1,0 +1,14 @@
+{
+    "title": "Latin font shortcut",
+    "blocks": [
+        {
+            "type": "heading",
+            "text": "Hello from --font latin",
+            "level": 1
+        },
+        {
+            "type": "paragraph",
+            "text": "This document is rendered using the bundled Noto Sans Latin font registered via the v0.3.0 --font flag, which avoids any programmatic font loader setup."
+        }
+    ]
+}

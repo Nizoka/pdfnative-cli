@@ -487,9 +487,9 @@ export async function verify(args: ParsedArgs): Promise<void> {
                         notes.push('RFC 3161 timestamp token present (recognised, not validated)');
                     }
                 }
-            } catch (e) {
-                const msg = e instanceof Error ? e.message : String(e);
-                notes.push(`failed to parse CMS: ${msg}`);
+            } catch {
+                // Avoid leaking ASN.1 byte offsets or internal parser state.
+                notes.push('failed to parse CMS (malformed or unsupported structure)');
             }
         } else {
             notes.push('missing /Contents');

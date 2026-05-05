@@ -1,0 +1,16 @@
+{
+    "metadata": {
+        "author": "Q1 Reporting Team"
+    },
+    "blocks": [
+        {
+            "type": "heading",
+            "text": "Q1 2026 Results",
+            "level": 1
+        },
+        {
+            "type": "paragraph",
+            "text": "This document inherits its title and `subject` metadata from base.json. The author field is overridden, and the blocks array fully replaces the placeholder heading from the template."
+        }
+    ]
+}

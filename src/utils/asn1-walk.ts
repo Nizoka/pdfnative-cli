@@ -34,6 +34,10 @@ export interface AbsNode {
     readonly children: readonly AbsNode[];
 }
 
+/** Hard cap on a single ASN.1 node's content length: 50 MiB.
+ *  Defends against crafted CMS structures with multi-GB declared lengths. */
+const MAX_CONTENT_LEN = 50 * 1024 * 1024;
+
 function decodeLength(buf: Uint8Array, pos: number): { length: number; nextPos: number } {
     if (pos >= buf.length) throw new Error('ASN.1: unexpected end in length');
     const first = buf[pos] as number;
@@ -48,6 +52,9 @@ function decodeLength(buf: Uint8Array, pos: number): { length: number; nextPos: 
     let v = 0;
     for (let i = 0; i < numBytes; i++) {
         v = (v << 8) | (buf[pos + 1 + i] as number);
+    }
+    if (v < 0 || v > MAX_CONTENT_LEN) {
+        throw new Error(`ASN.1: content length ${v} exceeds maximum (${MAX_CONTENT_LEN})`);
     }
     return { length: v, nextPos: pos + 1 + numBytes };
 }

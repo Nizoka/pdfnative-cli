@@ -107,8 +107,8 @@ export async function sign(args: ParsedArgs): Promise<void> {
         signedBytes = signPdfBytes(pdfBytes, options);
     } catch (e) {
         // Never include the underlying message — it may reference key bytes or hashes.
-        const safeMsg = e instanceof Error ? e.message.split('\n')[0] : 'unknown error';
-        throw new CliError(`Failed to sign PDF: ${safeMsg ?? 'unknown error'}`, 1);
+        if (e instanceof CliError) throw e;
+        throw new CliError('Failed to sign PDF.', 1);
     }
     await writeOutput(signedBytes, outputPath);
 }
