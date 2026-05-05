@@ -19,6 +19,7 @@ import type {
 } from '../core-bridge/index.js';
 import { validatePath } from './io.js';
 import { CliError } from './error.js';
+import { correctCertificateIssuerRaw } from './cert-fix.js';
 
 /**
  * Decode a PEM-encoded block to DER bytes.
@@ -267,7 +268,7 @@ export async function loadCertificate(
 ): Promise<X509Certificate> {
     const pem = await loadPem(envVar, filePath, 'certificate', flagName);
     try {
-        return parseCertificate(pemToDer(pem));
+        return correctCertificateIssuerRaw(parseCertificate(pemToDer(pem)));
     } catch {
         throw new CliError(
             'Failed to parse X.509 certificate. Verify the file is valid PEM-encoded.',
@@ -281,7 +282,7 @@ export function parseCertificateChain(pemBlocks: readonly string[]): X509Certifi
     const out: X509Certificate[] = [];
     for (const pem of pemBlocks) {
         try {
-            out.push(parseCertificate(pemToDer(pem)));
+            out.push(correctCertificateIssuerRaw(parseCertificate(pemToDer(pem))));
         } catch {
             throw new CliError('Failed to parse certificate in chain.', 1);
         }

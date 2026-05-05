@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
     openPdf,
-    derDecode,
+    ensureCryptoReady,
     parseCertificate,
     verifyCertSignature,
     isSelfSigned,
@@ -17,13 +17,14 @@ import type {
     PdfValue,
     X509Certificate,
     X509Name,
-    Asn1Node,
 } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../utils/args.js';
 import { readFileOrStdin } from '../utils/io.js';
 import { CliError } from '../utils/error.js';
+import { walkAbs, sliceNode, sliceContent, type AbsNode } from '../utils/asn1-walk.js';
 import { loadPemChain, parseCertificateChain } from '../utils/keys.js';
 import { verifyCmsSignatureValue } from '../utils/cms-verify.js';
+import { correctCertificateIssuerRaw } from '../utils/cert-fix.js';
 
 /**
  * `pdfnative-cli verify` — verify CMS/PKCS#7 signatures embedded in a PDF.
@@ -108,9 +109,10 @@ function digestByteRange(
 
 const MESSAGE_DIGEST_OID = '1.2.840.113549.1.9.4';
 
-function decodeOid(node: Asn1Node): string | null {
+/** Decode an OID from an `AbsNode` whose tag is OID (0x06). */
+function decodeOidAbs(buf: Uint8Array, node: AbsNode): string | null {
     if (node.tag !== 0x06) return null;
-    const bytes = node.value;
+    const bytes = sliceContent(buf, node);
     if (bytes.length === 0) return null;
     const first = bytes[0] as number;
     const parts: number[] = [Math.floor(first / 40), first % 40];
@@ -126,22 +128,22 @@ function decodeOid(node: Asn1Node): string | null {
     return parts.join('.');
 }
 
-/** Recursively scan an ASN.1 tree for the messageDigest attribute octet string. */
-function findMessageDigest(node: Asn1Node): Uint8Array | null {
+/** Recursively scan an absolute-offset ASN.1 tree for the messageDigest octet string. */
+function findMessageDigest(buf: Uint8Array, node: AbsNode): Uint8Array | null {
     if (node.children.length >= 2) {
-        const oid = decodeOid(node.children[0] as Asn1Node);
+        const oid = decodeOidAbs(buf, node.children[0] as AbsNode);
         if (oid === MESSAGE_DIGEST_OID) {
-            const setNode = node.children[1] as Asn1Node;
+            const setNode = node.children[1] as AbsNode;
             if (setNode.children.length > 0) {
-                const oct = setNode.children[0] as Asn1Node;
+                const oct = setNode.children[0] as AbsNode;
                 if (oct.tag === 0x04) {
-                    return oct.value;
+                    return sliceContent(buf, oct);
                 }
             }
         }
     }
     for (const child of node.children) {
-        const found = findMessageDigest(child);
+        const found = findMessageDigest(buf, child);
         if (found !== null) return found;
     }
     return null;
@@ -149,22 +151,33 @@ function findMessageDigest(node: Asn1Node): Uint8Array | null {
 
 /**
  * Extract certificate DER blocks from a CMS SignedData structure.
- * Walks the parsed ASN.1 tree looking for [0] IMPLICIT (tag 0xa0) — the
- * `certificates` field of SignedData. Each child SEQUENCE is one cert.
+ *
+ * Walks the precise CMS ASN.1 path (RFC 5652):
+ *   ContentInfo SEQUENCE
+ *     ├─ contentType OID
+ *     └─ content [0] EXPLICIT
+ *          └─ SignedData SEQUENCE
+ *               ├─ version, digestAlgorithms SET, encapContentInfo, …
+ *               └─ certificates [0] IMPLICIT  (← we want this)
+ *                    └─ each child SEQUENCE = one X.509 certificate
  */
-function extractCertsFromCms(cmsBytes: Uint8Array, root: Asn1Node): Uint8Array[] {
+function extractCertsFromCms(cmsBytes: Uint8Array, root: AbsNode): Uint8Array[] {
+    if (root.tag !== 0x30 || root.children.length < 2) return [];
+    const explicit = root.children[1] as AbsNode;
+    if (explicit.tag !== 0xa0 || explicit.children.length === 0) return [];
+    const signedData = explicit.children[0] as AbsNode;
+    if (signedData.tag !== 0x30) return [];
+
     const certs: Uint8Array[] = [];
-    const visit = (node: Asn1Node): void => {
-        if (node.tag === 0xa0 && node.children.length > 0) {
-            for (const child of node.children) {
-                if (child.tag === 0x30) {
-                    certs.push(cmsBytes.subarray(child.offset, child.offset + child.totalLength));
-                }
+    for (const child of signedData.children) {
+        if (child.tag === 0xa0) {
+            // certificates [0] IMPLICIT — children are SEQUENCEs (one per cert).
+            for (const certNode of child.children) {
+                if (certNode.tag === 0x30) certs.push(sliceNode(cmsBytes, certNode));
             }
+            break;
         }
-        for (const child of node.children) visit(child);
-    };
-    visit(root);
+    }
     return certs;
 }
 
@@ -244,6 +257,33 @@ interface ParsedSignature {
     readonly location: string | null;
 }
 
+/**
+ * Trim trailing zero-padding from a DER-encoded blob extracted from a PDF
+ * `/Contents <…>` placeholder. Returns the slice up to the encoded length of
+ * the outermost ASN.1 object, or `null` when the bytes don't start with a
+ * valid tag-length prefix.
+ */
+function trimDerToLength(bytes: Uint8Array): Uint8Array | null {
+    if (bytes.length < 2) return null;
+    const lenByte = bytes[1] as number;
+    let totalLen: number;
+    if (lenByte < 0x80) {
+        totalLen = 2 + lenByte;
+    } else {
+        const numLenBytes = lenByte & 0x7f;
+        if (numLenBytes === 0 || numLenBytes > 4) return null;
+        if (bytes.length < 2 + numLenBytes) return null;
+        let v = 0;
+        for (let i = 0; i < numLenBytes; i++) {
+            v = (v << 8) | (bytes[2 + i] as number);
+        }
+        totalLen = 2 + numLenBytes + v;
+    }
+    if (totalLen <= 0 || totalLen > bytes.length) return null;
+    if (totalLen === bytes.length) return bytes;
+    return bytes.slice(0, totalLen);
+}
+
 function parseSignatureDict(dict: PdfDict): ParsedSignature {
     const brVal = dict.get('ByteRange');
     let byteRange: readonly [number, number, number, number] | null = null;
@@ -276,6 +316,12 @@ function parseSignatureDict(dict: PdfDict): ParsedSignature {
                 raw[i] = contentsRaw.charCodeAt(i) & 0xff;
             }
             contents = raw;
+        }
+        // Trim trailing zero-padding from /Contents placeholder. The CMS
+        // is the first DER object; pdfnative pads the rest with 0x00 bytes.
+        if (contents !== null && contents.length >= 2) {
+            const trimmed = trimDerToLength(contents);
+            if (trimmed !== null) contents = trimmed;
         }
     }
 
@@ -351,6 +397,9 @@ export async function verify(args: ParsedArgs): Promise<void> {
         throw new CliError(`Invalid --format value "${format}". Valid: json, text.`, 2);
     }
 
+    // Async crypto bootstrap MUST run before any RSA/ECDSA verification.
+    await ensureCryptoReady();
+
     const trustPemBlocks = await loadPemChain('PDFNATIVE_VERIFY_TRUST', trustPaths);
     const trustRoots = trustPemBlocks.length > 0 ? parseCertificateChain(trustPemBlocks) : [];
 
@@ -389,17 +438,17 @@ export async function verify(args: ParsedArgs): Promise<void> {
 
         if (sig.contents !== null) {
             try {
-                const root = derDecode(sig.contents);
+                const root = walkAbs(sig.contents);
                 const certDers = extractCertsFromCms(sig.contents, root);
                 if (certDers.length === 0) {
                     notes.push('no certificates embedded in CMS');
                 } else {
-                    const certs = certDers.map((der) => parseCertificate(der));
+                    const certs = certDers.map((der) => correctCertificateIssuerRaw(parseCertificate(der)));
                     const leaf = certs[0] as X509Certificate;
                     signerSubject = nameToString(leaf.subject);
                     signerIssuer = nameToString(leaf.issuer);
 
-                    const md = findMessageDigest(root);
+                    const md = findMessageDigest(sig.contents, root);
                     if (md !== null && digest !== null) {
                         integrity = bytesToHex(md) === digest;
                         if (!integrity) {

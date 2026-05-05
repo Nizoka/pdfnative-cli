@@ -1,4 +1,4 @@
-import { signPdfBytes } from '../core-bridge/index.js';
+import { signPdfBytes, ensureCryptoReady } from '../core-bridge/index.js';
 import type { PdfSignOptions, SignatureAlgorithm } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll } from '../utils/args.js';
 import { readFileOrStdin, writeOutput } from '../utils/io.js';
@@ -10,6 +10,10 @@ import {
     loadPemChain,
     parseCertificateChain,
 } from '../utils/keys.js';
+import {
+    hasSignaturePlaceholder,
+    injectSignaturePlaceholder,
+} from '../utils/sign-placeholder.js';
 
 const VALID_ALGORITHMS = new Set<SignatureAlgorithm>(['rsa-sha256', 'ecdsa-sha256']);
 
@@ -55,8 +59,12 @@ export async function sign(args: ParsedArgs): Promise<void> {
         throw new CliError('Missing certificate. Provide $PDFNATIVE_SIGN_CERT (env) or --cert <path>.', 2);
     }
 
+    // Async crypto bootstrap MUST run before any RSA/ECDSA key parsing.
+    // pdfnative throws "ASN.1 module must be imported" otherwise.
+    await ensureCryptoReady();
+
     const pdfBuf = await readFileOrStdin(inputPath);
-    const pdfBytes = new Uint8Array(pdfBuf);
+    let pdfBytes: Uint8Array<ArrayBufferLike> = new Uint8Array(pdfBuf);
 
     // Load credentials. Env vars beat file flags (OWASP best practice).
     const signerCert = await loadCertificate('PDFNATIVE_SIGN_CERT', certPath, 'cert');
@@ -80,6 +88,19 @@ export async function sign(args: ParsedArgs): Promise<void> {
     if (location !== undefined) options.location = location;
     if (contactInfo !== undefined) options.contactInfo = contactInfo;
     if (signingTime !== undefined) options.signingTime = signingTime;
+
+    // Auto-inject a signature placeholder when the input PDF doesn't already
+    // carry one (the common case for `pdfnative render`-produced PDFs, which
+    // ship no AcroForm). Idempotent: a pre-prepared PDF is signed as-is.
+    if (!hasSignaturePlaceholder(pdfBytes)) {
+        try {
+            const injected = injectSignaturePlaceholder(pdfBytes, options);
+            pdfBytes = injected.bytes;
+        } catch (e) {
+            if (e instanceof CliError) throw e;
+            throw new CliError('Failed to prepare PDF for signing.', 1);
+        }
+    }
 
     let signedBytes: Uint8Array;
     try {

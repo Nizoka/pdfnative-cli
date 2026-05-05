@@ -32,6 +32,7 @@ import type {
     Asn1Node,
     X509Certificate,
 } from '../core-bridge/index.js';
+import { walkAbs, sliceNode, sliceContent, type AbsNode } from './asn1-walk.js';
 
 // ── OID constants ─────────────────────────────────────────────────────
 
@@ -107,6 +108,25 @@ function rsaPubKeyFromCert(cert: X509Certificate): RsaPublicKey {
 
 // ── CMS walker ────────────────────────────────────────────────────────
 
+/** Decode an OID from an `AbsNode` whose tag is OID (0x06). */
+function oidFromAbs(buf: Uint8Array, node: AbsNode): string | null {
+    if (node.tag !== 0x06) return null;
+    const bytes = sliceContent(buf, node);
+    if (bytes.length === 0) return null;
+    const first = bytes[0] as number;
+    const parts: number[] = [Math.floor(first / 40), first % 40];
+    let v = 0;
+    for (let i = 1; i < bytes.length; i++) {
+        const byte = bytes[i] as number;
+        v = (v << 7) | (byte & 0x7f);
+        if ((byte & 0x80) === 0) {
+            parts.push(v);
+            v = 0;
+        }
+    }
+    return parts.join('.');
+}
+
 /**
  * Locate the SignerInfo node inside a parsed CMS ContentInfo.
  *
@@ -115,18 +135,18 @@ function rsaPubKeyFromCert(cert: X509Certificate): RsaPublicKey {
  *                            certificates [0] IMPLICIT?, crls [1] IMPLICIT?,
  *                            signerInfos SET OF SignerInfo }
  */
-function findSignerInfo(root: Asn1Node): Asn1Node | null {
+function findSignerInfo(buf: Uint8Array, root: AbsNode): AbsNode | null {
     if (root.tag !== 0x30 || root.children.length < 2) return null;
-    if (oidToString(root.children[0] as Asn1Node) !== OID_SIGNED_DATA) return null;
-    const explicit = root.children[1] as Asn1Node;
+    if (oidFromAbs(buf, root.children[0] as AbsNode) !== OID_SIGNED_DATA) return null;
+    const explicit = root.children[1] as AbsNode;
     if (explicit.tag !== 0xa0 || explicit.children.length === 0) return null;
-    const signedData = explicit.children[0] as Asn1Node;
+    const signedData = explicit.children[0] as AbsNode;
     if (signedData.tag !== 0x30) return null;
     // signerInfos is the last SET in SignedData.
     for (let i = signedData.children.length - 1; i >= 0; i--) {
-        const child = signedData.children[i] as Asn1Node;
+        const child = signedData.children[i] as AbsNode;
         if (child.tag === 0x31 && child.children.length > 0) {
-            return child.children[0] as Asn1Node;
+            return child.children[0] as AbsNode;
         }
     }
     return null;
@@ -152,7 +172,7 @@ interface ParsedSignerInfo {
  *   unsignedAttrs [1] IMPLICIT UnsignedAttributes OPTIONAL
  * }
  */
-function parseSignerInfo(cmsBytes: Uint8Array, signerInfo: Asn1Node): ParsedSignerInfo {
+function parseSignerInfo(cmsBytes: Uint8Array, signerInfo: AbsNode): ParsedSignerInfo {
     if (signerInfo.tag !== 0x30) {
         return {
             signedAttrsRaw: null,
@@ -171,18 +191,18 @@ function parseSignerInfo(cmsBytes: Uint8Array, signerInfo: Asn1Node): ParsedSign
     for (const child of signerInfo.children) {
         if (child.tag === 0xa0) {
             // [0] IMPLICIT signedAttrs — capture raw bytes including header.
-            signedAttrsRaw = cmsBytes.subarray(child.offset, child.offset + child.totalLength);
+            signedAttrsRaw = sliceNode(cmsBytes, child);
         } else if (child.tag === 0xa1) {
-            unsignedAttrsRaw = cmsBytes.subarray(child.offset, child.offset + child.totalLength);
+            unsignedAttrsRaw = sliceNode(cmsBytes, child);
         } else if (child.tag === 0x30 && !sigAlgSeen) {
             // First plain SEQUENCE we encounter AFTER signedAttrs must be the
             // signatureAlgorithm. (digestAlgorithm appears before signedAttrs.)
             if (signedAttrsRaw !== null) {
-                signatureAlgorithmOid = oidToString(child.children[0] as Asn1Node);
+                signatureAlgorithmOid = oidFromAbs(cmsBytes, child.children[0] as AbsNode);
                 sigAlgSeen = true;
             }
         } else if (child.tag === 0x04 && sigAlgSeen) {
-            signatureValue = child.value;
+            signatureValue = sliceContent(cmsBytes, child);
         }
     }
     return { signedAttrsRaw, signatureAlgorithmOid, signatureValue, unsignedAttrsRaw };
@@ -272,9 +292,9 @@ export function verifyCmsSignatureValue(
     cmsBytes: Uint8Array,
     leafCert: X509Certificate,
 ): CmsVerifyResult {
-    let root: Asn1Node;
+    let root: AbsNode;
     try {
-        root = derDecode(cmsBytes);
+        root = walkAbs(cmsBytes);
     } catch {
         return {
             signatureValid: false,
@@ -283,7 +303,7 @@ export function verifyCmsSignatureValue(
             note: 'failed to decode CMS DER',
         };
     }
-    const signerInfo = findSignerInfo(root);
+    const signerInfo = findSignerInfo(cmsBytes, root);
     if (signerInfo === null) {
         return {
             signatureValid: false,
