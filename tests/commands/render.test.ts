@@ -288,4 +288,88 @@ describe('render', () => {
         // JSON watermark should be superseded by the CLI override.
         expect(raw).not.toContain('JSON_MARK');
     });
+
+    it('--template deep-merges base JSON under input (input wins)', async () => {
+        const template = JSON.stringify({
+            title: 'Template Title',
+            metadata: { author: 'tmpl-author', subject: 'tmpl-subject' },
+            blocks: [{ type: 'paragraph', text: 'should be overridden' }],
+        });
+        const input = JSON.stringify({
+            metadata: { author: 'input-author' }, // overrides only author
+            blocks: [{ type: 'paragraph', text: 'INPUT_BODY' }], // arrays replace
+        });
+        const outPath = path.join(os.tmpdir(), `render-template-${Date.now()}.pdf`);
+        tmpFiles.push(outPath);
+
+        await withTempFile('.json', template, async (tplPath) => {
+            await withTempFile('.json', input, async (inputPath) => {
+                await render(parseArgs([
+                    '--input', inputPath,
+                    '--template', tplPath,
+                    '--output', outPath,
+                ]));
+            });
+        });
+
+        const raw = (await fs.readFile(outPath)).toString('latin1');
+        // Title comes from template (input did not provide one)
+        expect(raw).toContain('Template Title');
+        // Author overridden by input
+        expect(raw).toContain('input-author');
+        expect(raw).not.toContain('tmpl-author');
+        // Subject preserved from template (input did not override)
+        expect(raw).toContain('tmpl-subject');
+        // Blocks replaced (arrays don't merge)
+        expect(raw).toContain('INPUT_BODY');
+        expect(raw).not.toContain('should be overridden');
+    });
+
+    it('--font registers a bundled shortcut usable by --lang', async () => {
+        const params = JSON.stringify({
+            blocks: [{ type: 'paragraph', text: 'Hello world' }],
+        });
+        const outPath = path.join(os.tmpdir(), `render-font-${Date.now()}.pdf`);
+        tmpFiles.push(outPath);
+
+        await withTempFile('.json', params, async (inputPath) => {
+            await render(parseArgs([
+                '--input', inputPath,
+                '--font', 'latin',
+                '--lang', 'latin',
+                '--output', outPath,
+            ]));
+        });
+
+        const stat = await fs.stat(outPath);
+        expect(stat.size).toBeGreaterThan(1000);
+    });
+
+    it('--font rejects unknown bundled names', async () => {
+        const outPath = path.join(os.tmpdir(), `render-font-bad-${Date.now()}.pdf`);
+        tmpFiles.push(outPath);
+
+        await withTempFile('.json', minimalParams, async (inputPath) => {
+            await expect(
+                render(parseArgs(['--input', inputPath, '--font', 'klingon', '--output', outPath])),
+            ).rejects.toBeInstanceOf(CliError);
+        });
+    });
+
+    it('--watch requires --input', async () => {
+        await expect(
+            render(parseArgs(['--watch', '--output', '/tmp/out.pdf'])),
+        ).rejects.toThrowError(/--input/);
+    });
+
+    it('--watch rejects stdout output', async () => {
+        await withTempFile('.json', minimalParams, async (inputPath) => {
+            await expect(
+                render(parseArgs(['--watch', '--input', inputPath])),
+            ).rejects.toThrowError(/--output/);
+            await expect(
+                render(parseArgs(['--watch', '--input', inputPath, '--output', '-'])),
+            ).rejects.toThrowError(/--output/);
+        });
+    });
 });
