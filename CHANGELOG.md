@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] – 2026-05-XX
+
+### Added
+
+#### `sign` command — full end-to-end signing pipeline
+
+- **ECDSA-SHA256 signatures** — `--algorithm ecdsa-sha256` is now fully wired
+  (was a stub in 0.2.0). Loads SEC1 / PKCS#8 P-256 keys via pdfnative's
+  `parseEcPrivateKey`. RSA remains the default.
+- **Automatic signature placeholder injection** — `pdfnative render` does not
+  emit AcroForm fields, so signing a freshly-rendered PDF used to fail with
+  "no /Contents placeholder". `sign` now detects the missing placeholder and
+  performs a single incremental update adding `/Sig`, the signature widget,
+  and `AcroForm /SigFlags 3` — fully transparent and idempotent for PDFs that
+  already carry a placeholder.
+- **`ensureCryptoReady()`** — pdfnative's async ASN.1 module is now booted on
+  the first sign / verify invocation; previously surfaced as a confusing
+  "ASN.1 module must be imported" error.
+
+#### `verify` command — full CMS / PKCS#7 cryptographic verification
+
+- **CMS signature value verification** — RSA-SHA256 and ECDSA-SHA256
+  signatures embedded in the PDF are now cryptographically verified against
+  the leaf certificate's public key, not just the byte-range digest.
+  Reported as `signatureValid` and `signatureAlgorithm`.
+- **RFC 3161 timestamp recognition** — presence of an unsigned-attribute
+  timestamp token is reported as `timestampPresent`. Full token validation
+  (TSA chain, MD comparison) remains tracked for v0.4.0.
+- **Robust ASN.1 walker** — replaces calls into `pdfnative.derDecode` whose
+  `offset` field is relative below depth 1. The new walker (and the cert-DN
+  re-slicing workaround) guarantee correct `issuerAndSerialNumber` extraction
+  and `isSelfSigned` evaluation for every embedded certificate.
+
+#### `render` command — iteration & template ergonomics
+
+- **`--watch`** — re-render on input file change (200 ms debounce, stderr-only
+  logs, requires `--input <file>` and a file `--output`). Clean shutdown on
+  `SIGINT` / `SIGTERM`.
+- **`--template <file.json>`** — deep-merge a base template under stdin /
+  `--input`. Plain objects merge recursively; arrays and primitives are
+  replaced (caller wins).
+- **`--font <name>`** — register a bundled pdfnative font shortcut.
+  Repeatable; allow-list of `latin` (Noto Sans VF) and `emoji` (Noto Emoji).
+  After registration the name is usable through `--lang`. No path-based
+  surface — the name resolves to a sealed mapping.
+
+### Changed
+
+- Bumped `pdfnative` peer / runtime dependency from `^1.0.0` to `^1.1.0`.
+- Help text for `sign` now lists `ecdsa-sha256` as a fully supported value.
+- Help text for `verify` enumerates the new `signatureValid`,
+  `signatureAlgorithm`, and `timestampPresent` report fields.
+
+### Fixed
+
+- Verify path no longer consumes pdfnative's broken `cert.issuer.raw` /
+  `cert.subject.raw` slices — both are recomputed from
+  `tbsCertificateBytes`. Restores correct chain building and self-signed
+  detection for every cert (including those embedded in CMS).
+
 ## [0.2.0] – 2026-04-28
 
 ### Added
