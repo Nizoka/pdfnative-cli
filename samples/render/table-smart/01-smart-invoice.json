@@ -1,0 +1,33 @@
+{
+  "title": "Smart Table Invoice — pdfnative 1.2.0",
+  "blocks": [
+    { "type": "heading", "text": "Invoice INV-2026-042", "level": 1 },
+    { "type": "paragraph", "text": "Demonstrates pdfnative 1.2.0 smart-table fields set directly in JSON: zebra striping, a repeating header, a caption, wrapping, and custom row height / cell padding." },
+    { "type": "spacer", "height": 12 },
+    {
+      "type": "table",
+      "caption": "Billable line items (Q2 2026)",
+      "wrap": "auto",
+      "repeatHeader": true,
+      "zebra": true,
+      "minRowHeight": 20,
+      "cellPadding": 6,
+      "headers": ["Description", "Qty", "Unit price", "Line total"],
+      "rows": [
+        { "cells": ["Annual platform licence", "1", "$1,200.00", "$1,200.00"], "type": "normal", "pointed": false },
+        { "cells": ["Premium support (per seat, long wrapping description to show auto-wrap behaviour)", "5", "$60.00", "$300.00"], "type": "normal", "pointed": false },
+        { "cells": ["Onboarding workshop", "2", "$450.00", "$900.00"], "type": "normal", "pointed": false },
+        { "cells": ["Data migration", "1", "$750.00", "$750.00"], "type": "normal", "pointed": false },
+        { "cells": ["Custom integration", "3", "$400.00", "$1,200.00"], "type": "normal", "pointed": false }
+      ]
+    },
+    { "type": "spacer", "height": 12 },
+    { "type": "paragraph", "text": "Total due: $4,350.00 — net 30." }
+  ],
+  "footerText": "Smart-table sample — pdfnative-cli 1.0.0",
+  "metadata": {
+    "author": "Accounts Receivable",
+    "subject": "Smart table demonstration",
+    "keywords": "table, zebra, caption, smart-table, invoice"
+  }
+}
