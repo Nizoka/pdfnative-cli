@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] – 2026
+## [1.0.0] – 2026-06-30
 
 First stable release. **Verify-side Long-Term Validation (LTV)** lands in full, the
 last two upstream workarounds are removed (now fixed in pdfnative 1.2.0), and the CLI
