@@ -146,3 +146,27 @@ export function getStringFlagAll(
 export function hasFlag(flags: ParsedArgs['flags'], ...names: string[]): boolean {
     return names.some((n) => flags[n] !== undefined);
 }
+
+/**
+ * Resolve a tri-state boolean flag.
+ *
+ * Returns `undefined` when the flag is absent (caller applies its default),
+ * `true` for a bare `--flag` or `--flag=true|1|yes|on`, and `false` for
+ * `--flag=false|0|no|off`. Throws CliError on any other value so typos are
+ * surfaced rather than silently coerced.
+ */
+export function getBoolFlag(
+    flags: ParsedArgs['flags'],
+    ...names: string[]
+): boolean | undefined {
+    for (const name of names) {
+        const value = flags[name];
+        if (value === undefined) continue;
+        if (typeof value === 'boolean') return value;
+        const v = (typeof value === 'string' ? value : (value[0] ?? '')).trim().toLowerCase();
+        if (v === '' || v === 'true' || v === '1' || v === 'yes' || v === 'on') return true;
+        if (v === 'false' || v === '0' || v === 'no' || v === 'off') return false;
+        throw new CliError(`Flag --${name} expects a boolean (true/false), got "${value}".`, 2);
+    }
+    return undefined;
+}

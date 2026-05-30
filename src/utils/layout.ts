@@ -5,6 +5,9 @@
 // Precedence: CLI flags > layout file > pdfnative defaults.
 
 import { readFile } from 'node:fs/promises';
+import {
+    PDF_A_CONFORMANCE_TARGETS,
+} from '../core-bridge/index.js';
 import type {
     PdfLayoutOptions,
     PageTemplate,
@@ -17,8 +20,14 @@ import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from './arg
 import { validatePath, readBinaryFile } from './io.js';
 import { CliError, deprecate } from './error.js';
 
-/** Tagged-mode values accepted by the `--tagged` flag. */
-export const VALID_TAGGED = ['none', 'pdfa1b', 'pdfa2b', 'pdfa2u', 'pdfa3b'] as const;
+/**
+ * Tagged-mode values accepted by the `--tagged` flag.
+ *
+ * The PDF/A targets are sourced from pdfnative's `PDF_A_CONFORMANCE_TARGETS`
+ * constant (single source of truth) so the CLI never drifts from the set of
+ * conformance levels the renderer actually supports.
+ */
+export const VALID_TAGGED = ['none', ...PDF_A_CONFORMANCE_TARGETS] as const;
 export type TaggedValue = (typeof VALID_TAGGED)[number];
 
 /** Built-in named page sizes (points). Matches pdfnative `PAGE_SIZES`. */

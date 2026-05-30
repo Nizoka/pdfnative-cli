@@ -33,8 +33,13 @@ Usage:
 I/O:
   --input,   -i   Path to JSON input (default: stdin)
   --output,  -o   Output PDF path (default: stdout)
-  --stream        Stream output (large documents). Incompatible with TOC blocks
-                  and with header/footer templates that contain {pages}.
+  --stream        Stream output (large documents). Single-pass; incompatible
+                  with TOC blocks and with header/footer templates that
+                  contain {pages}.
+  --stream-page-by-page
+                  Stream output chunked at PDF object boundaries. Assembles
+                  the full document first, so TOC blocks and {pages} ARE
+                  supported. Mutually exclusive with --stream.
   --watch         Re-render on input file change (requires --input and a
                   file --output; logs to stderr; debounce 200 ms).
   --template      Path to JSON template file. Stdin / --input is deep-merged
@@ -43,11 +48,19 @@ I/O:
 Variant:
   --variant       document (default) or table
 
+Smart tables (document variant; fills TableBlock fields left unset in JSON):
+  --table-wrap        auto (default) | always | never
+  --repeat-header     [true|false] repeat header row on continuation pages
+  --zebra             [true|false|"R G B"] alternate-row striping
+  --min-row-height    Minimum row height in points
+  --cell-padding      Horizontal cell padding in points
+                  (caption is per-table — set it in the JSON TableBlock)
+
 Layout (flags override values from --layout file):
   --layout        Path to JSON layout file (PdfLayoutOptions)
   --page-size     Named (a4|letter|legal|a3|tabloid|a5) or WxH in points
   --margin        Uniform N or "top,right,bottom,left" in points
-  --tagged        none|pdfa1b|pdfa2b|pdfa3b (PDF/A flag, sets PDF/A conformance)
+  --tagged        none|pdfa1b|pdfa2b|pdfa2u|pdfa3b (PDF/A flag)
   --conformance   DEPRECATED — alias for --tagged pdfa{1b|2b|3b}
   --compress      Enable Flate compression (initialises Node compression)
   --lang          Comma-separated language packs (e.g. th,ja,ar)
@@ -242,6 +255,9 @@ main().catch((e: unknown) => {
         process.exit(e.exitCode);
     }
     const message = e instanceof Error ? e.message : String(e);
+    if (process.env['PDFNATIVE_DEBUG'] === '1' && e instanceof Error) {
+        process.stderr.write((e.stack ?? e.message) + '\n');
+    }
     process.stderr.write(`Error: ${message}\n`);
     process.exit(1);
 });
