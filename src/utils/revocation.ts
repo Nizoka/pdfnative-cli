@@ -392,6 +392,13 @@ function ocspCertIdMatches(
     const digest = hashOid !== null ? DIGEST_BY_OID[hashOid] : undefined;
     if (digest === undefined) return false;
 
+    // NOTE: `digest` is whatever algorithm the responder put in the CertID
+    // (often SHA-1 per RFC 6960 §B.1, sometimes SHA-256). The hash here is a
+    // non-security *identifier* over the issuer's PUBLIC name and public key
+    // — not an integrity/signature primitive. OCSP trust comes from the
+    // responder signature, verified separately. SHA-1 here is therefore safe
+    // and required for interoperability (NIST SP 800-131A permits SHA-1 for
+    // non-signature uses). See SECURITY.md § "Cryptographic algorithm usage".
     const nameHash = new Uint8Array(createHash(digest).update(issuerCert.subject.raw).digest());
     const keyHash = new Uint8Array(createHash(digest).update(issuerCert.publicKeyBytes).digest());
     return (
@@ -584,7 +591,18 @@ export function buildOcspRequest(
     subjectCert: X509Certificate,
     issuerCert: X509Certificate,
 ): Uint8Array {
+    // SHA-1 is the RFC 6960 §B.1 DEFAULT CertID hash algorithm and the only one
+    // reliably indexed by deployed OCSP responders. The hash is a non-security
+    // *identifier* over the issuer's PUBLIC subject DN and public key — NOT an
+    // integrity or signature primitive (OCSP trust derives from the responder
+    // signature, which we verify separately). NIST SP 800-131A explicitly
+    // permits SHA-1 for such non-signature uses. Using SHA-256 here would make
+    // most responders answer "unknown". This is a reviewed CodeQL false positive
+    // (js/weak-cryptographic-algorithm). See SECURITY.md § "Cryptographic
+    // algorithm usage".
+    // codeql[js/weak-cryptographic-algorithm]
     const nameHash = Array.from(createHash('sha1').update(issuerCert.subject.raw).digest());
+    // codeql[js/weak-cryptographic-algorithm]
     const keyHash = Array.from(createHash('sha1').update(issuerCert.publicKeyBytes).digest());
     const serial = bigIntToBytes(subjectCert.serialNumber);
 

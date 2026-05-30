@@ -93,6 +93,29 @@ The `verify` command verifies, with no network access by default:
 - **Full PAdES-B-LTA archival validation** — document-timestamp chain evaluation over
   time is not performed.
 
+### Cryptographic algorithm usage
+
+All signature-relevant hashing and verification uses SHA-256 or stronger (see the
+scope above). **SHA-1 appears in exactly one place: the OCSP `CertID`** built by
+`buildOcspRequest` and matched in `ocspCertIdMatches`
+([src/utils/revocation.ts](./src/utils/revocation.ts)). This is **intentional and safe**:
+
+- RFC 6960 §B.1 defines **SHA-1 as the default `CertID` hash algorithm**, and it is
+  the only one reliably indexed by deployed OCSP responders; using SHA-256 would make
+  most responders answer `unknown`.
+- The `CertID` hash is a **non-security identifier** computed over the issuer's
+  **public** subject DN and public key — it is *not* an integrity or signature
+  primitive. OCSP trust is established solely by the responder's digital signature,
+  which is verified independently with SHA-256/ECDSA.
+- NIST SP 800-131A explicitly permits SHA-1 for such **non-digital-signature**
+  applications.
+
+Static analysers (e.g. CodeQL `js/weak-cryptographic-algorithm`) may flag this line
+because certificate-derived bytes are treated as "sensitive data". This is a
+**reviewed false positive**: the data is public and the hash is not used for any
+security decision. The call sites are annotated in source, and the alert is dismissed
+as *"Won't fix"* in code scanning with this rationale.
+
 ## Disclosure Policy
 
 We follow [coordinated disclosure](https://en.wikipedia.org/wiki/Coordinated_vulnerability_disclosure). We ask that you:

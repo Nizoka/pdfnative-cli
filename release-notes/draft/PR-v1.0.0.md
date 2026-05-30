@@ -69,7 +69,9 @@ story and raises the CLI to top-tier 2026 ergonomics:
 - `npm run lint` → clean.
 - `npm test` → **226 / 226 passing** (was 131 in 0.3.0).
 - `npm run test:coverage` → thresholds met
-  (statements 83.26 %, branches 80.63 %, functions 93.75 %, lines 83.26 %).
+  (statements 80.1 %, branches 69.7 %, functions 84.4 %, lines 82.2 % — vitest 4
+  AST-aware measurement; see note below).
+- `npm audit` → **0 vulnerabilities** (test toolchain upgraded to vitest 4).
 - `npm run build` → ESM 124.60 KB, CJS 125.31 KB, types emitted.
 - Smoke: `version --json`, `completion bash|zsh|fish`, `batch` (dir → PDFs),
   config (letter via `.pdfnativerc.json` vs A4 with `--no-config`),
@@ -83,8 +85,24 @@ The integration-only PKI modules — `cms-verify`, `revocation`,
 live OCSP responder / CRL signer / TSA token / DSS fixtures and a reachable
 public host; testable entry points (request builders, `isBlockedAddress`,
 `verifySignedStructure` via self-signed fixtures, guard rejections) are unit-
-tested. The functions threshold was lowered 95 → 90 to accommodate the larger
-LTV surface.
+tested. Thresholds were re-baselined to vitest 4's AST-aware V8 measurement,
+which counts branches/functions more granularly than vitest 2 (same 226 tests,
+same code — not a real coverage regression).
+
+### Security & dependency hardening
+
+- **SHA-1 / OCSP `CertID` (CodeQL false positive).** The lone SHA-1 usage is the
+  OCSP `CertID` (RFC 6960 §B.1 default), a non-security identifier over the
+  issuer's public DN/key; OCSP trust comes from the responder signature, verified
+  separately. Call sites are annotated and the rationale is documented in
+  [SECURITY.md](../../SECURITY.md). The CodeQL `js/weak-cryptographic-algorithm`
+  alert is dismissed as *"Won't fix"* with this justification.
+- **Test toolchain: vitest / @vitest/coverage-v8 2 → 4** — clears every known
+  dev-dependency advisory (`npm audit` → 0). Dev-only; the published package still
+  ships `pdfnative` as its only runtime dependency.
+- **Pinned-action bumps** — `codeql-action` 4.36.0, `setup-node` 6.4.0,
+  `upload-artifact` 7.0.1, `scorecard-action` 2.4.3; `typescript-eslint` 8.59.2.
+  Resolves the open Dependabot PRs (see release checklist).
 
 ## Backward compatibility
 

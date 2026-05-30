@@ -75,6 +75,20 @@ gains config-file, batch, completion and global-flag ergonomics.
 
 - `src/utils/cert-fix.ts` and `src/utils/sign-placeholder.ts` (and their tests).
 
+### Security
+
+- Documented the single, intentional SHA-1 usage — the OCSP `CertID` (RFC 6960 §B.1
+  default, a non-security identifier over public certificate fields). Annotated the call
+  sites and added a *Cryptographic algorithm usage* section to [SECURITY.md](./SECURITY.md);
+  the corresponding CodeQL `js/weak-cryptographic-algorithm` alert is a reviewed false
+  positive.
+- Upgraded the test toolchain (`vitest` / `@vitest/coverage-v8` 2 → 4) to clear all known
+  dev-dependency advisories (`npm audit` → 0 vulnerabilities). Coverage thresholds were
+  re-baselined to vitest 4's AST-aware measurement (identical tests and code).
+- Bumped pinned GitHub Actions: `github/codeql-action` 4.35.1 → 4.36.0,
+  `actions/setup-node` 6.3.0 → 6.4.0, `actions/upload-artifact` 4.6.2 → 7.0.1,
+  `ossf/scorecard-action` 2.4.2 → 2.4.3; `typescript-eslint` 8.57.2 → 8.59.2.
+
 ## [0.3.0] – 2026-05-05
 
 ### Added
