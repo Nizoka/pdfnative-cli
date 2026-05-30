@@ -1,4 +1,4 @@
-import { signPdfBytes, ensureCryptoReady } from '../core-bridge/index.js';
+import { signPdfBytes, addSignaturePlaceholder, ensureCryptoReady } from '../core-bridge/index.js';
 import type { PdfSignOptions, SignatureAlgorithm } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll } from '../utils/args.js';
 import { readFileOrStdin, writeOutput } from '../utils/io.js';
@@ -10,10 +10,6 @@ import {
     loadPemChain,
     parseCertificateChain,
 } from '../utils/keys.js';
-import {
-    hasSignaturePlaceholder,
-    injectSignaturePlaceholder,
-} from '../utils/sign-placeholder.js';
 
 const VALID_ALGORITHMS = new Set<SignatureAlgorithm>(['rsa-sha256', 'ecdsa-sha256']);
 
@@ -91,15 +87,13 @@ export async function sign(args: ParsedArgs): Promise<void> {
 
     // Auto-inject a signature placeholder when the input PDF doesn't already
     // carry one (the common case for `pdfnative render`-produced PDFs, which
-    // ship no AcroForm). Idempotent: a pre-prepared PDF is signed as-is.
-    if (!hasSignaturePlaceholder(pdfBytes)) {
-        try {
-            const injected = injectSignaturePlaceholder(pdfBytes, options);
-            pdfBytes = injected.bytes;
-        } catch (e) {
-            if (e instanceof CliError) throw e;
-            throw new CliError('Failed to prepare PDF for signing.', 1);
-        }
+    // ship no AcroForm). pdfnative's addSignaturePlaceholder is idempotent:
+    // a PDF that already carries a /FT /Sig widget is returned unchanged.
+    try {
+        pdfBytes = addSignaturePlaceholder(pdfBytes);
+    } catch (e) {
+        if (e instanceof CliError) throw e;
+        throw new CliError('Failed to prepare PDF for signing.', 1);
     }
 
     let signedBytes: Uint8Array;

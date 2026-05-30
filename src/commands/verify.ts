@@ -24,7 +24,7 @@ import { CliError } from '../utils/error.js';
 import { walkAbs, sliceNode, sliceContent, type AbsNode } from '../utils/asn1-walk.js';
 import { loadPemChain, parseCertificateChain } from '../utils/keys.js';
 import { verifyCmsSignatureValue } from '../utils/cms-verify.js';
-import { correctCertificateIssuerRaw } from '../utils/cert-fix.js';
+
 
 /**
  * `pdfnative-cli verify` — verify CMS/PKCS#7 signatures embedded in a PDF.
@@ -443,7 +443,7 @@ export async function verify(args: ParsedArgs): Promise<void> {
                 if (certDers.length === 0) {
                     notes.push('no certificates embedded in CMS');
                 } else {
-                    const certs = certDers.map((der) => correctCertificateIssuerRaw(parseCertificate(der)));
+                    const certs = certDers.map((der) => parseCertificate(der));
                     const leaf = certs[0] as X509Certificate;
                     signerSubject = nameToString(leaf.subject);
                     signerIssuer = nameToString(leaf.issuer);
