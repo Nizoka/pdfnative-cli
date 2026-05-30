@@ -21,6 +21,19 @@ function parseSigningTime(raw: string): Date {
     return t;
 }
 
+/** Validate that a flag value is a well-formed http(s) URL. */
+function assertHttpUrl(value: string, flag: string): void {
+    let url: URL;
+    try {
+        url = new URL(value);
+    } catch {
+        throw new CliError(`Invalid --${flag} URL "${value}".`, 2);
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        throw new CliError(`--${flag} must be an http(s) URL, got "${url.protocol}".`, 2);
+    }
+}
+
 export async function sign(args: ParsedArgs): Promise<void> {
     const inputPath = getStringFlag(args.flags, 'input', 'i');
     const outputPath = getStringFlag(args.flags, 'output', 'o');
@@ -33,10 +46,28 @@ export async function sign(args: ParsedArgs): Promise<void> {
     const contactInfo = getStringFlag(args.flags, 'contact');
     const signingTimeRaw = getStringFlag(args.flags, 'signing-time');
     const chainPaths = getStringFlagAll(args.flags, 'cert-chain');
+    const timestampUrl = getStringFlag(args.flags, 'timestamp');
 
     if (!VALID_ALGORITHMS.has(algorithm)) {
         throw new CliError(
             `Invalid --algorithm "${algorithm}". Valid: rsa-sha256, ecdsa-sha256.`,
+            2,
+        );
+    }
+
+    // Sign-side RFC 3161 timestamping (PAdES-T) requires timestamp-token
+    // embedding inside the CMS SignedData — PDF-writing logic that belongs in
+    // pdfnative and is not yet exposed (≤ 1.2.0). We surface the flag so the
+    // CLI contract is stable, but fail clearly rather than silently ignoring
+    // it. Verify-side timestamp validation IS supported (`pdfnative verify`).
+    if (timestampUrl !== undefined) {
+        assertHttpUrl(timestampUrl, 'timestamp');
+        throw new CliError(
+            'Sign-side RFC 3161 timestamping (PAdES-T) is not yet available: embedding a '
+            + 'timestamp token at signing time requires upstream support in pdfnative '
+            + '(tracked at https://github.com/pdfnative/pdfnative/issues). '
+            + 'Timestamp VALIDATION is already supported — run `pdfnative verify` on a '
+            + 'timestamped PDF.',
             2,
         );
     }

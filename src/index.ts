@@ -127,6 +127,13 @@ Signature metadata (optional):
   --contact       Contact info
   --signing-time  ISO 8601 timestamp (default: now)
 
+Long-term validation (LTV):
+  --timestamp <url>  RFC 3161 TSA URL for PAdES-T timestamping. NOT YET
+                     available — embedding a timestamp token at signing time
+                     requires upstream pdfnative support; the flag is reserved
+                     and currently errors. Timestamp VALIDATION already works
+                     via \`pdfnative verify\`.
+
 Security: key material is never written to logs or error messages.
 
   --help,    -h   Show this help message
