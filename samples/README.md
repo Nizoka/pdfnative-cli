@@ -403,7 +403,7 @@ Demonstrate the `pdfnative verify` command — verifies CMS/PKCS#7 signatures em
 | [verify/04-cms-ecdsa.sh](verify/04-cms-ecdsa.sh) | (v0.3.0) Verify CMS **ECDSA-SHA256 (P-256)** signature value end-to-end |
 | [verify/04-cms-ecdsa.ps1](verify/04-cms-ecdsa.ps1) | (v0.3.0) PowerShell equivalent |
 
-**Scope (v0.3.0):** verify checks **integrity** (byte-range SHA-256), **CMS signature value** (RSA-PKCS#1 v1.5 SHA-256 and ECDSA-SHA256 over P-256), **certificate chain signatures**, and **trust** (against `--trust <root.pem>` PEM roots, or self-signed acceptance). RFC 3161 timestamp tokens are **detected and reported** but their cryptographic validation is deferred to v0.4.0. OCSP/CRL revocation and PAdES-B-LT/B-LTA are also v0.4.0 targets — see [ROADMAP.md](../ROADMAP.md) and [SECURITY.md](../SECURITY.md#cryptographic-verification-scope).
+**Scope (v1.0.0):** verify checks **integrity** (byte-range SHA-256), **CMS signature value** (RSA-PKCS#1 v1.5 SHA-256 and ECDSA-SHA256 over P-256), **certificate chain signatures**, **trust** (against `--trust <root.pem>` PEM roots, or self-signed acceptance), **RFC 3161 timestamp validation (PAdES-T)**, and **OCSP (RFC 6960) + CRL (RFC 5280) revocation** — embedded from the PDF `/DSS` offline by default, with opt-in SSRF-guarded online fetching via `--revocation online`. Sign-side LTV (embedding timestamps/DSS at signing time) is upstream-blocked in pdfnative — see [ROADMAP.md](../ROADMAP.md) and [SECURITY.md](../SECURITY.md#network-access--revocation-checking).
 
 ---
 

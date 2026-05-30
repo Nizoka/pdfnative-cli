@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] – 2026
+
+First stable release. **Verify-side Long-Term Validation (LTV)** lands in full, the
+last two upstream workarounds are removed (now fixed in pdfnative 1.2.0), and the CLI
+gains config-file, batch, completion and global-flag ergonomics.
+
+### Added
+
+#### `verify` command — Long-Term Validation (LTV)
+
+- **RFC 3161 timestamp validation (PAdES-T)** — the signature-timestamp-token unsigned
+  attribute is now cryptographically validated: the TSA SignerInfo signature, the eContent
+  (TSTInfo) `messageDigest`, and the `messageImprint` binding to the document signature are
+  all checked, and the TSA certificate chain is built and trust-evaluated. Reported as
+  `timestampValid`, `timestampTime` (`genTime`) and `tsaSubject`. Replaces the
+  presence-only `timestampPresent` flag from 0.3.0 (still reported for back-compat).
+- **OCSP (RFC 6960) revocation** — parses OCSP responses embedded in the PDF `/DSS`
+  (PAdES-LT) and, with `--revocation online`, fetches from the certificate's AIA OCSP URL.
+  Verifies the responder signature and matches the CertID before reading the status.
+- **CRL (RFC 5280) revocation** — parses CRLs embedded in `/DSS` and, online, fetches from
+  the CRL Distribution Point. Verifies the CRL signature against the issuer before checking
+  the signer serial.
+- **`--revocation offline|online|disabled`** (default `offline`) and
+  **`--revocation-policy soft-fail|strict`** (default `soft-fail`). New report fields:
+  `revocationChecked`, `revocationStatus`, `revocationSource`, `revocationMethod`,
+  `revocationRevokedAt`.
+- **SSRF-guarded online fetching** — opt-in online OCSP/CRL requests pass a guard enforcing
+  an http(s) scheme allow-list, DNS resolution with private/loopback/link-local/CGNAT/
+  multicast (IPv4 + IPv6) blocking, no redirect following, a 10 s timeout and a 5 MiB cap.
+
+#### `render` command — pdfnative 1.2.0 features
+
+- **Smart tables** — `--table-wrap auto|always|never`, `--repeat-header`, `--zebra`,
+  `--min-row-height`, `--cell-padding` fill any `TableBlock` fields left unset in JSON
+  (block-level JSON wins). Also available through `--layout`.
+- **Page-by-page streaming** — `--stream-page-by-page` streams at PDF object boundaries
+  after assembling the document, so TOC blocks and `{pages}` placeholders are supported
+  (unlike single-pass `--stream`).
+- **PDF/A targets** are now sourced from pdfnative's `PDF_A_CONFORMANCE_TARGETS` constant.
+
+#### New commands & CLI ergonomics
+
+- **`batch`** — render every `*.json` file in a directory to PDF in parallel, reusing the
+  full `render` pipeline. `--input-dir`, `--output-dir`, `--concurrency`, `--fail-fast`,
+  text/JSON summary; exit 1 if any file fails.
+- **`completion bash|zsh|fish`** — emit a shell-completion script.
+- **`.pdfnativerc.json`** config file — discovered cwd-upward, with global and per-command
+  sections; `--config <file>` / `--no-config`. Precedence: CLI flags > env > config.
+- **Global flags** — `--quiet`/`-q`, `--no-color` (+ `NO_COLOR`), and `--version --json`.
+
+#### `sign` command
+
+- **`--timestamp <tsa-url>`** flag reserved for PAdES-T timestamping. Embedding a timestamp
+  token at signing time requires upstream pdfnative support; the flag validates the URL and
+  errors clearly today. Timestamp *validation* already works via `verify`.
+
+### Changed
+
+- **`pdfnative` bumped to `^1.2.0`** (was `^1.1.0`).
+- Removed the two upstream workarounds — `cert-fix` (issuer/subject DN re-slicing) and the
+  local signature-placeholder injector — now fixed in pdfnative 1.2.0. `sign` uses
+  `addSignaturePlaceholder` and `verify`/`keys` use the corrected `parseCertificate`
+  directly.
+
+### Removed
+
+- `src/utils/cert-fix.ts` and `src/utils/sign-placeholder.ts` (and their tests).
+
 ## [0.3.0] – 2026-05-05
 
 ### Added

@@ -2,9 +2,10 @@
 
 ## Overview
 
-Official CLI companion to the `pdfnative` library. Exposes four commands:
+Official CLI companion to the `pdfnative` library. Exposes six commands:
 `render` (JSON → PDF), `sign` (digital signature), `inspect` (PDF analysis),
-`verify` (CMS/PKCS#7 signature verification).
+`verify` (CMS/PKCS#7 + LTV verification), `batch` (parallel directory render),
+and `completion` (shell-completion scripts).
 
 **Philosophy:** Zero extra runtime dependencies. `pdfnative` is the only
 dependency — all PDF logic lives there. The CLI is a thin, composable
@@ -16,22 +17,28 @@ dispatch layer over it.
 
 ```
 src/
-├── index.ts           # CLI entry: parse argv → dispatch → exit
+├── index.ts           # CLI entry: parse argv → config merge → dispatch → exit
 ├── commands/
-│   ├── render.ts      # JSON input → buildDocumentPDFBytes / streamDocumentPdf → output
-│   ├── sign.ts        # PDF input + key/cert → signPdfBytes → output
+│   ├── render.ts      # JSON input → buildDocumentPDF* → output (+ smart tables, page streaming)
+│   ├── sign.ts        # PDF input + key/cert → addSignaturePlaceholder → signPdfBytes → output
 │   ├── inspect.ts     # PDF input → PdfReader → JSON/text metadata report
-│   └── verify.ts      # PDF input → CMS parsing + chain build → JSON verification report
+│   ├── verify.ts      # PDF input → CMS + timestamp + revocation → JSON/text report
+│   ├── batch.ts       # Directory of JSON → parallel render reuse → per-file summary
+│   └── completion.ts  # Emit bash/zsh/fish completion scripts
 ├── utils/
 │   ├── args.ts            # Zero-dep argument parser (flags, positionals, = notation)
-│   ├── io.ts              # stdin/stdout/file I/O helpers
+│   ├── io.ts              # stdin/stdout/file I/O helpers + path-traversal guard
 │   ├── error.ts           # CliError class, die() helper
+│   ├── config.ts          # `.pdfnativerc.json` discovery + flag-default merge
+│   ├── colors.ts          # NO_COLOR/TTY-aware ANSI helper
 │   ├── keys.ts            # PEM/DER loaders for RSA + EC private keys + X.509 certs
 │   ├── layout.ts          # `--layout` flag parsing & `PdfLayoutOptions` assembly
 │   ├── asn1-walk.ts       # ASN.1/DER walker with absolute byte offsets (50 MiB cap)
-│   ├── cert-fix.ts        # Workaround for pdfnative ≤ 1.1.0 issuer/subject raw slicing
-│   ├── cms-verify.ts      # RSA-SHA256 + ECDSA-SHA256 CMS signature-value verification
-│   └── sign-placeholder.ts # AcroForm signature-placeholder injector for incremental updates
+│   ├── cms-verify.ts      # RSA/ECDSA CMS signature-value + verifySignedStructure (CRL/OCSP)
+│   ├── cert-chain.ts      # X.509 chain construction + trust evaluation (shared)
+│   ├── timestamp-verify.ts # RFC 3161 timestamp-token validation (PAdES-T)
+│   ├── revocation.ts      # OCSP (RFC 6960) + CRL (RFC 5280), embedded DSS + online
+│   └── fetch-guard.ts     # SSRF-guarded HTTP(S) client for opt-in online revocation
 └── core-bridge/
     └── index.ts       # Selective re-exports from pdfnative (keeps the surface minimal)
 ```
@@ -72,8 +79,14 @@ src/
 - ASN.1 content lengths in `utils/asn1-walk.ts` are capped at 50 MiB per node.
 - `inspect` JSON output is sanitized (no raw binary blobs in default output).
 - `verify` redacts CMS parse errors — internal byte offsets / parser state never leak.
-- `verify` reports `timestampPresent` as informational only — RFC 3161 token validation
-  is **out of scope** in v0.3.x (see [SECURITY.md](../SECURITY.md)).
+- `verify` validates RFC 3161 timestamps (PAdES-T) and checks OCSP/CRL revocation; it is
+  **offline by default**. Online revocation (`--revocation online`) only runs through the
+  SSRF guard in `utils/fetch-guard.ts` (scheme allow-list, private/loopback/link-local/
+  CGNAT/multicast IPv4+IPv6 blocking, no redirects, timeout + size caps).
+- CRL/OCSP/TSA signatures are always cryptographically verified; unverifiable revocation
+  data yields `unknown`, never `good`.
+- Sign-side LTV (timestamp embedding / DSS) is upstream-blocked — `sign --timestamp` is
+  reserved and errors clearly (see [SECURITY.md](../SECURITY.md)).
 
 ## Code Style
 
