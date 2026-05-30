@@ -40,6 +40,11 @@ import { walkAbs, sliceNode, sliceContent, type AbsNode } from './asn1-walk.js';
 const OID_RSA_ENCRYPTION = '1.2.840.113549.1.1.1';
 /** SHA-256 with RSA encryption — sha256WithRSAEncryption. */
 const OID_SHA256_RSA = '1.2.840.113549.1.1.11';
+/** SHA-1 with RSA encryption (legacy CRL/OCSP responders). */
+const OID_SHA1_RSA = '1.2.840.113549.1.1.5';
+/** SHA-384 / SHA-512 with RSA encryption. */
+const OID_SHA384_RSA = '1.2.840.113549.1.1.12';
+const OID_SHA512_RSA = '1.2.840.113549.1.1.13';
 /** ECDSA with SHA-256 — ecdsa-with-SHA256. */
 const OID_ECDSA_SHA256 = '1.2.840.10045.4.3.2';
 /** id-data — ContentInfo content type. */
@@ -446,6 +451,51 @@ export const __testOnly = {
     OID_CONTENT_TYPE,
     OID_TIMESTAMP_TOKEN,
 };
+
+// ──────────────────────────────────────────────────────────────────────
+// Generic signed-structure verification (CRL `tbsCertList`, OCSP
+// `tbsResponseData`). Reuses the same RSA / ECDSA primitives as the CMS
+// SignerInfo verifier.
+// ──────────────────────────────────────────────────────────────────────
+
+const RSA_DIGEST_BY_OID: Readonly<Record<string, string>> = {
+    [OID_SHA256_RSA]: 'sha256',
+    [OID_SHA1_RSA]: 'sha1',
+    [OID_SHA384_RSA]: 'sha384',
+    [OID_SHA512_RSA]: 'sha512',
+};
+
+/**
+ * Verify a DER-signed structure (e.g. a CRL `tbsCertList` or an OCSP
+ * `tbsResponseData`) against a signer certificate's public key.
+ *
+ * Supports RSA with SHA-1/256/384/512 and ECDSA-SHA-256. Returns `false`
+ * (never throws) for unsupported algorithms or any structural problem.
+ */
+export function verifySignedStructure(
+    tbsBytes: Uint8Array,
+    signatureAlgorithmOid: string | null,
+    signature: Uint8Array,
+    signerCert: X509Certificate,
+): boolean {
+    if (signatureAlgorithmOid === null) return false;
+    try {
+        const rsaDigest = RSA_DIGEST_BY_OID[signatureAlgorithmOid];
+        if (rsaDigest !== undefined) {
+            const pub = rsaPubKeyFromCert(signerCert);
+            const hash = new Uint8Array(createHash(rsaDigest).update(tbsBytes).digest());
+            return rsaVerifyHash(hash, signature, pub);
+        }
+        if (signatureAlgorithmOid === OID_ECDSA_SHA256) {
+            const { r, s } = decodeEcdsaSignatureValue(signature);
+            const pub = decodeEcPublicKey(signerCert.publicKeyBytes);
+            return ecdsaVerify(tbsBytes, r, s, pub);
+        }
+    } catch {
+        return false;
+    }
+    return false;
+}
 
 // ──────────────────────────────────────────────────────────────────────
 // Shared CMS extraction helpers

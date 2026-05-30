@@ -127,16 +127,26 @@ const VERIFY_USAGE = `\
 pdfnative verify — Verify CMS/PKCS#7 signatures in a PDF
 
 Usage:
-  pdfnative verify [--input <file.pdf>] [--trust <root.pem>]... [--strict] [--format json|text]
+  pdfnative verify [--input <file.pdf>] [--trust <root.pem>]... [--strict]
+                   [--revocation offline|online|disabled]
+                   [--revocation-policy soft-fail|strict] [--format json|text]
 
 Options:
-  --input,   -i   Path to input PDF (default: stdin)
-  --trust         PEM file with trusted root certs (repeatable;
-                  env: PDFNATIVE_VERIFY_TRUST). When omitted, self-signed
-                  roots are accepted.
-  --strict        Exit code 1 if any signature fails any check.
-  --format,  -f   json (default) or text
-  --help,    -h   Show this help message
+  --input,   -i        Path to input PDF (default: stdin)
+  --trust              PEM file with trusted root certs (repeatable;
+                       env: PDFNATIVE_VERIFY_TRUST). When omitted, self-signed
+                       roots are accepted.
+  --strict             Exit code 1 if any signature fails any check.
+  --revocation         Certificate revocation source (default: offline):
+                         offline   embedded OCSP/CRL from the PDF /DSS only
+                         online    additionally fetch via OCSP (AIA) and CRL
+                                   (CDP) URLs — SSRF-guarded, no redirects
+                         disabled  skip revocation checking entirely
+  --revocation-policy  How revocation affects validity (default: soft-fail):
+                         soft-fail  only an explicit "revoked" status fails
+                         strict     a non-"good" status fails the signature
+  --format,  -f        json (default) or text
+  --help,    -h        Show this help message
 
 Reported per signature:
   - byte-range integrity (SHA-256 against CMS messageDigest)
@@ -144,10 +154,11 @@ Reported per signature:
   - certificate chain validity
   - chain root trust evaluation
   - signature value cryptographic verification (RSA-SHA256 / ECDSA-SHA256)
-  - RFC 3161 timestamp token presence (full timestamp validation TBD)
+  - RFC 3161 timestamp token validation (PAdES-T)
+  - OCSP (RFC 6960) + CRL (RFC 5280) revocation status
 
-Out of scope (v0.3.0): OCSP/CRL revocation, full RFC 3161 token validation,
-LTV. These require future pdfnative API additions.
+Note: sign-side LTV (embedding timestamps / DSS into signatures) is tracked
+upstream in pdfnative and is out of scope for this CLI.
 `;
 
 const INSPECT_USAGE = `\

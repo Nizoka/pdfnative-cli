@@ -41,7 +41,7 @@ export {
 } from 'pdfnative';
 
 // ── Inspect / Verify — PDF parser helpers ────────────────────────────
-export { openPdf, isRef, isName, isDict, isArray, nameValue } from 'pdfnative';
+export { openPdf, isRef, isName, isDict, isArray, isStream, nameValue } from 'pdfnative';
 
 // ── Fonts (multi-language --lang flag, v1.1.0 latin/emoji modules) ──
 export { registerFont, registerFonts, loadFontData, hasFontLoader } from 'pdfnative';
