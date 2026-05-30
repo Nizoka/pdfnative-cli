@@ -75,7 +75,11 @@ samples/
 │   ├── table-variant/            (v0.2.0) Table-centric PdfParams (--variant table)
 │   ├── font/                     (v0.3.0) `--font` / `--lang` flag demo (latin preset)
 │   ├── template/                 (v0.3.0) `--template` deep-merge demo (base + override)
-│   └── watch/                    (v0.3.0) `--watch` interactive auto-rebuild demo
+│   ├── watch/                    (v0.3.0) `--watch` interactive auto-rebuild demo
+│   └── table-smart/              (v1.0.0) Smart tables: zebra, caption, repeat-header, wrap
+├── batch/                        (v1.0.0) Parallel directory render (pdfnative batch)
+├── completion/                   (v1.0.0) Shell-completion script generation
+├── config/                       (v1.0.0) `.pdfnativerc.json` default-flags demo
 ├── sign/                         Digital signature shell / PowerShell scripts
 │   ├── 01-basic.*                Self-signed RSA-SHA256 sign
 │   ├── 02-with-metadata.*        (v0.2.0) Sign with reason / location / signing-time
@@ -86,7 +90,8 @@ samples/
 │   ├── 01-self-signed.*          (v0.2.0) Verify a self-signed PDF
 │   ├── 02-strict-mode.*          (v0.2.0) `--strict` exits non-zero on failure
 │   ├── 03-cms-rsa.*              (v0.3.0) Verify CMS RSA-SHA256 signature value
-│   └── 04-cms-ecdsa.*            (v0.3.0) Verify CMS ECDSA-SHA256 signature value
+│   ├── 04-cms-ecdsa.*            (v0.3.0) Verify CMS ECDSA-SHA256 signature value
+│   └── 05-revocation.*           (v1.0.0) OCSP/CRL revocation + timestamp (PAdES-T)
 └── streaming/                    Streaming render Node.js scripts
 ```
 
@@ -340,6 +345,16 @@ The CLI deep-merges `--template` into `--input` before rendering. Use this to sh
 
 `--watch` keeps the process running and rebuilds the PDF whenever the input JSON changes. **Skipped by `run-all.js`** because it never exits — run manually and Ctrl-C when done.
 
+### `render/table-smart/` — Smart Tables (v1.0.0)
+
+| File | Description |
+|------|-------------|
+| [01-smart-invoice.json](render/table-smart/01-smart-invoice.json) | Invoice using pdfnative 1.2.0 smart-table fields set directly in JSON: `zebra`, `caption`, `repeatHeader`, `wrap`, `minRowHeight`, `cellPadding` |
+| [01-smart-invoice.sh](render/table-smart/01-smart-invoice.sh) | Renders the smart-table invoice (Bash) |
+| [01-smart-invoice.ps1](render/table-smart/01-smart-invoice.ps1) | PowerShell equivalent |
+
+Smart-table fields live on the `table` block in the JSON payload (no extra CLI flags required), so `run-all.js` renders this category automatically. Document-wide defaults can also be supplied via the `--table-wrap` and `--zebra` render flags.
+
 ---
 
 ## Sign Samples
@@ -402,8 +417,57 @@ Demonstrate the `pdfnative verify` command — verifies CMS/PKCS#7 signatures em
 | [verify/03-cms-rsa.ps1](verify/03-cms-rsa.ps1) | (v0.3.0) PowerShell equivalent |
 | [verify/04-cms-ecdsa.sh](verify/04-cms-ecdsa.sh) | (v0.3.0) Verify CMS **ECDSA-SHA256 (P-256)** signature value end-to-end |
 | [verify/04-cms-ecdsa.ps1](verify/04-cms-ecdsa.ps1) | (v0.3.0) PowerShell equivalent |
+| [verify/05-revocation.sh](verify/05-revocation.sh) | (v1.0.0) Revocation checking — `--revocation offline\|online` + `--revocation-policy strict\|soft-fail` (OCSP/CRL + PAdES-T timestamp) |
+| [verify/05-revocation.ps1](verify/05-revocation.ps1) | (v1.0.0) PowerShell equivalent |
 
-**Scope (v0.3.0):** verify checks **integrity** (byte-range SHA-256), **CMS signature value** (RSA-PKCS#1 v1.5 SHA-256 and ECDSA-SHA256 over P-256), **certificate chain signatures**, and **trust** (against `--trust <root.pem>` PEM roots, or self-signed acceptance). RFC 3161 timestamp tokens are **detected and reported** but their cryptographic validation is deferred to v0.4.0. OCSP/CRL revocation and PAdES-B-LT/B-LTA are also v0.4.0 targets — see [ROADMAP.md](../ROADMAP.md) and [SECURITY.md](../SECURITY.md#cryptographic-verification-scope).
+**Scope (v1.0.0):** verify checks **integrity** (byte-range SHA-256), **CMS signature value** (RSA-PKCS#1 v1.5 SHA-256 and ECDSA-SHA256 over P-256), **certificate chain signatures**, **trust** (against `--trust <root.pem>` PEM roots, or self-signed acceptance), **RFC 3161 timestamp validation (PAdES-T)**, and **OCSP (RFC 6960) + CRL (RFC 5280) revocation** — embedded from the PDF `/DSS` offline by default, with opt-in SSRF-guarded online fetching via `--revocation online`. Sign-side LTV (embedding timestamps/DSS at signing time) is upstream-blocked in pdfnative — see [ROADMAP.md](../ROADMAP.md) and [SECURITY.md](../SECURITY.md#network-access--revocation-checking).
+
+---
+
+## Batch Samples (v1.0.0)
+
+Demonstrate the `pdfnative batch` command — renders every `*.json` in a directory to `<output-dir>/<name>.pdf` in parallel, reusing the full render pipeline. Exits non-zero if any file fails.
+
+| Script | Description |
+|--------|-------------|
+| [batch/01-batch.sh](batch/01-batch.sh) | Batch-render `render/document/*.json` with `--concurrency 4 --compress` (Bash) |
+| [batch/01-batch.ps1](batch/01-batch.ps1) | PowerShell equivalent |
+
+Render flags other than `--input-dir` / `--output-dir` / `--concurrency` / `--fail-fast` / `--format` are forwarded to every file.
+
+---
+
+## Completion Samples (v1.0.0)
+
+Demonstrate the `pdfnative completion` command — emits shell-completion scripts for **bash**, **zsh**, and **fish**.
+
+| Script | Description |
+|--------|-------------|
+| [completion/01-generate.sh](completion/01-generate.sh) | Prints install one-liners for each shell, then previews the bash script (Bash) |
+| [completion/01-generate.ps1](completion/01-generate.ps1) | PowerShell equivalent |
+
+```bash
+# bash (system-wide)
+pdfnative completion bash | sudo tee /etc/bash_completion.d/pdfnative >/dev/null
+# zsh (first fpath entry)
+pdfnative completion zsh > "${fpath[1]}/_pdfnative"
+# fish
+pdfnative completion fish > ~/.config/fish/completions/pdfnative.fish
+```
+
+---
+
+## Config Samples (v1.0.0)
+
+Demonstrate `.pdfnativerc.json` — a config file discovered cwd-upward that supplies **default flags**. Top-level keys are global defaults; keys named after a command (`render`, `verify`, `batch`, …) are per-command sections. Precedence is **CLI flags > env > config**.
+
+| File | Description |
+|------|-------------|
+| [config/.pdfnativerc.json](config/.pdfnativerc.json) | Sample config: letter page size + compression + zebra tables for `render`, offline soft-fail revocation for `verify`, concurrency 8 for `batch` |
+| [config/01-config.sh](config/01-config.sh) | Renders from the config dir (defaults apply) vs `--no-config` (built-in defaults) (Bash) |
+| [config/01-config.ps1](config/01-config.ps1) | PowerShell equivalent |
+
+Use `--config <path>` to point at an explicit config file, or `--no-config` to ignore config discovery entirely.
 
 ---
 

@@ -1,0 +1,17 @@
+{
+  "_comment": "Sample .pdfnativerc.json — discovered cwd-upward. Top-level keys are global defaults; keys named after a command are per-command sections. Precedence: CLI flags > env > config.",
+  "no-color": false,
+  "render": {
+    "page-size": "letter",
+    "compress": true,
+    "table-wrap": "auto",
+    "zebra": true
+  },
+  "verify": {
+    "revocation": "offline",
+    "revocation-policy": "soft-fail"
+  },
+  "batch": {
+    "concurrency": 8
+  }
+}

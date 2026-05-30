@@ -40,6 +40,11 @@ import { walkAbs, sliceNode, sliceContent, type AbsNode } from './asn1-walk.js';
 const OID_RSA_ENCRYPTION = '1.2.840.113549.1.1.1';
 /** SHA-256 with RSA encryption — sha256WithRSAEncryption. */
 const OID_SHA256_RSA = '1.2.840.113549.1.1.11';
+/** SHA-1 with RSA encryption (legacy CRL/OCSP responders). */
+const OID_SHA1_RSA = '1.2.840.113549.1.1.5';
+/** SHA-384 / SHA-512 with RSA encryption. */
+const OID_SHA384_RSA = '1.2.840.113549.1.1.12';
+const OID_SHA512_RSA = '1.2.840.113549.1.1.13';
 /** ECDSA with SHA-256 — ecdsa-with-SHA256. */
 const OID_ECDSA_SHA256 = '1.2.840.10045.4.3.2';
 /** id-data — ContentInfo content type. */
@@ -128,20 +133,30 @@ function oidFromAbs(buf: Uint8Array, node: AbsNode): string | null {
 }
 
 /**
- * Locate the SignerInfo node inside a parsed CMS ContentInfo.
+ * Locate the inner `SignedData` SEQUENCE of a CMS `ContentInfo`.
  *
  * ContentInfo ::= SEQUENCE { contentType OID, content [0] EXPLICIT ANY }
- * SignedData  ::= SEQUENCE { version, digestAlgorithms SET, encapContentInfo,
- *                            certificates [0] IMPLICIT?, crls [1] IMPLICIT?,
- *                            signerInfos SET OF SignerInfo }
+ * (contentType MUST be id-signedData).
  */
-function findSignerInfo(buf: Uint8Array, root: AbsNode): AbsNode | null {
+function getSignedData(buf: Uint8Array, root: AbsNode): AbsNode | null {
     if (root.tag !== 0x30 || root.children.length < 2) return null;
     if (oidFromAbs(buf, root.children[0] as AbsNode) !== OID_SIGNED_DATA) return null;
     const explicit = root.children[1] as AbsNode;
     if (explicit.tag !== 0xa0 || explicit.children.length === 0) return null;
     const signedData = explicit.children[0] as AbsNode;
-    if (signedData.tag !== 0x30) return null;
+    return signedData.tag === 0x30 ? signedData : null;
+}
+
+/**
+ * Locate the SignerInfo node inside a parsed CMS ContentInfo.
+ *
+ * SignedData  ::= SEQUENCE { version, digestAlgorithms SET, encapContentInfo,
+ *                            certificates [0] IMPLICIT?, crls [1] IMPLICIT?,
+ *                            signerInfos SET OF SignerInfo }
+ */
+function findSignerInfo(buf: Uint8Array, root: AbsNode): AbsNode | null {
+    const signedData = getSignedData(buf, root);
+    if (signedData === null) return null;
     // signerInfos is the last SET in SignedData.
     for (let i = signedData.children.length - 1; i >= 0; i--) {
         const child = signedData.children[i] as AbsNode;
@@ -436,3 +451,213 @@ export const __testOnly = {
     OID_CONTENT_TYPE,
     OID_TIMESTAMP_TOKEN,
 };
+
+// ──────────────────────────────────────────────────────────────────────
+// Generic signed-structure verification (CRL `tbsCertList`, OCSP
+// `tbsResponseData`). Reuses the same RSA / ECDSA primitives as the CMS
+// SignerInfo verifier.
+// ──────────────────────────────────────────────────────────────────────
+
+const RSA_DIGEST_BY_OID: Readonly<Record<string, string>> = {
+    [OID_SHA256_RSA]: 'sha256',
+    [OID_SHA1_RSA]: 'sha1',
+    [OID_SHA384_RSA]: 'sha384',
+    [OID_SHA512_RSA]: 'sha512',
+};
+
+/**
+ * Verify a DER-signed structure (e.g. a CRL `tbsCertList` or an OCSP
+ * `tbsResponseData`) against a signer certificate's public key.
+ *
+ * Supports RSA with SHA-1/256/384/512 and ECDSA-SHA-256. Returns `false`
+ * (never throws) for unsupported algorithms or any structural problem.
+ */
+export function verifySignedStructure(
+    tbsBytes: Uint8Array,
+    signatureAlgorithmOid: string | null,
+    signature: Uint8Array,
+    signerCert: X509Certificate,
+): boolean {
+    if (signatureAlgorithmOid === null) return false;
+    try {
+        const rsaDigest = RSA_DIGEST_BY_OID[signatureAlgorithmOid];
+        if (rsaDigest !== undefined) {
+            const pub = rsaPubKeyFromCert(signerCert);
+            const hash = new Uint8Array(createHash(rsaDigest).update(tbsBytes).digest());
+            return rsaVerifyHash(hash, signature, pub);
+        }
+        if (signatureAlgorithmOid === OID_ECDSA_SHA256) {
+            const { r, s } = decodeEcdsaSignatureValue(signature);
+            const pub = decodeEcPublicKey(signerCert.publicKeyBytes);
+            return ecdsaVerify(tbsBytes, r, s, pub);
+        }
+    } catch {
+        return false;
+    }
+    return false;
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Shared CMS extraction helpers
+//
+// Re-used by the `verify` command, the RFC 3161 timestamp verifier
+// (timestamp-verify.ts) and the revocation checker (revocation.ts). Each
+// returns `null` / `[]` on any structural problem — callers decide how to
+// report. None of these throw on malformed input.
+// ──────────────────────────────────────────────────────────────────────
+
+/** Decode a DER OID node (absolute-offset) to dotted-decimal, or null. */
+export function decodeOid(buf: Uint8Array, node: AbsNode): string | null {
+    return oidFromAbs(buf, node);
+}
+
+/** Extract every embedded X.509 certificate DER block from a CMS SignedData. */
+export function extractCmsCertificates(cmsBytes: Uint8Array): Uint8Array[] {
+    let root: AbsNode;
+    try {
+        root = walkAbs(cmsBytes);
+    } catch {
+        return [];
+    }
+    const signedData = getSignedData(cmsBytes, root);
+    if (signedData === null) return [];
+    for (const child of signedData.children) {
+        if (child.tag === 0xa0) {
+            // certificates [0] IMPLICIT — children are SEQUENCEs (one per cert).
+            const out: Uint8Array[] = [];
+            for (const certNode of child.children) {
+                if (certNode.tag === 0x30) out.push(sliceNode(cmsBytes, certNode));
+            }
+            return out;
+        }
+    }
+    return [];
+}
+
+/** Extract every embedded CRL DER block from a CMS SignedData (`crls [1]`). */
+export function extractCmsCrls(cmsBytes: Uint8Array): Uint8Array[] {
+    let root: AbsNode;
+    try {
+        root = walkAbs(cmsBytes);
+    } catch {
+        return [];
+    }
+    const signedData = getSignedData(cmsBytes, root);
+    if (signedData === null) return [];
+    for (const child of signedData.children) {
+        if (child.tag === 0xa1) {
+            // crls [1] IMPLICIT — children are CertificateList SEQUENCEs.
+            const out: Uint8Array[] = [];
+            for (const crlNode of child.children) {
+                if (crlNode.tag === 0x30) out.push(sliceNode(cmsBytes, crlNode));
+            }
+            return out;
+        }
+    }
+    return [];
+}
+
+/**
+ * Extract the document SignerInfo's `signatureValue` OCTET STRING content.
+ * This is the value an RFC 3161 timestamp's `messageImprint` is taken over.
+ */
+export function extractSignerSignatureValue(cmsBytes: Uint8Array): Uint8Array | null {
+    let root: AbsNode;
+    try {
+        root = walkAbs(cmsBytes);
+    } catch {
+        return null;
+    }
+    const signerInfo = findSignerInfo(cmsBytes, root);
+    if (signerInfo === null) return null;
+    return parseSignerInfo(cmsBytes, signerInfo).signatureValue;
+}
+
+/** Extract the raw `[1] IMPLICIT unsignedAttrs` blob (header included), or null. */
+export function extractUnsignedAttrs(cmsBytes: Uint8Array): Uint8Array | null {
+    let root: AbsNode;
+    try {
+        root = walkAbs(cmsBytes);
+    } catch {
+        return null;
+    }
+    const signerInfo = findSignerInfo(cmsBytes, root);
+    if (signerInfo === null) return null;
+    return parseSignerInfo(cmsBytes, signerInfo).unsignedAttrsRaw;
+}
+
+/**
+ * Extract the value of the SignerInfo `messageDigest` signed attribute
+ * (PKCS#9 OID 1.2.840.113549.1.9.4), or null when absent.
+ */
+export function extractSignedMessageDigest(cmsBytes: Uint8Array): Uint8Array | null {
+    let root: AbsNode;
+    try {
+        root = walkAbs(cmsBytes);
+    } catch {
+        return null;
+    }
+    const signerInfo = findSignerInfo(cmsBytes, root);
+    if (signerInfo === null) return null;
+    const signedAttrsRaw = parseSignerInfo(cmsBytes, signerInfo).signedAttrsRaw;
+    if (signedAttrsRaw === null) return null;
+    let attrsSet: AbsNode;
+    try {
+        // Re-tag [0] IMPLICIT → SET (0x31) so the walker treats it uniformly.
+        const buf = new Uint8Array(signedAttrsRaw);
+        buf[0] = 0x31;
+        attrsSet = walkAbs(buf);
+        for (const attr of attrsSet.children) {
+            if (attr.children.length < 2) continue;
+            if (oidFromAbs(buf, attr.children[0] as AbsNode) !== OID_MESSAGE_DIGEST) continue;
+            const valueSet = attr.children[1] as AbsNode;
+            if (valueSet.children.length === 0) return null;
+            const oct = valueSet.children[0] as AbsNode;
+            if (oct.tag !== 0x04) return null;
+            return sliceContent(buf, oct);
+        }
+    } catch {
+        return null;
+    }
+    return null;
+}
+
+/** Encapsulated content of a CMS SignedData (`eContentType` + `eContent` bytes). */
+export interface EncapsulatedContent {
+    readonly contentType: string | null;
+    readonly content: Uint8Array;
+}
+
+/**
+ * Extract the encapsulated content (`eContentType`, `eContent`) of a CMS
+ * SignedData. For an RFC 3161 token the content is the DER-encoded TSTInfo.
+ */
+export function extractEContent(cmsBytes: Uint8Array): EncapsulatedContent | null {
+    let root: AbsNode;
+    try {
+        root = walkAbs(cmsBytes);
+    } catch {
+        return null;
+    }
+    const signedData = getSignedData(cmsBytes, root);
+    if (signedData === null) return null;
+    // encapContentInfo is the first plain SEQUENCE child (after version INTEGER
+    // and digestAlgorithms SET).
+    for (const child of signedData.children) {
+        if (child.tag !== 0x30) continue;
+        if (child.children.length < 1) return null;
+        const oid = oidFromAbs(cmsBytes, child.children[0] as AbsNode);
+        // eContent is wrapped in [0] EXPLICIT containing an OCTET STRING.
+        if (child.children.length >= 2) {
+            const explicit = child.children[1] as AbsNode;
+            if (explicit.tag === 0xa0 && explicit.children.length > 0) {
+                const oct = explicit.children[0] as AbsNode;
+                if (oct.tag === 0x04) {
+                    return { contentType: oid, content: sliceContent(cmsBytes, oct) };
+                }
+            }
+        }
+        return { contentType: oid, content: new Uint8Array(0) };
+    }
+    return null;
+}

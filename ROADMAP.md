@@ -42,26 +42,50 @@ This document outlines the planned development direction for pdfnative-cli. Prio
 - [x] **`render --template`** — load a JSON template file, deep-merge with stdin/`--input`.
 - [x] **`render --font`** — register bundled `latin` / `emoji` font shortcuts.
 - [x] **RFC 3161 timestamp recognition** — `verify` reports `timestampPresent: true`
-  when a signature-timestamp attribute is found. **Validation deferred** — see v0.4.0.
+  when a signature-timestamp attribute is found. **Validation deferred** — see v1.0.0.
 - [x] **`pdfnative` bumped** to `^1.1.0` (was `^1.0.5`).
+
+### v1.0.0 — LTV verification, smart tables & CLI excellence _(released 2026)_
+
+- [x] **`pdfnative` bumped** to `^1.2.0`; removed the two upstream workarounds
+  (`cert-fix`, `sign-placeholder`) now fixed in pdfnative — uses
+  `addSignaturePlaceholder` and the corrected `parseCertificate` directly (#45, #46).
+- [x] **Full RFC 3161 timestamp validation (PAdES-T)** — `verify` cryptographically
+  verifies the TSA-token signature, the `messageImprint` binding to the document
+  signature, the TSA certificate chain, and reports `genTime` / `tsaSubject`.
+- [x] **OCSP (RFC 6960) + CRL (RFC 5280) revocation** — embedded `/DSS` (offline,
+  default) and opt-in online fetching via AIA / CDP URLs through an SSRF-guarded
+  client. `verify --revocation offline|online|disabled` and
+  `--revocation-policy soft-fail|strict`.
+- [x] **Smart tables** — `render` exposes pdfnative 1.2.0 `TableBlock` smarts via both
+  `--layout` JSON and dedicated flags (`--table-wrap`, `--repeat-header`, `--zebra`,
+  `--min-row-height`, `--cell-padding`).
+- [x] **Page-by-page streaming** — `render --stream-page-by-page` (TOC- and
+  `{pages}`-compatible, unlike single-pass `--stream`).
+- [x] **`.pdfnativerc.json` config file** — discovery cwd-upward, global + per-command
+  sections; precedence flags > env > config.
+- [x] **`batch` command** — parallel directory rendering reusing the render pipeline.
+- [x] **Shell completions** — `completion bash|zsh|fish`.
+- [x] **Global flags** — `--quiet`, `--no-color` (+`NO_COLOR`), `--version --json`.
 
 ## In Progress
 
-### v0.4.0 — Long-Term Validation (LTV) & revocation
+### Next — Sign-side LTV (PAdES-T / LT / LTA), upstream-coordinated
 
-- [ ] **Full RFC 3161 timestamp validation** — verify TSA-token signature, certificate
-  chain, and asserted time as part of `verify --strict`.
-- [ ] **OCSP responder support** — online and embedded responses inside `verify`.
-- [ ] **CRL support** — fetch / parse CRLs for offline revocation checks.
-- [ ] **PAdES-B-LT / B-LTA** — emit DSS dictionaries and document timestamps when signing.
-- [ ] **`verify --revocation-policy`** — strict / soft-fail / disabled selector.
+Sign-side LTV is **PDF-writing logic that belongs in pdfnative**; the CLI exposes the
+surface and will light it up once the upstream primitives ship.
+
+- [ ] **`sign --timestamp <tsa-url>`** — embed an RFC 3161 timestamp token into the CMS
+  at signing time. Flag is reserved (errors clearly today); blocked on pdfnative
+  timestamp-embedding support.
+- [ ] **PAdES-B-LT / B-LTA** — emit `/DSS` dictionaries and document timestamps when
+  signing. Blocked on pdfnative DSS-writing primitives.
+- [ ] **OCSP / CRL stapling at signing time** — collect and embed revocation data into
+  the signed PDF for archival.
+
 
 ## Future Considerations
 
-- **Long-Term Validation (LTV)** — embed validation data (cert chain + OCSP responses)
-  inside the signature for archival.
-- **Config file** (`.pdfnativerc.json`) — default flags, key paths, conformance level.
-- **`batch` command** — render multiple JSON files in parallel.
-- **Shell completions** — bash/zsh/fish completion scripts.
 - **`merge` / `encrypt` / `modify` standalone commands** — once pdfnative exposes the
   matching primitives.
+- **Additional shell integrations** — PowerShell completion, man pages.

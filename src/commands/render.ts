@@ -5,8 +5,10 @@ import { createRequire } from 'node:module';
 import {
     buildDocumentPDFBytes,
     buildDocumentPDFStream,
+    buildDocumentPDFStreamPageByPage,
     buildPDFBytes,
     buildPDFStream,
+    buildPDFStreamPageByPage,
     initNodeCompression,
     loadFontData,
     hasFontLoader,
@@ -16,9 +18,16 @@ import type {
     DocumentParams,
     PdfLayoutOptions,
     PdfParams,
+    PdfColor,
     FontEntry,
 } from '../core-bridge/index.js';
-import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../utils/args.js';
+import {
+    type ParsedArgs,
+    getStringFlag,
+    getStringFlagAll,
+    getBoolFlag,
+    hasFlag,
+} from '../utils/args.js';
 import {
     readFileOrStdin,
     writeOutput,
@@ -90,6 +99,109 @@ function hasTocBlock(params: DocumentParams): boolean {
         if (block.type === 'toc') return true;
     }
     return false;
+}
+
+// ── Smart-table defaults (pdfnative 1.2.0) ───────────────────────────────
+
+/**
+ * CLI-level defaults applied to every document `TableBlock` that does not
+ * already specify the corresponding field. Block-level values always win, so
+ * a JSON input remains authoritative; these flags only fill the gaps.
+ *
+ * Table-variant input (`--variant table`, `PdfParams`) does not carry these
+ * per-block fields and is therefore unaffected.
+ */
+const VALID_TABLE_WRAP = new Set(['auto', 'always', 'never']);
+
+interface TableDefaults {
+    readonly wrap?: 'auto' | 'always' | 'never';
+    readonly repeatHeader?: boolean;
+    readonly zebra?: boolean | PdfColor;
+    readonly minRowHeight?: number;
+    readonly cellPadding?: number;
+}
+
+function parseNonNegativeNumber(value: string, flag: string): number {
+    const n = Number.parseFloat(value);
+    if (!Number.isFinite(n) || n < 0) {
+        throw new CliError(`Invalid --${flag} value "${value}". Expected a non-negative number.`, 2);
+    }
+    return n;
+}
+
+/** Parse the smart-table default flags, or return undefined when none are set. */
+function parseTableDefaults(args: ParsedArgs): TableDefaults | undefined {
+    const defaults: { -readonly [K in keyof TableDefaults]: TableDefaults[K] } = {};
+    let any = false;
+
+    const wrap = getStringFlag(args.flags, 'table-wrap');
+    if (wrap !== undefined) {
+        if (!VALID_TABLE_WRAP.has(wrap)) {
+            throw new CliError(`Invalid --table-wrap "${wrap}". Valid: auto, always, never.`, 2);
+        }
+        defaults.wrap = wrap as 'auto' | 'always' | 'never';
+        any = true;
+    }
+
+    const repeatHeader = getBoolFlag(args.flags, 'repeat-header');
+    if (repeatHeader !== undefined) {
+        defaults.repeatHeader = repeatHeader;
+        any = true;
+    }
+
+    const zebraVal = args.flags['zebra'];
+    if (zebraVal !== undefined) {
+        if (typeof zebraVal === 'boolean') {
+            defaults.zebra = zebraVal;
+        } else {
+            const s = (typeof zebraVal === 'string' ? zebraVal : (zebraVal[0] ?? '')).trim();
+            const low = s.toLowerCase();
+            if (low === '' || low === 'true' || low === 'on' || low === 'yes' || low === '1') {
+                defaults.zebra = true;
+            } else if (low === 'false' || low === 'off' || low === 'no' || low === '0') {
+                defaults.zebra = false;
+            } else {
+                // Treat any other value as a PdfColor (e.g. "0.95 0.95 0.98").
+                defaults.zebra = s as PdfColor;
+            }
+        }
+        any = true;
+    }
+
+    const minRowHeight = getStringFlag(args.flags, 'min-row-height');
+    if (minRowHeight !== undefined) {
+        defaults.minRowHeight = parseNonNegativeNumber(minRowHeight, 'min-row-height');
+        any = true;
+    }
+
+    const cellPadding = getStringFlag(args.flags, 'cell-padding');
+    if (cellPadding !== undefined) {
+        defaults.cellPadding = parseNonNegativeNumber(cellPadding, 'cell-padding');
+        any = true;
+    }
+
+    return any ? defaults : undefined;
+}
+
+/**
+ * Return a copy of `params` with the smart-table `defaults` merged into every
+ * `TableBlock`. Block-level fields take precedence; only absent fields are
+ * filled. Returns `params` unchanged when there are no table blocks.
+ */
+function applyTableDefaults(params: DocumentParams, defaults: TableDefaults): DocumentParams {
+    let touched = false;
+    const blocks = params.blocks.map((b) => {
+        const block = b as { type?: unknown } & Record<string, unknown>;
+        if (block.type !== 'table') return b;
+        touched = true;
+        const merged: Record<string, unknown> = { ...block };
+        for (const [key, value] of Object.entries(defaults)) {
+            if (merged[key] === undefined) merged[key] = value;
+        }
+        return merged as unknown as typeof b;
+    });
+    if (!touched) return params;
+    return { ...params, blocks: blocks as DocumentParams['blocks'] };
 }
 
 /** Build font entries for bundled-language codes (e.g. th, ja, ar). */
@@ -176,10 +288,12 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 interface RenderConfig {
     readonly variant: string;
     readonly useStream: boolean;
+    readonly usePageStream: boolean;
     readonly inputPath: string | undefined;
     readonly outputPath: string | undefined;
     readonly langs: readonly string[];
     readonly layout: Partial<PdfLayoutOptions>;
+    readonly tableDefaults: TableDefaults | undefined;
 }
 
 async function loadTemplate(templatePath: string): Promise<unknown> {
@@ -217,7 +331,10 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
                 1,
             );
         }
-        if (cfg.useStream) {
+        if (cfg.usePageStream) {
+            const generator = buildPDFStreamPageByPage(parsedInput, cfg.layout);
+            await writeStreamingOutput(generator, cfg.outputPath);
+        } else if (cfg.useStream) {
             const generator = buildPDFStream(parsedInput, cfg.layout);
             await writeStreamingOutput(generator, cfg.outputPath);
         } else {
@@ -236,6 +353,10 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
     }
 
     let params: DocumentParams = parsedInput;
+
+    if (cfg.tableDefaults !== undefined) {
+        params = applyTableDefaults(params, cfg.tableDefaults);
+    }
 
     if (cfg.langs.length > 0) {
         const existing = (params.fontEntries ?? []) as readonly FontEntry[];
@@ -261,7 +382,13 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
         );
     }
 
-    if (cfg.useStream) {
+    if (cfg.usePageStream) {
+        // Page-by-page streaming assembles the full PDF, then chunks it at PDF
+        // object boundaries — so TOC blocks and {pages} placeholders are fully
+        // supported (unlike single-pass --stream).
+        const generator = buildDocumentPDFStreamPageByPage(params, effectiveLayout);
+        await writeStreamingOutput(generator, cfg.outputPath);
+    } else if (cfg.useStream) {
         const generator = buildDocumentPDFStream(params, effectiveLayout);
         await writeStreamingOutput(generator, cfg.outputPath);
     } else {
@@ -274,15 +401,24 @@ export async function render(args: ParsedArgs): Promise<void> {
     const inputPath = getStringFlag(args.flags, 'input', 'i');
     const outputPath = getStringFlag(args.flags, 'output', 'o');
     const useStream = hasFlag(args.flags, 'stream');
+    const usePageStream = hasFlag(args.flags, 'stream-page-by-page');
     const useWatch = hasFlag(args.flags, 'watch');
     const variant = getStringFlag(args.flags, 'variant') ?? 'document';
     const langsRaw = getStringFlag(args.flags, 'lang');
     const templatePath = getStringFlag(args.flags, 'template');
     const fontFlags = getStringFlagAll(args.flags, 'font');
+    const tableDefaults = parseTableDefaults(args);
 
     if (!VALID_VARIANTS.has(variant)) {
         throw new CliError(
             `Invalid --variant "${variant}". Valid: document, table.`,
+            2,
+        );
+    }
+
+    if (useStream && usePageStream) {
+        throw new CliError(
+            'Use either --stream or --stream-page-by-page, not both.',
             2,
         );
     }
@@ -316,10 +452,12 @@ export async function render(args: ParsedArgs): Promise<void> {
     const cfg: RenderConfig = {
         variant,
         useStream,
+        usePageStream,
         inputPath,
         outputPath,
         langs,
         layout,
+        tableDefaults,
     };
 
     // Initial render (always runs, even in --watch mode).

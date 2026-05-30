@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
-import { parseArgs, hasFlag } from './utils/args.js';
+import { parseArgs, hasFlag, getStringFlag } from './utils/args.js';
 import { CliError } from './utils/error.js';
+import { loadConfig, applyConfigDefaults } from './utils/config.js';
 
 // Lazy-import commands to keep startup fast for --help / --version
 type CommandFn = (args: ReturnType<typeof parseArgs>) => Promise<void>;
@@ -16,10 +17,18 @@ Commands:
   sign      Apply a digital signature to a PDF
   verify    Verify embedded PDF signatures
   inspect   Analyse a PDF and output metadata / conformance info
+  batch     Render every JSON file in a directory to PDF (parallel)
+  completion  Emit a shell completion script (bash|zsh|fish)
 
 Options:
   --help,    -h   Show this help message
-  --version, -V   Show version
+  --version, -V   Show version (add --json for machine-readable output)
+
+Global options (any command):
+  --config <file>   Use a specific .pdfnativerc.json (default: nearest upward)
+  --no-config       Ignore any .pdfnativerc.json
+  --quiet,   -q     Suppress progress output on stderr
+  --no-color        Disable ANSI colour (also respects NO_COLOR)
 
 Run \`pdfnative <command> --help\` for per-command options.
 `;
@@ -33,8 +42,13 @@ Usage:
 I/O:
   --input,   -i   Path to JSON input (default: stdin)
   --output,  -o   Output PDF path (default: stdout)
-  --stream        Stream output (large documents). Incompatible with TOC blocks
-                  and with header/footer templates that contain {pages}.
+  --stream        Stream output (large documents). Single-pass; incompatible
+                  with TOC blocks and with header/footer templates that
+                  contain {pages}.
+  --stream-page-by-page
+                  Stream output chunked at PDF object boundaries. Assembles
+                  the full document first, so TOC blocks and {pages} ARE
+                  supported. Mutually exclusive with --stream.
   --watch         Re-render on input file change (requires --input and a
                   file --output; logs to stderr; debounce 200 ms).
   --template      Path to JSON template file. Stdin / --input is deep-merged
@@ -43,11 +57,19 @@ I/O:
 Variant:
   --variant       document (default) or table
 
+Smart tables (document variant; fills TableBlock fields left unset in JSON):
+  --table-wrap        auto (default) | always | never
+  --repeat-header     [true|false] repeat header row on continuation pages
+  --zebra             [true|false|"R G B"] alternate-row striping
+  --min-row-height    Minimum row height in points
+  --cell-padding      Horizontal cell padding in points
+                  (caption is per-table — set it in the JSON TableBlock)
+
 Layout (flags override values from --layout file):
   --layout        Path to JSON layout file (PdfLayoutOptions)
   --page-size     Named (a4|letter|legal|a3|tabloid|a5) or WxH in points
   --margin        Uniform N or "top,right,bottom,left" in points
-  --tagged        none|pdfa1b|pdfa2b|pdfa3b (PDF/A flag, sets PDF/A conformance)
+  --tagged        none|pdfa1b|pdfa2b|pdfa2u|pdfa3b (PDF/A flag)
   --conformance   DEPRECATED — alias for --tagged pdfa{1b|2b|3b}
   --compress      Enable Flate compression (initialises Node compression)
   --lang          Comma-separated language packs (e.g. th,ja,ar)
@@ -105,6 +127,13 @@ Signature metadata (optional):
   --contact       Contact info
   --signing-time  ISO 8601 timestamp (default: now)
 
+Long-term validation (LTV):
+  --timestamp <url>  RFC 3161 TSA URL for PAdES-T timestamping. NOT YET
+                     available — embedding a timestamp token at signing time
+                     requires upstream pdfnative support; the flag is reserved
+                     and currently errors. Timestamp VALIDATION already works
+                     via \`pdfnative verify\`.
+
 Security: key material is never written to logs or error messages.
 
   --help,    -h   Show this help message
@@ -114,16 +143,26 @@ const VERIFY_USAGE = `\
 pdfnative verify — Verify CMS/PKCS#7 signatures in a PDF
 
 Usage:
-  pdfnative verify [--input <file.pdf>] [--trust <root.pem>]... [--strict] [--format json|text]
+  pdfnative verify [--input <file.pdf>] [--trust <root.pem>]... [--strict]
+                   [--revocation offline|online|disabled]
+                   [--revocation-policy soft-fail|strict] [--format json|text]
 
 Options:
-  --input,   -i   Path to input PDF (default: stdin)
-  --trust         PEM file with trusted root certs (repeatable;
-                  env: PDFNATIVE_VERIFY_TRUST). When omitted, self-signed
-                  roots are accepted.
-  --strict        Exit code 1 if any signature fails any check.
-  --format,  -f   json (default) or text
-  --help,    -h   Show this help message
+  --input,   -i        Path to input PDF (default: stdin)
+  --trust              PEM file with trusted root certs (repeatable;
+                       env: PDFNATIVE_VERIFY_TRUST). When omitted, self-signed
+                       roots are accepted.
+  --strict             Exit code 1 if any signature fails any check.
+  --revocation         Certificate revocation source (default: offline):
+                         offline   embedded OCSP/CRL from the PDF /DSS only
+                         online    additionally fetch via OCSP (AIA) and CRL
+                                   (CDP) URLs — SSRF-guarded, no redirects
+                         disabled  skip revocation checking entirely
+  --revocation-policy  How revocation affects validity (default: soft-fail):
+                         soft-fail  only an explicit "revoked" status fails
+                         strict     a non-"good" status fails the signature
+  --format,  -f        json (default) or text
+  --help,    -h        Show this help message
 
 Reported per signature:
   - byte-range integrity (SHA-256 against CMS messageDigest)
@@ -131,10 +170,11 @@ Reported per signature:
   - certificate chain validity
   - chain root trust evaluation
   - signature value cryptographic verification (RSA-SHA256 / ECDSA-SHA256)
-  - RFC 3161 timestamp token presence (full timestamp validation TBD)
+  - RFC 3161 timestamp token validation (PAdES-T)
+  - OCSP (RFC 6960) + CRL (RFC 5280) revocation status
 
-Out of scope (v0.3.0): OCSP/CRL revocation, full RFC 3161 token validation,
-LTV. These require future pdfnative API additions.
+Note: sign-side LTV (embedding timestamps / DSS into signatures) is tracked
+upstream in pdfnative and is out of scope for this CLI.
 `;
 
 const INSPECT_USAGE = `\
@@ -152,6 +192,37 @@ Options:
   --check         Assert a property; repeatable; AND semantics; exits 1 on
                   failure. Values: pdfa | signed | encrypted
   --help,    -h   Show this help message
+`;
+
+const BATCH_USAGE = `\
+pdfnative batch — Render every JSON file in a directory to PDF
+
+Usage:
+  pdfnative batch --input-dir <dir> --output-dir <dir> [render options]
+
+Options:
+  --input-dir        Directory of *.json document definitions (required)
+  --output-dir       Directory for the rendered *.pdf files (created if absent)
+  --concurrency      Maximum parallel renders (default: 4)
+  --fail-fast        Stop at the first failure (default: render all, then report)
+  --format,  -f      Summary format: text (default) or json
+  --help,    -h      Show this help message
+
+All other flags (--variant, --layout, --page-size, --tagged, --compress,
+smart-table flags, …) are forwarded to each render. Per-file --input/--output
+are managed automatically. Exit code 1 if any file fails.
+`;
+
+const COMPLETION_USAGE = `\
+pdfnative completion — Emit a shell completion script
+
+Usage:
+  pdfnative completion <bash|zsh|fish>
+
+Install (examples):
+  pdfnative completion bash > /etc/bash_completion.d/pdfnative
+  pdfnative completion zsh  > "\${fpath[1]}/_pdfnative"
+  pdfnative completion fish > ~/.config/fish/completions/pdfnative.fish
 `;
 
 function getVersion(): string {
@@ -178,6 +249,14 @@ async function loadCommand(name: string): Promise<CommandFn> {
             const m = await import('./commands/inspect.js');
             return m.inspect;
         }
+        case 'batch': {
+            const m = await import('./commands/batch.js');
+            return m.batch;
+        }
+        case 'completion': {
+            const m = await import('./commands/completion.js');
+            return m.completion;
+        }
         default:
             return Promise.reject(
                 new CliError(`Unknown command: ${name}. Run pdfnative --help for usage.`, 1),
@@ -189,13 +268,26 @@ async function main(): Promise<void> {
     const argv = process.argv.slice(2);
     const args = parseArgs(argv);
 
+    // Global output flags (recognised anywhere in argv).
+    if (hasFlag(args.flags, 'no-color') || process.env['NO_COLOR'] !== undefined) {
+        process.env['NO_COLOR'] = '1';
+    }
+    if (hasFlag(args.flags, 'quiet', 'q')) {
+        process.env['PDFNATIVE_QUIET'] = '1';
+    }
+
     if (hasFlag(args.flags, 'help', 'h') && args.positionals.length === 0) {
         process.stdout.write(USAGE);
         process.exit(0);
     }
 
     if (hasFlag(args.flags, 'version', 'V')) {
-        process.stdout.write(getVersion() + '\n');
+        const version = getVersion();
+        if (hasFlag(args.flags, 'json')) {
+            process.stdout.write(JSON.stringify({ name: 'pdfnative-cli', version }) + '\n');
+        } else {
+            process.stdout.write(version + '\n');
+        }
         process.exit(0);
     }
 
@@ -212,6 +304,8 @@ async function main(): Promise<void> {
             case 'sign':   process.stdout.write(SIGN_USAGE);   break;
             case 'verify': process.stdout.write(VERIFY_USAGE); break;
             case 'inspect': process.stdout.write(INSPECT_USAGE); break;
+            case 'batch': process.stdout.write(BATCH_USAGE); break;
+            case 'completion': process.stdout.write(COMPLETION_USAGE); break;
             default:
                 process.stderr.write(`Unknown command: ${commandName}. Run pdfnative --help for usage.\n`);
                 process.exit(1);
@@ -230,8 +324,17 @@ async function main(): Promise<void> {
     });
 
     const commandArgs = parseArgs(rest);
+
+    // Apply `.pdfnativerc.json` defaults (unless --no-config). CLI flags win.
+    let effectiveArgs = commandArgs;
+    if (!hasFlag(commandArgs.flags, 'no-config')) {
+        const configPath = getStringFlag(commandArgs.flags, 'config');
+        const defaults = loadConfig(commandName, configPath);
+        effectiveArgs = applyConfigDefaults(commandArgs, defaults);
+    }
+
     const command = await loadCommand(commandName);
-    await command(commandArgs);
+    await command(effectiveArgs);
 }
 
 main().catch((e: unknown) => {
@@ -242,6 +345,9 @@ main().catch((e: unknown) => {
         process.exit(e.exitCode);
     }
     const message = e instanceof Error ? e.message : String(e);
+    if (process.env['PDFNATIVE_DEBUG'] === '1' && e instanceof Error) {
+        process.stderr.write((e.stack ?? e.message) + '\n');
+    }
     process.stderr.write(`Error: ${message}\n`);
     process.exit(1);
 });

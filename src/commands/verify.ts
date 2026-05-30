@@ -3,8 +3,6 @@ import {
     openPdf,
     ensureCryptoReady,
     parseCertificate,
-    verifyCertSignature,
-    isSelfSigned,
     isRef,
     isName,
     isDict,
@@ -23,25 +21,33 @@ import { readFileOrStdin } from '../utils/io.js';
 import { CliError } from '../utils/error.js';
 import { walkAbs, sliceNode, sliceContent, type AbsNode } from '../utils/asn1-walk.js';
 import { loadPemChain, parseCertificateChain } from '../utils/keys.js';
-import { verifyCmsSignatureValue } from '../utils/cms-verify.js';
-import { correctCertificateIssuerRaw } from '../utils/cert-fix.js';
+import { verifyCmsSignatureValue, extractUnsignedAttrs, extractSignerSignatureValue } from '../utils/cms-verify.js';
+import { buildChain, isTrustedRoot } from '../utils/cert-chain.js';
+import { verifyTimestamp } from '../utils/timestamp-verify.js';
+import {
+    checkRevocation,
+    type RevocationMode,
+    type RevocationPolicy,
+    type RevocationStatus,
+} from '../utils/revocation.js';
+
 
 /**
  * `pdfnative-cli verify` — verify CMS/PKCS#7 signatures embedded in a PDF.
  *
- * Scope (v0.3.0):
+ * Scope (v1.0.0):
  *   ✔ Enumerate signature fields and parse /ByteRange + /Contents
  *   ✔ Recompute SHA-256 of byte-range-covered bytes
  *   ✔ Compare with messageDigest attribute embedded in CMS SignedData (integrity)
  *   ✔ Walk certificate chain via pdfnative `verifyCertSignature`
  *   ✔ Trust evaluation against --trust roots (or self-signed acceptance)
  *   ✔ FULL CMS signature-value verification (RSA + ECDSA over signedAttrs)
- *   ✔ RFC 3161 signature-time-stamp-token recognition (presence flag)
+ *   ✔ RFC 3161 signature-time-stamp-token validation (PAdES-T)
+ *   ✔ OCSP (RFC 6960) + CRL (RFC 5280) revocation — embedded DSS (offline,
+ *     default) and opt-in online fetching (--revocation online, SSRF-guarded)
  *
- * Out of scope (deferred to v0.4.0):
- *   ✘ RFC 3161 timestamp signature validation
- *   ✘ OCSP / CRL revocation
- *   ✘ Long-Term Validation (LTV)
+ * Out of scope:
+ *   ✘ Sign-side LTV (embedding timestamps / DSS) — tracked upstream in pdfnative
  */
 
 interface SignatureReport {
@@ -60,6 +66,14 @@ interface SignatureReport {
     readonly signatureValid: boolean;
     readonly signatureAlgorithm: 'rsa-sha256' | 'ecdsa-sha256' | null;
     readonly timestampPresent: boolean;
+    readonly timestampValid: boolean;
+    readonly timestampTime: string | null;
+    readonly tsaSubject: string | null;
+    readonly revocationChecked: boolean;
+    readonly revocationStatus: RevocationStatus;
+    readonly revocationSource: 'embedded' | 'online' | 'none';
+    readonly revocationMethod: 'ocsp' | 'crl' | null;
+    readonly revocationRevokedAt: string | null;
     readonly notes: readonly string[];
 }
 
@@ -339,49 +353,9 @@ function parseSignatureDict(dict: PdfDict): ParsedSignature {
 // Certificate chain
 // ──────────────────────────────────────────────────────────────────────
 
-function findChainParent(
-    cert: X509Certificate,
-    candidates: readonly X509Certificate[],
-): X509Certificate | undefined {
-    for (const c of candidates) {
-        if (c === cert) continue;
-        try {
-            if (verifyCertSignature(cert, c)) return c;
-        } catch {
-            // ignore — try next candidate
-        }
-    }
-    return undefined;
-}
-
-function buildChain(
-    leaf: X509Certificate,
-    pool: readonly X509Certificate[],
-): { chain: X509Certificate[]; chainValid: boolean; root: X509Certificate } {
-    const chain: X509Certificate[] = [leaf];
-    let current = leaf;
-    let chainValid = true;
-    const seen = new Set<X509Certificate>([leaf]);
-    while (!isSelfSigned(current)) {
-        const parent = findChainParent(current, pool);
-        if (parent === undefined || seen.has(parent)) {
-            chainValid = false;
-            break;
-        }
-        chain.push(parent);
-        seen.add(parent);
-        current = parent;
-    }
-    return { chain, chainValid, root: current };
-}
-
-function certEquals(a: X509Certificate, b: X509Certificate): boolean {
-    if (a.raw.length !== b.raw.length) return false;
-    for (let i = 0; i < a.raw.length; i++) {
-        if (a.raw[i] !== b.raw[i]) return false;
-    }
-    return true;
-}
+// Chain construction, parent resolution, byte-equality and trust evaluation
+// live in ../utils/cert-chain.ts (shared with the timestamp + revocation
+// verifiers).
 
 // ──────────────────────────────────────────────────────────────────────
 // Main
@@ -392,9 +366,23 @@ export async function verify(args: ParsedArgs): Promise<void> {
     const format = getStringFlag(args.flags, 'format', 'f') ?? 'json';
     const strict = hasFlag(args.flags, 'strict');
     const trustPaths = getStringFlagAll(args.flags, 'trust');
+    const revocationMode = (getStringFlag(args.flags, 'revocation') ?? 'offline') as RevocationMode;
+    const revocationPolicy = (getStringFlag(args.flags, 'revocation-policy') ?? 'soft-fail') as RevocationPolicy;
 
     if (format !== 'json' && format !== 'text') {
         throw new CliError(`Invalid --format value "${format}". Valid: json, text.`, 2);
+    }
+    if (revocationMode !== 'offline' && revocationMode !== 'online' && revocationMode !== 'disabled') {
+        throw new CliError(
+            `Invalid --revocation value "${revocationMode}". Valid: offline, online, disabled.`,
+            2,
+        );
+    }
+    if (revocationPolicy !== 'soft-fail' && revocationPolicy !== 'strict') {
+        throw new CliError(
+            `Invalid --revocation-policy value "${revocationPolicy}". Valid: soft-fail, strict.`,
+            2,
+        );
     }
 
     // Async crypto bootstrap MUST run before any RSA/ECDSA verification.
@@ -417,7 +405,8 @@ export async function verify(args: ParsedArgs): Promise<void> {
     const fields = findSignatureFields(reader);
     const reports: SignatureReport[] = [];
 
-    fields.forEach((field, idx) => {
+    for (let idx = 0; idx < fields.length; idx++) {
+        const field = fields[idx] as (typeof fields)[number];
         const notes: string[] = [];
         const sig = parseSignatureDict(field.sigDict);
         let digest: string | null = null;
@@ -429,6 +418,14 @@ export async function verify(args: ParsedArgs): Promise<void> {
         let signatureValid = false;
         let signatureAlgorithm: 'rsa-sha256' | 'ecdsa-sha256' | null = null;
         let timestampPresent = false;
+        let timestampValid = false;
+        let timestampTime: string | null = null;
+        let tsaSubject: string | null = null;
+        let revocationChecked = false;
+        let revocationStatus: RevocationStatus = 'unknown';
+        let revocationSource: 'embedded' | 'online' | 'none' = 'none';
+        let revocationMethod: 'ocsp' | 'crl' | null = null;
+        let revocationRevokedAt: string | null = null;
 
         if (sig.byteRange !== null) {
             digest = digestByteRange(pdfBytes, sig.byteRange);
@@ -443,7 +440,7 @@ export async function verify(args: ParsedArgs): Promise<void> {
                 if (certDers.length === 0) {
                     notes.push('no certificates embedded in CMS');
                 } else {
-                    const certs = certDers.map((der) => correctCertificateIssuerRaw(parseCertificate(der)));
+                    const certs = certDers.map((der) => parseCertificate(der));
                     const leaf = certs[0] as X509Certificate;
                     signerSubject = nameToString(leaf.subject);
                     signerIssuer = nameToString(leaf.issuer);
@@ -465,14 +462,11 @@ export async function verify(args: ParsedArgs): Promise<void> {
                         notes.push('chain incomplete (no parent for an intermediate cert)');
                     }
 
-                    if (trustRoots.length === 0) {
-                        trustedRoot = isSelfSigned(built.root);
-                        if (trustedRoot) {
-                            notes.push('no --trust provided; accepted self-signed root');
-                        }
-                    } else {
-                        trustedRoot = trustRoots.some((t) => certEquals(t, built.root));
-                        if (!trustedRoot) notes.push('chain root not in --trust list');
+                    trustedRoot = isTrustedRoot(built.root, trustRoots);
+                    if (trustRoots.length === 0 && trustedRoot) {
+                        notes.push('no --trust provided; accepted self-signed root');
+                    } else if (!trustedRoot) {
+                        notes.push('chain root not in --trust list');
                     }
 
                     // Full CMS signature-value verification (NEW in v0.3.0).
@@ -483,8 +477,44 @@ export async function verify(args: ParsedArgs): Promise<void> {
                     if (!signatureValid && cmsResult.note !== null) {
                         notes.push(`CMS signature: ${cmsResult.note}`);
                     }
+
+                    // RFC 3161 timestamp validation (PAdES-T, NEW in v1.0.0).
                     if (timestampPresent) {
-                        notes.push('RFC 3161 timestamp token present (recognised, not validated)');
+                        const unsignedAttrs = extractUnsignedAttrs(sig.contents);
+                        const docSigValue = extractSignerSignatureValue(sig.contents);
+                        const ts = verifyTimestamp(unsignedAttrs, docSigValue, trustRoots);
+                        timestampValid = ts.valid;
+                        timestampTime = ts.genTime;
+                        tsaSubject = ts.tsaSubject;
+                        if (ts.valid) {
+                            notes.push(
+                                `RFC 3161 timestamp valid (genTime ${ts.genTime ?? 'unknown'}`
+                                + `${ts.trusted ? ', TSA trusted' : ', TSA untrusted'})`,
+                            );
+                        } else {
+                            notes.push(`RFC 3161 timestamp invalid${ts.note !== null ? `: ${ts.note}` : ''}`);
+                        }
+                    }
+
+                    // Certificate revocation — OCSP + CRL (PAdES-LT, NEW in v1.0.0).
+                    if (revocationMode !== 'disabled') {
+                        const issuerCert = built.chain.length > 1 ? (built.chain[1] as X509Certificate) : null;
+                        const rev = await checkRevocation(reader, leaf, issuerCert, certs, revocationMode);
+                        revocationChecked = rev.checked;
+                        revocationStatus = rev.status;
+                        revocationSource = rev.source;
+                        revocationMethod = rev.method;
+                        revocationRevokedAt = rev.revokedAt;
+                        if (rev.status === 'revoked') {
+                            notes.push(
+                                `certificate REVOKED${rev.revokedAt !== null ? ` at ${rev.revokedAt}` : ''}`
+                                + ` (via ${rev.method ?? 'unknown'}, ${rev.source})`,
+                            );
+                        } else if (rev.checked && rev.status === 'good') {
+                            notes.push(`revocation OK (via ${rev.method ?? 'unknown'}, ${rev.source})`);
+                        } else if (rev.note !== null) {
+                            notes.push(`revocation: ${rev.note}`);
+                        }
                     }
                 }
             } catch {
@@ -511,13 +541,32 @@ export async function verify(args: ParsedArgs): Promise<void> {
             signatureValid,
             signatureAlgorithm,
             timestampPresent,
+            timestampValid,
+            timestampTime,
+            tsaSubject,
+            revocationChecked,
+            revocationStatus,
+            revocationSource,
+            revocationMethod,
+            revocationRevokedAt,
             notes,
         });
-    });
+    }
+
+    // A signature's revocation outcome blocks validity when the certificate is
+    // explicitly revoked, or — under the strict policy — whenever a 'good'
+    // status could not be positively established.
+    const revocationOk = (r: SignatureReport): boolean => {
+        if (r.revocationStatus === 'revoked') return false;
+        if (revocationPolicy === 'strict') return r.revocationStatus === 'good';
+        return true;
+    };
 
     const allValid =
         reports.length > 0
-        && reports.every((r) => r.integrity && r.chainValid && r.trustedRoot && r.signatureValid);
+        && reports.every(
+            (r) => r.integrity && r.chainValid && r.trustedRoot && r.signatureValid && revocationOk(r),
+        );
 
     const result: VerifyResult = { signatures: reports, allValid };
 
@@ -536,7 +585,8 @@ export async function verify(args: ParsedArgs): Promise<void> {
                 + `    signature: ${r.signatureValid ? 'OK' : 'FAIL'}\n`
                 + `    chain:     ${r.chainValid ? 'valid' : 'invalid'}\n`
                 + `    trust:     ${r.trustedRoot ? 'trusted' : 'untrusted'}\n`
-                + `    timestamp: ${r.timestampPresent ? 'present' : '—'}\n`,
+                + `    timestamp: ${r.timestampPresent ? (r.timestampValid ? `valid (${r.timestampTime ?? 'unknown time'})` : 'present but INVALID') : '—'}\n`
+                + `    revocation: ${r.revocationChecked ? `${r.revocationStatus} (${r.revocationMethod ?? '—'}, ${r.revocationSource})` : '—'}\n`,
             );
             if (r.notes.length > 0) {
                 process.stdout.write(`    notes:     ${r.notes.join('; ')}\n`);

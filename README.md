@@ -13,7 +13,16 @@
 
 Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library — render JSON to PDF, apply digital signatures, verify them, and inspect PDF conformance, directly from the terminal. Zero extra runtime dependencies.
 
-> **What's new in v0.3.0** — full digital-signature stack: ECDSA-SHA256 signing, end-to-end CMS/PKCS#7 cryptographic verification (RSA + ECDSA), RFC 3161 timestamp recognition, and an automatic AcroForm signature-placeholder injector that lets you sign any `pdfnative render` output in one command. `render` gains `--watch`, `--template`, and `--font latin|emoji` shortcuts. **100 % backward-compatible** with v0.2.0 — see [release notes](release-notes/v0.3.0.md).
+> **What's new in v1.0.0** — **Long-Term Validation (LTV) on the verify side**: full
+> RFC 3161 timestamp-token validation (PAdES-T), plus OCSP (RFC 6960) and CRL (RFC 5280)
+> revocation checking — offline from the embedded `/DSS` by default, with opt-in,
+> SSRF-guarded online fetching (`verify --revocation online`). `render` exposes
+> pdfnative 1.2.0 **smart tables** (`--table-wrap`, `--repeat-header`, `--zebra`,
+> `--cell-padding`, `--min-row-height`) and **page-by-page streaming**
+> (`--stream-page-by-page`, TOC-compatible). New **`batch`** and **`completion`** commands,
+> a **`.pdfnativerc.json`** config file, and global `--quiet` / `--no-color` /
+> `--version --json` flags. Built on **pdfnative 1.2.0**, dropping the last two upstream
+> workarounds. See [release notes](release-notes/v1.0.0.md).
 >
 > ⭐ Star [`pdfnative`](https://github.com/Nizoka/pdfnative) — the zero-dependency PDF engine that powers this CLI.
 
@@ -27,9 +36,18 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
   `--cert-chain` (repeatable). Keys loaded from env vars or files; never logged.
 - **`inspect`** — PDF version, page count, encryption, PDF/A conformance, signature count,
   metadata. `--verbose`, `--pages`, and `--check pdfa|signed|encrypted` for CI assertions.
-- **`verify`** _(new in v0.2.0)_ — verify integrity, certificate chains, and trust roots
-  of every CMS/PKCS#7 signature embedded in a PDF. JSON & text output, `--strict` mode.
+- **`verify`** — verify every CMS/PKCS#7 signature: byte-range integrity, RSA/ECDSA
+  signature value, certificate chain, trust roots, **RFC 3161 timestamp (PAdES-T)**, and
+  **OCSP + CRL revocation** (embedded `/DSS` offline by default, opt-in SSRF-guarded online).
+  JSON & text output, `--strict`, `--revocation`, `--revocation-policy`.
+- **`batch`** — render every JSON file in a directory to PDF in parallel, reusing the full
+  `render` pipeline, with a per-file summary and bounded `--concurrency`.
+- **`completion`** — emit `bash`, `zsh`, or `fish` shell-completion scripts.
+- **`.pdfnativerc.json`** — optional config file for default flags (global + per-command);
+  precedence is CLI flags > env > config.
 - **Zero extra dependencies** — `pdfnative` is the sole runtime dependency.
+- **Offline by default** — no network access unless you explicitly opt in with
+  `verify --revocation online`, and even then every request passes an SSRF guard.
 - **Stdin / stdout by default** — every command is shell-pipeline friendly.
 - **Secret-safe** — signing keys, certs, encryption passwords never appear in error
   output or stderr. PEM material redacted; layout-file `attachments[].data` injection blocked.
@@ -44,7 +62,10 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 | `render` JSON → PDF | ✅ | Streaming, hybrid layout model, multilingual fonts |
 | `sign` digital signatures | ✅ | RSA (CMS/PKCS#7), metadata fields, cert chains |
 | `inspect` PDF metadata | ✅ | `--verbose`, `--pages`, `--check pdfa\|signed\|encrypted` |
-| `verify` signature verification (v0.2.0) | ✅ | Integrity + chain + trust; `--strict`, `--trust` |
+| `verify` signature verification | ✅ | Integrity + chain + trust + timestamp + revocation; `--strict` |
+| `batch` parallel rendering | ✅ | Directory → PDFs, `--concurrency`, `--fail-fast` |
+| `completion` shell scripts | ✅ | `bash` / `zsh` / `fish` |
+| `.pdfnativerc.json` config file | ✅ | Global + per-command defaults; flags > env > config |
 | **Document Blocks** | | |
 | Headings, paragraphs, lists | ✅ | Full text styling support |
 | Tables | ✅ | Headers, rows, multi-page |
@@ -77,10 +98,15 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 | CMS signature-value verification | ✅ | RSA-SHA256 + ECDSA-SHA256 (v0.3.0) |
 | Certificate chain verification | ✅ | Via pdfnative `verifyCertSignature` |
 | Trust roots | ✅ | `--trust <root.pem>` (repeatable) + self-signed acceptance |
-| RFC 3161 timestamp recognition | ✅ | Reported as `timestampPresent` (v0.3.0); full TSA validation pending |
-| OCSP / CRL revocation | ⚠️ | Deferred to v0.4.0+ |
-| Full RFC 3161 token validation | ⚠️ | Deferred to v0.4.0+ |
-| **Render iteration (v0.3.0)** | | |
+| RFC 3161 timestamp recognition | ✅ | Reported as `timestampPresent` |
+| RFC 3161 timestamp validation (PAdES-T) | ✅ | TSA signature, messageImprint binding, chain, `genTime` |
+| OCSP revocation (RFC 6960) | ✅ | Embedded `/DSS` + opt-in online via AIA (SSRF-guarded) |
+| CRL revocation (RFC 5280) | ✅ | Embedded `/DSS` + opt-in online via CDP (SSRF-guarded) |
+| Revocation policy | ✅ | `--revocation offline\|online\|disabled`, `--revocation-policy soft-fail\|strict` |
+| Sign-side LTV (timestamp embedding / DSS) | ⚠️ | Upstream-blocked in pdfnative; `sign --timestamp` reserved |
+| **Render iteration** | | |
+| Smart tables | ✅ | `--table-wrap`, `--repeat-header`, `--zebra`, `--cell-padding`, `--min-row-height` |
+| Page-by-page streaming | ✅ | `--stream-page-by-page` (TOC- and `{pages}`-compatible) |
 | `--watch` re-render on file change | ✅ | 200 ms debounce, requires file `--output` |
 | `--template <file.json>` | ✅ | Deep-merge base under input (caller wins) |
 | `--font latin\|emoji` shortcuts | ✅ | Repeatable, allow-list bundled font names |
@@ -272,7 +298,7 @@ See `samples/render/` for a working example of every category.
 | `--pages` | false | Add per-page metadata array |
 | `--check pdfa\|signed\|encrypted` _(repeatable)_ | — | CI-friendly assertion; sets exit code (0 = pass, 1 = fail) |
 
-### `pdfnative verify` _(new in v0.2.0)_
+### `pdfnative verify`
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -280,13 +306,52 @@ See `samples/render/` for a working example of every category.
 | `--format json\|text` | `json` | Output format |
 | `--strict` | false | Exit 1 on any failure or zero signatures (CI-friendly) |
 | `--trust <root.pem>` _(repeatable)_ | _self-signed only_ | Trusted root certificates (PEM) |
+| `--revocation offline\|online\|disabled` | `offline` | Revocation source: embedded `/DSS` only, also fetch online (SSRF-guarded), or skip |
+| `--revocation-policy soft-fail\|strict` | `soft-fail` | `strict` fails the signature on any non-`good` status; `soft-fail` only fails on explicit `revoked` |
 
-**Scope (v0.2.0):** integrity (byte-range SHA-256) + certificate chain signatures + trust
-evaluation. Full CMS-signature-value verification, OCSP/CRL revocation, and RFC 3161
-timestamp validation are deferred — see [ROADMAP.md](ROADMAP.md).
+**Scope (v1.0.0):** byte-range integrity (SHA-256), full CMS signature value
+(RSA-PKCS#1 v1.5 SHA-256 + ECDSA-SHA256 over P-256), certificate chain + trust,
+**RFC 3161 timestamp validation (PAdES-T)**, and **OCSP (RFC 6960) + CRL (RFC 5280)
+revocation** — embedded from the PDF `/DSS` offline by default, with opt-in online
+fetching through an SSRF-guarded HTTP client. Sign-side LTV (embedding timestamps /
+DSS at signing time) is upstream-blocked in pdfnative — see [ROADMAP.md](ROADMAP.md)
+and [SECURITY.md](SECURITY.md#network-access-revocation-checking).
+
+### `pdfnative batch`
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--input-dir <dir>` | _required_ | Directory of `*.json` document definitions |
+| `--output-dir <dir>` | _required_ | Output directory for the rendered `*.pdf` (created if absent) |
+| `--concurrency <n>` | `4` | Maximum parallel renders |
+| `--fail-fast` | false | Stop at the first failure (default: render all, then report) |
+| `--format json\|text` | `text` | Summary format |
+
+All other flags are forwarded to each `render`. Exit code 1 if any file fails.
+
+### `pdfnative completion`
+
+```bash
+pdfnative completion bash > /etc/bash_completion.d/pdfnative
+pdfnative completion zsh  > "${fpath[1]}/_pdfnative"
+pdfnative completion fish > ~/.config/fish/completions/pdfnative.fish
+```
+
+### Global options
+
+| Flag | Description |
+|------|-------------|
+| `--config <file>` | Use a specific `.pdfnativerc.json` (default: nearest upward from cwd) |
+| `--no-config` | Ignore any `.pdfnativerc.json` |
+| `--quiet`, `-q` | Suppress progress output on stderr |
+| `--no-color` | Disable ANSI colour (also respects the `NO_COLOR` env var) |
+| `--version --json` | Machine-readable version output |
 
 ## Security
 
+- **Offline by default** — no network access unless you pass `verify --revocation online`.
+  Online revocation requests pass an **SSRF guard** (scheme allow-list, private/loopback/
+  link-local/CGNAT address blocking, no redirects, timeout + size caps).
 - **Signing keys are never logged** — not in error messages, not in debug output.
 - **Path traversal protection** — all file path arguments are validated against `../` sequences.
 - **JSON size cap** — input is capped at 50 MB before parsing to prevent memory exhaustion.

@@ -1,4 +1,4 @@
-import { signPdfBytes, ensureCryptoReady } from '../core-bridge/index.js';
+import { signPdfBytes, addSignaturePlaceholder, ensureCryptoReady } from '../core-bridge/index.js';
 import type { PdfSignOptions, SignatureAlgorithm } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll } from '../utils/args.js';
 import { readFileOrStdin, writeOutput } from '../utils/io.js';
@@ -10,10 +10,6 @@ import {
     loadPemChain,
     parseCertificateChain,
 } from '../utils/keys.js';
-import {
-    hasSignaturePlaceholder,
-    injectSignaturePlaceholder,
-} from '../utils/sign-placeholder.js';
 
 const VALID_ALGORITHMS = new Set<SignatureAlgorithm>(['rsa-sha256', 'ecdsa-sha256']);
 
@@ -23,6 +19,19 @@ function parseSigningTime(raw: string): Date {
         throw new CliError(`Invalid --signing-time "${raw}". Expected ISO 8601 (e.g. 2026-04-28T12:00:00Z).`, 2);
     }
     return t;
+}
+
+/** Validate that a flag value is a well-formed http(s) URL. */
+function assertHttpUrl(value: string, flag: string): void {
+    let url: URL;
+    try {
+        url = new URL(value);
+    } catch {
+        throw new CliError(`Invalid --${flag} URL "${value}".`, 2);
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        throw new CliError(`--${flag} must be an http(s) URL, got "${url.protocol}".`, 2);
+    }
 }
 
 export async function sign(args: ParsedArgs): Promise<void> {
@@ -37,10 +46,28 @@ export async function sign(args: ParsedArgs): Promise<void> {
     const contactInfo = getStringFlag(args.flags, 'contact');
     const signingTimeRaw = getStringFlag(args.flags, 'signing-time');
     const chainPaths = getStringFlagAll(args.flags, 'cert-chain');
+    const timestampUrl = getStringFlag(args.flags, 'timestamp');
 
     if (!VALID_ALGORITHMS.has(algorithm)) {
         throw new CliError(
             `Invalid --algorithm "${algorithm}". Valid: rsa-sha256, ecdsa-sha256.`,
+            2,
+        );
+    }
+
+    // Sign-side RFC 3161 timestamping (PAdES-T) requires timestamp-token
+    // embedding inside the CMS SignedData — PDF-writing logic that belongs in
+    // pdfnative and is not yet exposed (≤ 1.2.0). We surface the flag so the
+    // CLI contract is stable, but fail clearly rather than silently ignoring
+    // it. Verify-side timestamp validation IS supported (`pdfnative verify`).
+    if (timestampUrl !== undefined) {
+        assertHttpUrl(timestampUrl, 'timestamp');
+        throw new CliError(
+            'Sign-side RFC 3161 timestamping (PAdES-T) is not yet available: embedding a '
+            + 'timestamp token at signing time requires upstream support in pdfnative '
+            + '(tracked at https://github.com/pdfnative/pdfnative/issues). '
+            + 'Timestamp VALIDATION is already supported — run `pdfnative verify` on a '
+            + 'timestamped PDF.',
             2,
         );
     }
@@ -91,15 +118,13 @@ export async function sign(args: ParsedArgs): Promise<void> {
 
     // Auto-inject a signature placeholder when the input PDF doesn't already
     // carry one (the common case for `pdfnative render`-produced PDFs, which
-    // ship no AcroForm). Idempotent: a pre-prepared PDF is signed as-is.
-    if (!hasSignaturePlaceholder(pdfBytes)) {
-        try {
-            const injected = injectSignaturePlaceholder(pdfBytes, options);
-            pdfBytes = injected.bytes;
-        } catch (e) {
-            if (e instanceof CliError) throw e;
-            throw new CliError('Failed to prepare PDF for signing.', 1);
-        }
+    // ship no AcroForm). pdfnative's addSignaturePlaceholder is idempotent:
+    // a PDF that already carries a /FT /Sig widget is returned unchanged.
+    try {
+        pdfBytes = addSignaturePlaceholder(pdfBytes);
+    } catch (e) {
+        if (e instanceof CliError) throw e;
+        throw new CliError('Failed to prepare PDF for signing.', 1);
     }
 
     let signedBytes: Uint8Array;

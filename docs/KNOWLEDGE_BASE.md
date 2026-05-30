@@ -8,7 +8,7 @@
 ## 1. Context
 
 **What is pdfnative-cli?**
-The official command-line interface for [`pdfnative`](https://github.com/Nizoka/pdfnative) — a zero-dependency, ISO 32000-1 compliant PDF generation library. The CLI exposes four commands: `render`, `sign`, `inspect`, `verify`.
+The official command-line interface for [`pdfnative`](https://github.com/Nizoka/pdfnative) — a zero-dependency, ISO 32000-1 compliant PDF generation library. The CLI exposes six commands: `render`, `sign`, `inspect`, `verify`, `batch`, `completion`.
 
 **Philosophy:**
 - Zero extra runtime dependencies — `pdfnative` is the *only* dependency.
@@ -27,17 +27,27 @@ The official command-line interface for [`pdfnative`](https://github.com/Nizoka/
 
 ```
 src/
-├── index.ts              # Entry: parse argv → dispatch → process.exit
+├── index.ts              # Entry: parse argv → config merge → dispatch → process.exit
 ├── commands/
-│   ├── render.ts         # JSON → PDF (buildDocumentPDFBytes / streamDocumentPdf)
-│   ├── sign.ts           # PDF + key/cert → signPdfBytes
+│   ├── render.ts         # JSON → PDF (buildDocumentPDF*, smart tables, page streaming)
+│   ├── sign.ts           # PDF + key/cert → addSignaturePlaceholder → signPdfBytes
 │   ├── inspect.ts        # PDF → PdfReader → metadata JSON/text
-│   └── verify.ts         # PDF → CMS signature verification (integrity, chain, trust)
+│   ├── verify.ts         # PDF → CMS + timestamp (PAdES-T) + OCSP/CRL revocation
+│   ├── batch.ts          # Directory of JSON → parallel render → per-file summary
+│   └── completion.ts     # bash/zsh/fish completion scripts
 ├── utils/
 │   ├── args.ts           # Zero-dep argument parser
 │   ├── io.ts             # stdin/stdout/file I/O helpers
+│   ├── config.ts         # `.pdfnativerc.json` discovery + flag-default merge
+│   ├── colors.ts         # NO_COLOR/TTY-aware ANSI helper
 │   ├── layout.ts         # Layout option composer (CLI flags + --layout file merge)
 │   ├── keys.ts           # PEM / PEM-chain loader (key-material redaction on error)
+│   ├── asn1-walk.ts      # ASN.1/DER walker with absolute byte offsets (50 MiB cap)
+│   ├── cms-verify.ts     # RSA/ECDSA CMS + verifySignedStructure (CRL/OCSP)
+│   ├── cert-chain.ts     # X.509 chain construction + trust evaluation
+│   ├── timestamp-verify.ts # RFC 3161 timestamp validation (PAdES-T)
+│   ├── revocation.ts     # OCSP (RFC 6960) + CRL (RFC 5280), DSS + online
+│   ├── fetch-guard.ts    # SSRF-guarded HTTP(S) client (opt-in online revocation)
 │   └── error.ts          # CliError class + die() + deprecate() helpers
 └── core-bridge/
     └── index.ts          # Selective re-exports from pdfnative
