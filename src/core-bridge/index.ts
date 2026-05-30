@@ -7,11 +7,17 @@ export { buildDocumentPDFBytes, buildDocumentPDFStream } from 'pdfnative';
 // ── Render (table-centric, --variant table) ──────────────────────────
 export { buildPDFBytes, buildPDFStream } from 'pdfnative';
 
+// ── Render (page-by-page streaming, v1.2.0) ──────────────────────────
+export { buildDocumentPDFStreamPageByPage, buildPDFStreamPageByPage } from 'pdfnative';
+
+// ── PDF/A conformance targets (single source of truth, v1.2.0) ───────
+export { PDF_A_CONFORMANCE_TARGETS } from 'pdfnative';
+
 // ── Compression bootstrap (Node Flate) ───────────────────────────────
 export { initNodeCompression } from 'pdfnative';
 
 // ── Sign ─────────────────────────────────────────────────────────────
-export { signPdfBytes, buildSigDict } from 'pdfnative';
+export { signPdfBytes, buildSigDict, addSignaturePlaceholder } from 'pdfnative';
 export { parseRsaPrivateKey, parseCertificate } from 'pdfnative';
 
 // ── One-time async crypto bootstrap (initCrypto must run before any
@@ -59,6 +65,9 @@ export type {
 export type {
     PdfSignOptions,
     SignatureAlgorithm,
+    AddSignaturePlaceholderOptions,
+    SigDictMetadata,
+    PdfAConformanceTarget,
     X509Certificate,
     X509Name,
     RsaPrivateKey,
