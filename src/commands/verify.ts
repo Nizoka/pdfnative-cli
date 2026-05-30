@@ -3,8 +3,6 @@ import {
     openPdf,
     ensureCryptoReady,
     parseCertificate,
-    verifyCertSignature,
-    isSelfSigned,
     isRef,
     isName,
     isDict,
@@ -23,7 +21,9 @@ import { readFileOrStdin } from '../utils/io.js';
 import { CliError } from '../utils/error.js';
 import { walkAbs, sliceNode, sliceContent, type AbsNode } from '../utils/asn1-walk.js';
 import { loadPemChain, parseCertificateChain } from '../utils/keys.js';
-import { verifyCmsSignatureValue } from '../utils/cms-verify.js';
+import { verifyCmsSignatureValue, extractUnsignedAttrs, extractSignerSignatureValue } from '../utils/cms-verify.js';
+import { buildChain, isTrustedRoot } from '../utils/cert-chain.js';
+import { verifyTimestamp } from '../utils/timestamp-verify.js';
 
 
 /**
@@ -60,6 +60,9 @@ interface SignatureReport {
     readonly signatureValid: boolean;
     readonly signatureAlgorithm: 'rsa-sha256' | 'ecdsa-sha256' | null;
     readonly timestampPresent: boolean;
+    readonly timestampValid: boolean;
+    readonly timestampTime: string | null;
+    readonly tsaSubject: string | null;
     readonly notes: readonly string[];
 }
 
@@ -339,49 +342,9 @@ function parseSignatureDict(dict: PdfDict): ParsedSignature {
 // Certificate chain
 // ──────────────────────────────────────────────────────────────────────
 
-function findChainParent(
-    cert: X509Certificate,
-    candidates: readonly X509Certificate[],
-): X509Certificate | undefined {
-    for (const c of candidates) {
-        if (c === cert) continue;
-        try {
-            if (verifyCertSignature(cert, c)) return c;
-        } catch {
-            // ignore — try next candidate
-        }
-    }
-    return undefined;
-}
-
-function buildChain(
-    leaf: X509Certificate,
-    pool: readonly X509Certificate[],
-): { chain: X509Certificate[]; chainValid: boolean; root: X509Certificate } {
-    const chain: X509Certificate[] = [leaf];
-    let current = leaf;
-    let chainValid = true;
-    const seen = new Set<X509Certificate>([leaf]);
-    while (!isSelfSigned(current)) {
-        const parent = findChainParent(current, pool);
-        if (parent === undefined || seen.has(parent)) {
-            chainValid = false;
-            break;
-        }
-        chain.push(parent);
-        seen.add(parent);
-        current = parent;
-    }
-    return { chain, chainValid, root: current };
-}
-
-function certEquals(a: X509Certificate, b: X509Certificate): boolean {
-    if (a.raw.length !== b.raw.length) return false;
-    for (let i = 0; i < a.raw.length; i++) {
-        if (a.raw[i] !== b.raw[i]) return false;
-    }
-    return true;
-}
+// Chain construction, parent resolution, byte-equality and trust evaluation
+// live in ../utils/cert-chain.ts (shared with the timestamp + revocation
+// verifiers).
 
 // ──────────────────────────────────────────────────────────────────────
 // Main
@@ -429,6 +392,9 @@ export async function verify(args: ParsedArgs): Promise<void> {
         let signatureValid = false;
         let signatureAlgorithm: 'rsa-sha256' | 'ecdsa-sha256' | null = null;
         let timestampPresent = false;
+        let timestampValid = false;
+        let timestampTime: string | null = null;
+        let tsaSubject: string | null = null;
 
         if (sig.byteRange !== null) {
             digest = digestByteRange(pdfBytes, sig.byteRange);
@@ -465,14 +431,11 @@ export async function verify(args: ParsedArgs): Promise<void> {
                         notes.push('chain incomplete (no parent for an intermediate cert)');
                     }
 
-                    if (trustRoots.length === 0) {
-                        trustedRoot = isSelfSigned(built.root);
-                        if (trustedRoot) {
-                            notes.push('no --trust provided; accepted self-signed root');
-                        }
-                    } else {
-                        trustedRoot = trustRoots.some((t) => certEquals(t, built.root));
-                        if (!trustedRoot) notes.push('chain root not in --trust list');
+                    trustedRoot = isTrustedRoot(built.root, trustRoots);
+                    if (trustRoots.length === 0 && trustedRoot) {
+                        notes.push('no --trust provided; accepted self-signed root');
+                    } else if (!trustedRoot) {
+                        notes.push('chain root not in --trust list');
                     }
 
                     // Full CMS signature-value verification (NEW in v0.3.0).
@@ -483,8 +446,23 @@ export async function verify(args: ParsedArgs): Promise<void> {
                     if (!signatureValid && cmsResult.note !== null) {
                         notes.push(`CMS signature: ${cmsResult.note}`);
                     }
+
+                    // RFC 3161 timestamp validation (PAdES-T, NEW in v1.0.0).
                     if (timestampPresent) {
-                        notes.push('RFC 3161 timestamp token present (recognised, not validated)');
+                        const unsignedAttrs = extractUnsignedAttrs(sig.contents);
+                        const docSigValue = extractSignerSignatureValue(sig.contents);
+                        const ts = verifyTimestamp(unsignedAttrs, docSigValue, trustRoots);
+                        timestampValid = ts.valid;
+                        timestampTime = ts.genTime;
+                        tsaSubject = ts.tsaSubject;
+                        if (ts.valid) {
+                            notes.push(
+                                `RFC 3161 timestamp valid (genTime ${ts.genTime ?? 'unknown'}`
+                                + `${ts.trusted ? ', TSA trusted' : ', TSA untrusted'})`,
+                            );
+                        } else {
+                            notes.push(`RFC 3161 timestamp invalid${ts.note !== null ? `: ${ts.note}` : ''}`);
+                        }
                     }
                 }
             } catch {
@@ -511,6 +489,9 @@ export async function verify(args: ParsedArgs): Promise<void> {
             signatureValid,
             signatureAlgorithm,
             timestampPresent,
+            timestampValid,
+            timestampTime,
+            tsaSubject,
             notes,
         });
     });
@@ -536,7 +517,7 @@ export async function verify(args: ParsedArgs): Promise<void> {
                 + `    signature: ${r.signatureValid ? 'OK' : 'FAIL'}\n`
                 + `    chain:     ${r.chainValid ? 'valid' : 'invalid'}\n`
                 + `    trust:     ${r.trustedRoot ? 'trusted' : 'untrusted'}\n`
-                + `    timestamp: ${r.timestampPresent ? 'present' : '—'}\n`,
+                + `    timestamp: ${r.timestampPresent ? (r.timestampValid ? `valid (${r.timestampTime ?? 'unknown time'})` : 'present but INVALID') : '—'}\n`,
             );
             if (r.notes.length > 0) {
                 process.stdout.write(`    notes:     ${r.notes.join('; ')}\n`);
