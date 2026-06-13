@@ -33,18 +33,18 @@ const CATEGORY_FLAGS = {
     '--header-right',  '{date}',
     '--footer-center', 'Page {page} of {pages}',
   ],
-  encryption: [
-    '--encrypt-algorithm',  'aes128',
-    '--encrypt-permissions', 'print',
-  ],
+  encryption: [], // file-name-driven (see FILE_FLAGS): aes128 vs aes256 per file.
   attachments: [
     '--tagged',     'pdfa3b',
     '--attachment', join(__dirname, 'render', 'attachments', 'invoice.xml')
                     + ':application/xml:Source:Structured invoice payload',
   ],
   multilang: [], // file-name-driven; resolved below
-  // v0.3.0 additions
-  font:     ['--font', 'latin', '--lang', 'latin'],
+  // v0.3.0+ font samples are file-name-driven (see FILE_FLAGS): each JSON in
+  // font/ registers a different set of bundled fonts, so no category-wide flag
+  // applies — e.g. 02-new-scripts.json must NOT inherit the Latin-only flags,
+  // otherwise its non-Latin scripts render as .notdef tofu.
+  font:     [],
 };
 
 // Categories whose JSON samples are intentionally skipped by run-all because
@@ -52,10 +52,34 @@ const CATEGORY_FLAGS = {
 const SKIP_CATEGORIES = new Set(['watch', 'template']);
 
 /** Per-file overrides (within a category). */
-// Note: --lang <code> requires a programmatic font loader registered before the
-// render call (see samples/render/multilang/ for guidance). The built-in samples
-// use Latin-only content so they work out of the box with no extra loaders.
-const FILE_FLAGS = {};
+// Note: --lang <code> for non-Latin scripts requires the matching bundled font
+// to be registered first via --font (see samples/render/font/ and
+// samples/render/multilang/ for guidance). Each font/ sample registers exactly
+// the fonts its content needs so it renders real glyphs out of the box.
+const FILE_FLAGS = {
+  // document/ — 06 caps the block ceiling as a large-report guard.
+  '06-max-blocks.json': ['--max-blocks', '10000'],
+  // font/ — each sample registers a different bundled font set.
+  '01-latin.json': ['--font', 'latin', '--lang', 'latin'],
+  '02-new-scripts.json': [
+    '--font', 'te', '--font', 'si', '--font', 'km', '--font', 'my',
+    '--font', 'bo', '--font', 'am', '--font', 'color-emoji',
+    '--lang', 'te,si,km,my,bo,am,color-emoji',
+  ],
+  '03-emoji.json': ['--font', 'emoji', '--lang', 'emoji'],
+  // encryption/ — algorithm differs per file (passwords come from CATEGORY_ENV).
+  '01-aes128-protected.json': ['--encrypt-algorithm', 'aes128', '--encrypt-permissions', 'print'],
+  '02-aes256-protected.json': ['--encrypt-algorithm', 'aes256', '--encrypt-permissions', 'print'],
+  // watermark/ — 03 layers the stamp on entirely from the CLI.
+  '03-cli-flags.json': [
+    '--watermark-text', 'CONFIDENTIAL',
+    '--watermark-opacity', '0.15',
+    '--watermark-angle', '45',
+    '--watermark-color', '#FF3B30',
+    '--watermark-font-size', '64',
+    '--watermark-position', 'background',
+  ],
+};
 
 // Per-category env-var bootstrap (e.g. encryption passwords).
 const CATEGORY_ENV = {

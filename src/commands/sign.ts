@@ -1,8 +1,9 @@
 import { signPdfBytes, addSignaturePlaceholder, ensureCryptoReady } from '../core-bridge/index.js';
 import type { PdfSignOptions, SignatureAlgorithm } from '../core-bridge/index.js';
-import { type ParsedArgs, getStringFlag, getStringFlagAll } from '../utils/args.js';
+import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../utils/args.js';
 import { readFileOrStdin, writeOutput } from '../utils/io.js';
-import { CliError } from '../utils/error.js';
+import { CliError, ErrorCode } from '../utils/error.js';
+import { emitStatus, isDryRun } from '../utils/agent.js';
 import {
     loadRsaPrivateKey,
     loadEcPrivateKey,
@@ -47,6 +48,7 @@ export async function sign(args: ParsedArgs): Promise<void> {
     const signingTimeRaw = getStringFlag(args.flags, 'signing-time');
     const chainPaths = getStringFlagAll(args.flags, 'cert-chain');
     const timestampUrl = getStringFlag(args.flags, 'timestamp');
+    const dryRun = hasFlag(args.flags, 'dry-run') || isDryRun();
 
     if (!VALID_ALGORITHMS.has(algorithm)) {
         throw new CliError(
@@ -69,6 +71,7 @@ export async function sign(args: ParsedArgs): Promise<void> {
             + 'Timestamp VALIDATION is already supported — run `pdfnative verify` on a '
             + 'timestamped PDF.',
             2,
+            ErrorCode.UNSUPPORTED,
         );
     }
 
@@ -124,7 +127,15 @@ export async function sign(args: ParsedArgs): Promise<void> {
         pdfBytes = addSignaturePlaceholder(pdfBytes);
     } catch (e) {
         if (e instanceof CliError) throw e;
-        throw new CliError('Failed to prepare PDF for signing.', 1);
+        throw new CliError('Failed to prepare PDF for signing.', 1, ErrorCode.SIGN);
+    }
+
+    // Dry-run: credentials parsed, PDF read and placeholder-prepared. Stop
+    // before producing (or writing) a signature. No key material is touched
+    // beyond the validation already performed above.
+    if (dryRun) {
+        emitStatus({ command: 'sign', dryRun: true, algorithm, output: outputPath ?? '-' });
+        return;
     }
 
     let signedBytes: Uint8Array;
@@ -133,7 +144,14 @@ export async function sign(args: ParsedArgs): Promise<void> {
     } catch (e) {
         // Never include the underlying message — it may reference key bytes or hashes.
         if (e instanceof CliError) throw e;
-        throw new CliError('Failed to sign PDF.', 1);
+        throw new CliError('Failed to sign PDF.', 1, ErrorCode.SIGN);
     }
     await writeOutput(signedBytes, outputPath);
+    emitStatus({
+        command: 'sign',
+        dryRun: false,
+        algorithm,
+        output: outputPath ?? '-',
+        bytes: signedBytes.length,
+    });
 }

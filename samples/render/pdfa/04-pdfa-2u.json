@@ -1,0 +1,31 @@
+{
+  "title": "Unicode-Preserving Archive — PDF/A-2u",
+  "blocks": [
+    { "type": "heading",   "text": "Unicode-Preserving Archive — PDF/A-2u", "level": 1 },
+    { "type": "paragraph", "text": "PDF/A-2u (ISO 19005-2, level U) adds one guarantee on top of PDF/A-2b: every glyph in the document maps back to a Unicode code point. This makes the archive reliably searchable and extractable — text can always be copied as the original characters, not as orphaned glyph IDs." },
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "b vs u — what changes", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "PDF/A-2b: visual reproduction is guaranteed (Basic conformance).",
+        "PDF/A-2u: visual reproduction AND Unicode mapping are guaranteed.",
+        "Both share ISO 19005-2 (PDF 1.7, transparency, layers, JPEG 2000).",
+        "Choose u when full-text search and reliable text extraction matter."
+    ]},
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "When to Use", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Records that must remain searchable for a decade or more",
+        "Legal and regulatory archives where text extraction is audited",
+        "Accessibility workflows that depend on reliable character mapping"
+    ]}
+  ],
+  "footerText": "Archived — PDF/A-2u — ISO 19005-2 (level U)",
+  "layout": {
+    "tagged": "pdfa2u"
+  },
+  "metadata": {
+    "author": "pdfnative-cli",
+    "subject": "PDF/A-2u Unicode-preserving archival demonstration",
+    "keywords": "pdfa, archival, iso19005, pdfa2u, unicode"
+  }
+}

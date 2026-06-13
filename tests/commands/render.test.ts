@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
@@ -370,6 +370,219 @@ describe('render', () => {
             await expect(
                 render(parseArgs(['--watch', '--input', inputPath, '--output', '-'])),
             ).rejects.toThrowError(/--output/);
+        });
+    });
+
+    it('produces valid PDF with --stream-true (document variant)', async () => {
+        const outPath = path.join(os.tmpdir(), `render-streamtrue-${Date.now()}.pdf`);
+        tmpFiles.push(outPath);
+
+        await withTempFile('.json', minimalParams, async (inputPath) => {
+            await render(parseArgs(['--input', inputPath, '--output', outPath, '--stream-true']));
+        });
+
+        const bytes = await fs.readFile(outPath);
+        expect(bytes.slice(0, 4).toString('ascii')).toBe('%PDF');
+        expect(bytes.toString('ascii').includes('%%EOF')).toBe(true);
+    });
+
+    it('--stream-true is byte-identical to non-streaming output', async () => {
+        const bufferedPath = path.join(os.tmpdir(), `render-buf-${Date.now()}.pdf`);
+        const truePath = path.join(os.tmpdir(), `render-true-${Date.now()}.pdf`);
+        tmpFiles.push(bufferedPath, truePath);
+
+        await withTempFile('.json', minimalParams, async (inputPath) => {
+            await render(parseArgs(['--input', inputPath, '--output', bufferedPath]));
+            await render(parseArgs(['--input', inputPath, '--output', truePath, '--stream-true']));
+        });
+
+        const a = await fs.readFile(bufferedPath);
+        const b = await fs.readFile(truePath);
+        expect(b.equals(a)).toBe(true);
+    });
+
+    it('--stream-true produces valid PDF for --variant table', async () => {
+        const tableParams = JSON.stringify({
+            title: 'Table',
+            infoItems: [],
+            balanceText: '',
+            countText: '',
+            headers: ['A', 'B'],
+            rows: [
+                { cells: ['1', '2'], type: 'normal', pointed: false },
+                { cells: ['3', '4'], type: 'normal', pointed: false },
+            ],
+            footerText: 'footer',
+        });
+        const outPath = path.join(os.tmpdir(), `render-streamtrue-table-${Date.now()}.pdf`);
+        tmpFiles.push(outPath);
+
+        await withTempFile('.json', tableParams, async (inputPath) => {
+            await render(parseArgs([
+                '--input', inputPath, '--output', outPath,
+                '--variant', 'table', '--stream-true',
+            ]));
+        });
+
+        const bytes = await fs.readFile(outPath);
+        expect(bytes.slice(0, 4).toString('ascii')).toBe('%PDF');
+    });
+
+    it('--stream-true rejects TOC blocks', async () => {
+        const tocParams = JSON.stringify({
+            blocks: [
+                { type: 'toc' },
+                { type: 'heading', level: 1, text: 'Section' },
+            ],
+        });
+        await withTempFile('.json', tocParams, async (inputPath) => {
+            const err = await render(parseArgs([
+                '--input', inputPath, '--output', '-', '--stream-true',
+            ])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(2);
+        });
+    });
+
+    it('rejects combining multiple --stream* flags', async () => {
+        await withTempFile('.json', minimalParams, async (inputPath) => {
+            const err = await render(parseArgs([
+                '--input', inputPath, '--output', '-',
+                '--stream', '--stream-true',
+            ])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(2);
+        });
+    });
+
+    it('--max-blocks accepts a positive integer', async () => {
+        const outPath = path.join(os.tmpdir(), `render-maxblocks-${Date.now()}.pdf`);
+        tmpFiles.push(outPath);
+
+        await withTempFile('.json', minimalParams, async (inputPath) => {
+            await render(parseArgs(['--input', inputPath, '--output', outPath, '--max-blocks', '500']));
+        });
+
+        const bytes = await fs.readFile(outPath);
+        expect(bytes.slice(0, 4).toString('ascii')).toBe('%PDF');
+    });
+
+    it('--max-blocks rejects non-positive / non-integer values', async () => {
+        await withTempFile('.json', minimalParams, async (inputPath) => {
+            for (const bad of ['0', '-3', 'abc', '1.5']) {
+                const err = await render(parseArgs([
+                    '--input', inputPath, '--output', '-', '--max-blocks', bad,
+                ])).catch((e: unknown) => e);
+                expect(err).toBeInstanceOf(CliError);
+                expect((err as CliError).exitCode).toBe(2);
+            }
+        });
+    });
+
+    it('--font registers a new pdfnative 1.3.0 script (te) usable by --lang', async () => {
+        const params = JSON.stringify({
+            blocks: [{ type: 'paragraph', text: 'తెలుగు' }],
+        });
+        const outPath = path.join(os.tmpdir(), `render-font-te-${Date.now()}.pdf`);
+        tmpFiles.push(outPath);
+
+        await withTempFile('.json', params, async (inputPath) => {
+            await render(parseArgs([
+                '--input', inputPath,
+                '--font', 'te',
+                '--lang', 'te',
+                '--output', outPath,
+            ]));
+        });
+
+        const stat = await fs.stat(outPath);
+        expect(stat.size).toBeGreaterThan(1000);
+    });
+
+    it('--font accepts the COLRv1 color-emoji shortcut', async () => {
+        const params = JSON.stringify({
+            blocks: [{ type: 'paragraph', text: 'Hi 🎉' }],
+        });
+        const outPath = path.join(os.tmpdir(), `render-font-coloremoji-${Date.now()}.pdf`);
+        tmpFiles.push(outPath);
+
+        await withTempFile('.json', params, async (inputPath) => {
+            await render(parseArgs([
+                '--input', inputPath,
+                '--font', 'color-emoji',
+                '--lang', 'color-emoji',
+                '--output', outPath,
+            ]));
+        });
+
+        const stat = await fs.stat(outPath);
+        expect(stat.size).toBeGreaterThan(1000);
+    });
+
+    describe('agent mode', () => {
+        const origJson = process.env['PDFNATIVE_JSON'];
+        const origDry = process.env['PDFNATIVE_DRY_RUN'];
+
+        afterEach(() => {
+            if (origJson === undefined) delete process.env['PDFNATIVE_JSON'];
+            else process.env['PDFNATIVE_JSON'] = origJson;
+            if (origDry === undefined) delete process.env['PDFNATIVE_DRY_RUN'];
+            else process.env['PDFNATIVE_DRY_RUN'] = origDry;
+        });
+
+        it('--dry-run validates without writing the output file', async () => {
+            const outPath = path.join(os.tmpdir(), `render-dryrun-${Date.now()}.pdf`);
+            await withTempFile('.json', minimalParams, async (inputPath) => {
+                await render(parseArgs(['--input', inputPath, '--output', outPath, '--dry-run']));
+            });
+            await expect(fs.stat(outPath)).rejects.toThrow();
+        });
+
+        it('--json --dry-run emits an ok:true dryRun envelope on stderr', async () => {
+            process.env['PDFNATIVE_JSON'] = '1';
+            const outPath = path.join(os.tmpdir(), `render-dryrun-json-${Date.now()}.pdf`);
+            const lines: string[] = [];
+            const spy = vi.spyOn(process.stderr, 'write').mockImplementation((c: unknown) => {
+                lines.push(String(c));
+                return true;
+            });
+            try {
+                await withTempFile('.json', minimalParams, async (inputPath) => {
+                    await render(parseArgs(['--input', inputPath, '--output', outPath, '--dry-run']));
+                });
+            } finally {
+                spy.mockRestore();
+            }
+            await expect(fs.stat(outPath)).rejects.toThrow();
+            const envelope = lines.map((l) => l.trim()).filter(Boolean).map((l) => JSON.parse(l)).at(-1);
+            expect(envelope).toMatchObject({
+                ok: true,
+                command: 'render',
+                variant: 'document',
+                dryRun: true,
+            });
+        });
+
+        it('--json emits an ok:true status envelope with byte count on success', async () => {
+            process.env['PDFNATIVE_JSON'] = '1';
+            const outPath = path.join(os.tmpdir(), `render-json-${Date.now()}.pdf`);
+            tmpFiles.push(outPath);
+            const lines: string[] = [];
+            const spy = vi.spyOn(process.stderr, 'write').mockImplementation((c: unknown) => {
+                lines.push(String(c));
+                return true;
+            });
+            try {
+                await withTempFile('.json', minimalParams, async (inputPath) => {
+                    await render(parseArgs(['--input', inputPath, '--output', outPath]));
+                });
+            } finally {
+                spy.mockRestore();
+            }
+            const envelope = lines.map((l) => l.trim()).filter(Boolean).map((l) => JSON.parse(l)).at(-1);
+            expect(envelope).toMatchObject({ ok: true, command: 'render', dryRun: false });
+            expect(typeof envelope.bytes).toBe('number');
+            expect(envelope.bytes).toBeGreaterThan(0);
         });
     });
 });

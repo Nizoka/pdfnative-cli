@@ -6,9 +6,11 @@ import {
     buildDocumentPDFBytes,
     buildDocumentPDFStream,
     buildDocumentPDFStreamPageByPage,
+    buildDocumentPDFStreamTrue,
     buildPDFBytes,
     buildPDFStream,
     buildPDFStreamPageByPage,
+    buildPDFStreamTrue,
     initNodeCompression,
     loadFontData,
     hasFontLoader,
@@ -34,7 +36,8 @@ import {
     writeStreamingOutput,
     assertJsonSizeLimit,
 } from '../utils/io.js';
-import { CliError } from '../utils/error.js';
+import { CliError, ErrorCode } from '../utils/error.js';
+import { emitStatus, isDryRun } from '../utils/agent.js';
 import {
     buildLayoutOptions,
     assertStreamingCompatible,
@@ -52,8 +55,35 @@ const VALID_VARIANTS = new Set(['document', 'table']);
  * stays predictable and free from path-based RCE vectors.
  */
 const BUNDLED_FONT_MODULES: Readonly<Record<string, string>> = Object.freeze({
+    // Latin + monochrome / COLRv1 colour emoji
     latin: 'noto-sans-data.js',
     emoji: 'noto-emoji-data.js',
+    'color-emoji': 'noto-color-emoji-data.js',
+    // 22 Unicode scripts (pdfnative ≥ 1.3.0). The shortcut name doubles as the
+    // `--lang` code; pdfnative routes each code point to the font whose cmap
+    // covers it, so any registered script font is used automatically.
+    ar: 'noto-arabic-data.js',
+    hy: 'noto-armenian-data.js',
+    bn: 'noto-bengali-data.js',
+    ru: 'noto-cyrillic-data.js',
+    hi: 'noto-devanagari-data.js',
+    am: 'noto-ethiopic-data.js',
+    ka: 'noto-georgian-data.js',
+    el: 'noto-greek-data.js',
+    he: 'noto-hebrew-data.js',
+    ja: 'noto-jp-data.js',
+    km: 'noto-khmer-data.js',
+    ko: 'noto-kr-data.js',
+    my: 'noto-myanmar-data.js',
+    pl: 'noto-polish-data.js',
+    zh: 'noto-sc-data.js',
+    si: 'noto-sinhala-data.js',
+    ta: 'noto-tamil-data.js',
+    te: 'noto-telugu-data.js',
+    th: 'noto-thai-data.js',
+    bo: 'noto-tibetan-data.js',
+    tr: 'noto-turkish-data.js',
+    vi: 'noto-vietnamese-data.js',
 });
 
 let cachedFontsDir: string | null = null;
@@ -289,11 +319,13 @@ interface RenderConfig {
     readonly variant: string;
     readonly useStream: boolean;
     readonly usePageStream: boolean;
+    readonly useStreamTrue: boolean;
     readonly inputPath: string | undefined;
     readonly outputPath: string | undefined;
     readonly langs: readonly string[];
     readonly layout: Partial<PdfLayoutOptions>;
     readonly tableDefaults: TableDefaults | undefined;
+    readonly dryRun: boolean;
 }
 
 async function loadTemplate(templatePath: string): Promise<unknown> {
@@ -329,18 +361,29 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
             throw new CliError(
                 'JSON input must be a PdfParams object (with title, headers, rows) when --variant table is used.',
                 1,
+                ErrorCode.INPUT,
             );
         }
+        if (cfg.dryRun) {
+            emitStatus({ command: 'render', variant: 'table', dryRun: true, output: cfg.outputPath ?? '-' });
+            return;
+        }
+        let bytes: number | null = null;
         if (cfg.usePageStream) {
             const generator = buildPDFStreamPageByPage(parsedInput, cfg.layout);
+            await writeStreamingOutput(generator, cfg.outputPath);
+        } else if (cfg.useStreamTrue) {
+            const generator = buildPDFStreamTrue(parsedInput, cfg.layout);
             await writeStreamingOutput(generator, cfg.outputPath);
         } else if (cfg.useStream) {
             const generator = buildPDFStream(parsedInput, cfg.layout);
             await writeStreamingOutput(generator, cfg.outputPath);
         } else {
             const pdfBytes = buildPDFBytes(parsedInput, cfg.layout);
+            bytes = pdfBytes.length;
             await writeOutput(pdfBytes, cfg.outputPath);
         }
+        emitStatus({ command: 'render', variant: 'table', dryRun: false, output: cfg.outputPath ?? '-', bytes });
         return;
     }
 
@@ -349,6 +392,7 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
         throw new CliError(
             'JSON input must be a DocumentParams object (with a "blocks" array).',
             1,
+            ErrorCode.INPUT,
         );
     }
 
@@ -381,20 +425,40 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
             2,
         );
     }
+    if (cfg.useStreamTrue && hasTocBlock(params)) {
+        throw new CliError(
+            '--stream-true is incompatible with TOC blocks (multi-pass pagination required).',
+            2,
+        );
+    }
 
+    if (cfg.dryRun) {
+        emitStatus({ command: 'render', variant: 'document', dryRun: true, output: cfg.outputPath ?? '-' });
+        return;
+    }
+
+    let bytes: number | null = null;
     if (cfg.usePageStream) {
         // Page-by-page streaming assembles the full PDF, then chunks it at PDF
         // object boundaries — so TOC blocks and {pages} placeholders are fully
         // supported (unlike single-pass --stream).
         const generator = buildDocumentPDFStreamPageByPage(params, effectiveLayout);
         await writeStreamingOutput(generator, cfg.outputPath);
+    } else if (cfg.useStreamTrue) {
+        // True constant-memory streaming: parts are emitted and freed as they
+        // go, so the joined binary never materialises. Same constraints as
+        // --stream (no TOC, no {pages}); byte-identical to buildDocumentPDFBytes.
+        const generator = buildDocumentPDFStreamTrue(params, effectiveLayout);
+        await writeStreamingOutput(generator, cfg.outputPath);
     } else if (cfg.useStream) {
         const generator = buildDocumentPDFStream(params, effectiveLayout);
         await writeStreamingOutput(generator, cfg.outputPath);
     } else {
         const pdfBytes = buildDocumentPDFBytes(params, effectiveLayout);
+        bytes = pdfBytes.length;
         await writeOutput(pdfBytes, cfg.outputPath);
     }
+    emitStatus({ command: 'render', variant: 'document', dryRun: false, output: cfg.outputPath ?? '-', bytes });
 }
 
 export async function render(args: ParsedArgs): Promise<void> {
@@ -402,7 +466,9 @@ export async function render(args: ParsedArgs): Promise<void> {
     const outputPath = getStringFlag(args.flags, 'output', 'o');
     const useStream = hasFlag(args.flags, 'stream');
     const usePageStream = hasFlag(args.flags, 'stream-page-by-page');
+    const useStreamTrue = hasFlag(args.flags, 'stream-true');
     const useWatch = hasFlag(args.flags, 'watch');
+    const dryRun = hasFlag(args.flags, 'dry-run') || isDryRun();
     const variant = getStringFlag(args.flags, 'variant') ?? 'document';
     const langsRaw = getStringFlag(args.flags, 'lang');
     const templatePath = getStringFlag(args.flags, 'template');
@@ -416,9 +482,9 @@ export async function render(args: ParsedArgs): Promise<void> {
         );
     }
 
-    if (useStream && usePageStream) {
+    if ([useStream, usePageStream, useStreamTrue].filter(Boolean).length > 1) {
         throw new CliError(
-            'Use either --stream or --stream-page-by-page, not both.',
+            'Use only one of --stream, --stream-page-by-page, or --stream-true.',
             2,
         );
     }
@@ -433,7 +499,7 @@ export async function render(args: ParsedArgs): Promise<void> {
     }
 
     const layout = await buildLayoutOptions(args);
-    if (useStream) assertStreamingCompatible(layout);
+    if (useStream || useStreamTrue) assertStreamingCompatible(layout);
 
     if (layout.compress === true) {
         // Required once per process for FlateDecode in Node ESM.
@@ -453,17 +519,19 @@ export async function render(args: ParsedArgs): Promise<void> {
         variant,
         useStream,
         usePageStream,
+        useStreamTrue,
         inputPath,
         outputPath,
         langs,
         layout,
         tableDefaults,
+        dryRun,
     };
 
     // Initial render (always runs, even in --watch mode).
     await renderOnce(cfg, template);
 
-    if (!useWatch || inputPath === undefined) return;
+    if (dryRun || !useWatch || inputPath === undefined) return;
 
     // Watch loop: 200 ms debounce, stderr-only logs. Re-render errors are
     // reported and the watcher stays alive (renderOnce never escapes here).

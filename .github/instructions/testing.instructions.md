@@ -2,100 +2,32 @@
 description: "Use when writing tests, adding test coverage, or debugging test failures in pdfnative-cli. Covers vitest patterns, CLI testing conventions, and coverage targets."
 applyTo: "tests/**"
 ---
-# Testing Standards
+# Testing
 
 ## Framework
 
-- **vitest** — native ESM, fast watch mode, built-in coverage.
-- Run: `npm run test` (single run), `npm run test:watch` (watch), `npm run test:coverage`.
-- Config: `vitest.config.ts`.
+- **vitest** (native ESM). Run: `npm test`, `npm run test:watch`, `npm run test:coverage`.
+- Tests mirror `src/`: `tests/commands/*.test.ts`, `tests/utils/*.test.ts`,
+  `tests/integration/*.test.ts`.
 
-## Test Organization
+## Command test pattern
 
-```
-tests/
-├── utils/
-│   └── args.test.ts        # arg parser edge cases
-└── commands/
-    ├── render.test.ts       # render command (JSON → PDF bytes)
-    ├── sign.test.ts         # sign command (PDF + key → signed PDF)
-    └── inspect.test.ts      # inspect command (PDF → metadata)
-```
+1. Capture stdout via `vi.spyOn(process.stdout, 'write')`.
+2. Use `os.tmpdir()` temp files; clean up in `afterEach`.
+3. Test error paths with `await expect(fn(...)).rejects.toBeInstanceOf(CliError)` and assert
+   `.exitCode`.
+4. Drive commands through `parseArgs([...])`, e.g. `await render(parseArgs(['--input', tmpIn]))`.
+5. Assert PDF output starts with `%PDF` and contains `%%EOF`.
 
-## Command Testing Patterns
+## Conventions
 
-Because commands write to `process.stdout` or files, tests should:
+- `describe('functionName')` → `it('should ...')`; one concept per assertion; `it.each` for
+  parameterized flag forms.
+- Append new cases before the final `});` of the relevant `describe`.
+- `--variant table` tests need COMPLETE `PdfParams` (incl. `infoItems`, `balanceText`,
+  `countText`) — `assembleTableParts` throws on missing `infoItems`.
 
-1. **Capture stdout**: redirect `process.stdout.write` via `vi.spyOn`.
-2. **Use temp files**: write fixtures to OS temp dir (`os.tmpdir()`), clean up in `afterEach`.
-3. **Test error paths**: verify `CliError` is thrown with correct `.exitCode`.
+## Coverage targets
 
-```typescript
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render } from '../../src/commands/render.js';
-import { CliError } from '../../src/utils/error.js';
-import { parseArgs } from '../../src/utils/args.js';
-import * as os from 'node:os';
-import * as path from 'node:path';
-import * as fs from 'node:fs/promises';
-
-describe('render', () => {
-    it('should produce a valid PDF for minimal DocumentParams', async () => {
-        const tmpOut = path.join(os.tmpdir(), `test-${Date.now()}.pdf`);
-        const input = JSON.stringify({ title: 'Test' });
-        const tmpIn = path.join(os.tmpdir(), `in-${Date.now()}.json`);
-        await fs.writeFile(tmpIn, input, 'utf8');
-
-        await render(parseArgs([`--input`, tmpIn, `--output`, tmpOut]));
-
-        const bytes = await fs.readFile(tmpOut);
-        expect(bytes.slice(0, 4).toString()).toBe('%PDF');
-        expect(bytes.toString().includes('%%EOF')).toBe(true);
-
-        await fs.unlink(tmpIn);
-        await fs.unlink(tmpOut);
-    });
-
-    it('should throw CliError(2) when JSON is invalid', async () => {
-        const tmpIn = path.join(os.tmpdir(), `bad-${Date.now()}.json`);
-        await fs.writeFile(tmpIn, '{bad json}', 'utf8');
-
-        await expect(render(parseArgs([`--input`, tmpIn]))).rejects.toBeInstanceOf(CliError);
-
-        await fs.unlink(tmpIn);
-    });
-});
-```
-
-## Args Testing Patterns
-
-```typescript
-import { describe, it, expect } from 'vitest';
-import { parseArgs } from '../../src/utils/args.js';
-
-describe('parseArgs', () => {
-    it('handles --flag value', () => {
-        const result = parseArgs(['--input', 'file.pdf']);
-        expect(result.flags['input']).toBe('file.pdf');
-    });
-
-    it('handles --flag=value', () => {
-        const result = parseArgs(['--input=file.pdf']);
-        expect(result.flags['input']).toBe('file.pdf');
-    });
-});
-```
-
-## Coverage Targets
-
-- Statements: ≥ 90%
-- Branches: ≥ 80%
-- Functions: ≥ 85%
-- Lines: ≥ 90%
-- `src/index.ts` is excluded from coverage (entry point, tested via smoke test).
-
-## Vitest Naming Convention
-
-- `describe('functionName')` → `it('should ...')`
-- One assertion per concept.
-- Use `it.each` for parameterized cases (e.g., multiple flag forms).
+- Statements ≥ 90% · Branches ≥ 80% · Functions ≥ 85% · Lines ≥ 90%.
+- `src/index.ts` excluded (entry point, covered by smoke test).

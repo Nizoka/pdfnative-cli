@@ -18,7 +18,7 @@ import type {
 } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../utils/args.js';
 import { readFileOrStdin } from '../utils/io.js';
-import { CliError } from '../utils/error.js';
+import { CliError, ErrorCode } from '../utils/error.js';
 import { walkAbs, sliceNode, sliceContent, type AbsNode } from '../utils/asn1-walk.js';
 import { loadPemChain, parseCertificateChain } from '../utils/keys.js';
 import { verifyCmsSignatureValue, extractUnsignedAttrs, extractSignerSignatureValue } from '../utils/cms-verify.js';
@@ -399,7 +399,7 @@ export async function verify(args: ParsedArgs): Promise<void> {
         reader = openPdf(pdfBytes);
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        throw new CliError(`Failed to read PDF: ${message}`, 1);
+        throw new CliError(`Failed to read PDF: ${message}`, 1, ErrorCode.PARSE);
     }
 
     const fields = findSignatureFields(reader);
@@ -598,6 +598,6 @@ export async function verify(args: ParsedArgs): Promise<void> {
     }
 
     if (strict && !allValid) {
-        throw new CliError('', 1);
+        throw new CliError('', 1, ErrorCode.VERIFY_FAILED);
     }
 }

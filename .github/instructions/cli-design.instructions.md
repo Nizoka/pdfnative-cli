@@ -2,54 +2,37 @@
 description: "Use when working on the CLI entry point, arg parser, or overall dispatch logic. Covers entry point contract, help formatting, and exit code conventions."
 applyTo: "src/index.ts"
 ---
-# CLI Design Standards
+# CLI Design
 
-## Entry Point Rules
+> Entry-point and arg-parser contracts live in `.github/copilot-instructions.md`. This file only
+> adds deltas — do not restate the global rules.
 
-- `main()` is the sole entry point — called at module bottom with `main().catch(...)`.
-- Command dispatch uses a `switch` on `args.positionals[0]`.
-- `--help` / `-h` is checked before command dispatch — print help and `process.exit(0)`.
-- `--version` / `-V` prints `package.json` `version` and  exits 0.
-- Unknown commands print `"Unknown command: <name>. Run pdfnative --help for usage."` to stderr, then exit 1.
+## Exit codes
 
-## Exit Codes
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | Runtime error (invalid input, I/O failure) |
+| 2 | Usage error (missing/invalid required argument) |
 
-| Code | Meaning                                   |
-|------|-------------------------------------------|
-| 0    | Success                                   |
-| 1    | Runtime error (invalid input, I/O error)  |
-| 2    | Usage error (missing required argument)   |
+## Dispatch
 
-## Help Text Format
+- `switch` on `args.positionals[0]` over the commands: `render`, `sign`, `inspect`,
+  `verify`, `batch`, `completion`, `schema`.
+- `--help`/`-h` and `--version`/`-v` handled before dispatch.
+- Unknown command → stderr message + exit 1.
 
-```
-pdfnative-cli — Official CLI for pdfnative
+## Agent globals
 
-Usage:
-  pdfnative <command> [options]
+- The global-flag block sets `PDFNATIVE_JSON=1` on `--json` and `PDFNATIVE_DRY_RUN=1` on
+  `--dry-run` so all commands and `utils/agent.ts` can read them via env.
+- Track the active command in a module-level `activeCommand` (set in `main()`); on a thrown
+  error, when `isJsonMode()` is true, `emitJsonError(activeCommand, e)` writes the failure
+  envelope to stderr and the process exits with the `CliError.exitCode` (default 1).
+- Numeric exit codes (0/1/2) are unchanged in every mode — `--json` only adds the envelope.
 
-Commands:
-  render    Render a JSON document definition to PDF
-  sign      Apply a digital signature to an existing PDF
-  inspect   Analyse a PDF and output metadata / conformance info
+## Help text
 
-Options:
-  --help, -h      Show this help message
-  --version, -V   Show version
-
-Run `pdfnative <command> --help` for per-command options.
-```
-
-## Arg Parser Rules (`src/utils/args.ts`)
-
-- Handle: `--flag value`, `--flag=value`, `-f value`, `--flag` (boolean).
-- `--` stops flag parsing; remaining tokens become positionals.
-- Return type: `ParsedArgs = { flags: Record<string, string | boolean>; positionals: string[] }`.
-- Helper: `getFlag(flags, ...names)` returns the first matching flag value or `undefined`.
-- Never throw on unknown flags — collect them silently.
-
-## Naming
-
-- Command functions: `render`, `sign`, `inspect` (verb, no prefix).
-- Flag names: kebab-case (`--input`, `--output`, `--key`, `--cert`).
-- Env vars: `PDFNATIVE_SIGN_KEY`, `PDFNATIVE_SIGN_CERT` (screaming snake).
+- One global `USAGE` block listing all commands (incl. `schema`) and the `--json` / `--dry-run`
+  global options, plus one `*_USAGE` block per command. Point agents at `AGENTS.md`.
+- Keep `*_USAGE` flag lists in sync with each command's actual flags.

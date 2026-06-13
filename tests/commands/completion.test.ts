@@ -50,4 +50,13 @@ describe('completion', () => {
     it('throws CliError(2) for an unsupported shell', async () => {
         await expect(completion(parseArgs(['powershell']))).rejects.toBeInstanceOf(CliError);
     });
+
+    it('includes the schema command and agent global flags in each shell', async () => {
+        for (const shell of ['bash', 'zsh', 'fish']) {
+            const out = await capture(() => completion(parseArgs([shell])));
+            expect(out).toContain('schema');
+            expect(out).toContain('json');
+            expect(out).toContain('dry-run');
+        }
+    });
 });

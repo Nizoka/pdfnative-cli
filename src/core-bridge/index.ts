@@ -9,6 +9,8 @@ export { buildPDFBytes, buildPDFStream } from 'pdfnative';
 
 // ── Render (page-by-page streaming, v1.2.0) ──────────────────────────
 export { buildDocumentPDFStreamPageByPage, buildPDFStreamPageByPage } from 'pdfnative';
+// ── Render (true constant-memory streaming, v1.3.0) ──────────────
+export { buildDocumentPDFStreamTrue, buildPDFStreamTrue } from 'pdfnative';
 
 // ── PDF/A conformance targets (single source of truth, v1.2.0) ───────
 export { PDF_A_CONFORMANCE_TARGETS } from 'pdfnative';
@@ -42,6 +44,9 @@ export {
 
 // ── Inspect / Verify — PDF parser helpers ────────────────────────────
 export { openPdf, isRef, isName, isDict, isArray, isStream, nameValue } from 'pdfnative';
+
+// ── Inspect — PDF/UA structural validator (ISO 14289-1, v1.3.0) ──────
+export { validatePdfUA } from 'pdfnative';
 
 // ── Fonts (multi-language --lang flag, v1.1.0 latin/emoji modules) ──
 export { registerFont, registerFonts, loadFontData, hasFontLoader } from 'pdfnative';
@@ -78,3 +83,4 @@ export type {
 
 export type { PdfReader, PdfValue, PdfName, PdfRef, PdfStream } from 'pdfnative';
 export type { ParsedDict as PdfDict, ParsedArray as PdfArray } from 'pdfnative';
+export type { PdfUAValidationResult } from 'pdfnative';

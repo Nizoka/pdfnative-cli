@@ -1,10 +1,11 @@
-import { openPdf } from '../core-bridge/index.js';
-import type { PdfReader } from '../core-bridge/index.js';
+import { openPdf, validatePdfUA, isStream } from '../core-bridge/index.js';
+import type { PdfReader, PdfUAValidationResult } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../utils/args.js';
 import { readFileOrStdin } from '../utils/io.js';
-import { CliError } from '../utils/error.js';
+import { CliError, ErrorCode } from '../utils/error.js';
+import { isJsonMode } from '../utils/agent.js';
 
-const VALID_CHECKS = new Set(['pdfa', 'signed', 'encrypted']);
+const VALID_CHECKS = new Set(['pdfa', 'signed', 'encrypted', 'pdfua']);
 
 interface PageInfo {
     readonly index: number;
@@ -29,6 +30,11 @@ interface InspectResult {
         readonly producer: string | null;
     };
     readonly pages?: readonly PageInfo[];
+    readonly pdfua?: {
+        readonly valid: boolean;
+        readonly errors: readonly string[];
+        readonly warnings: readonly string[];
+    };
     readonly verbose?: {
         readonly trailerKeys: readonly string[];
         readonly catalogKeys: readonly string[];
@@ -71,11 +77,7 @@ function readXmp(reader: PdfReader): string | null {
         const metaRef = catalog.get('Metadata');
         if (metaRef === undefined) return null;
         const metaObj = reader.resolveValue(metaRef);
-        if (
-            typeof metaObj !== 'object' ||
-            metaObj === null ||
-            !('streamData' in metaObj)
-        ) {
+        if (!isStream(metaObj)) {
             return null;
         }
         const decoded = reader.decodeStream(
@@ -158,6 +160,11 @@ function inspectPages(reader: PdfReader): readonly PageInfo[] {
     return out;
 }
 
+function runPdfUaCheck(bytes: Uint8Array): NonNullable<InspectResult['pdfua']> {
+    const res: PdfUAValidationResult = validatePdfUA(bytes);
+    return { valid: res.valid, errors: res.errors, warnings: res.warnings };
+}
+
 function buildVerbose(reader: PdfReader): InspectResult['verbose'] {
     const trailerKeys: string[] = [];
     for (const k of reader.trailer.keys()) trailerKeys.push(k);
@@ -189,6 +196,7 @@ function evaluateChecks(checks: readonly string[], result: InspectResult): Check
         if (c === 'pdfa') out.push({ name: c, passed: result.pdfaConformance !== null });
         if (c === 'signed') out.push({ name: c, passed: result.signatures > 0 });
         if (c === 'encrypted') out.push({ name: c, passed: result.encrypted });
+        if (c === 'pdfua') out.push({ name: c, passed: result.pdfua?.valid === true });
     }
     return {
         checks: out.map((x) => `${x.name}=${x.passed ? 'pass' : 'fail'}`),
@@ -202,6 +210,7 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     const verbose = hasFlag(args.flags, 'verbose');
     const includePages = hasFlag(args.flags, 'pages');
     const checks = getStringFlagAll(args.flags, 'check');
+    const includePdfua = hasFlag(args.flags, 'pdfua') || checks.includes('pdfua');
 
     if (format !== 'json' && format !== 'text') {
         throw new CliError(`Invalid --format value "${format}". Valid: json, text.`, 2);
@@ -215,7 +224,7 @@ export async function inspect(args: ParsedArgs): Promise<void> {
         reader = openPdf(pdfBytes);
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        throw new CliError(`Failed to read PDF: ${message}`, 1);
+        throw new CliError(`Failed to read PDF: ${message}`, 1, ErrorCode.PARSE);
     }
 
     const info = reader.getInfo();
@@ -237,6 +246,7 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     const result: InspectResult = {
         ...baseResult,
         ...(includePages ? { pages: inspectPages(reader) } : {}),
+        ...(includePdfua ? { pdfua: runPdfUaCheck(pdfBytes) } : {}),
         ...(verbose ? { verbose: buildVerbose(reader) } : {}),
     };
 
@@ -263,6 +273,11 @@ export async function inspect(args: ParsedArgs): Promise<void> {
                 );
             }
         }
+        if (result.pdfua !== undefined) {
+            lines.push(`PDF/UA:         ${result.pdfua.valid ? 'valid' : 'invalid'}`);
+            for (const err of result.pdfua.errors) lines.push(`  error:   ${err}`);
+            for (const warn of result.pdfua.warnings) lines.push(`  warning: ${warn}`);
+        }
         if (result.verbose !== undefined) {
             lines.push(`Trailer keys:   ${result.verbose.trailerKeys.join(', ')}`);
             lines.push(`Catalog keys:   ${result.verbose.catalogKeys.join(', ')}`);
@@ -278,10 +293,16 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     if (checks.length > 0) {
         const evaluation = evaluateChecks(checks, result);
         if (!evaluation.allPassed) {
-            process.stderr.write(`check failed: ${evaluation.checks.join(', ')}\n`);
-            // exit 1 = check failure (semantic), distinct from a usage error (2) or runtime error (1).
-            // Reuse exit code 1 to keep the "failure" semantics consistent.
-            throw new CliError('', 1);
+            const detail = `check failed: ${evaluation.checks.join(', ')}`;
+            // exit 1 = check failure (semantic), distinct from a usage error (2)
+            // or runtime error (1). Human mode prints the breakdown to stderr and
+            // throws an empty message (the dispatcher would otherwise re-print it);
+            // agent mode carries the detail in the JSON error envelope instead.
+            if (!isJsonMode()) {
+                process.stderr.write(detail + '\n');
+                throw new CliError('', 1, ErrorCode.CHECK_FAILED);
+            }
+            throw new CliError(detail, 1, ErrorCode.CHECK_FAILED);
         }
     }
 }

@@ -9,7 +9,8 @@ import { readdir, mkdir } from 'node:fs/promises';
 import { join, basename, extname } from 'node:path';
 import { type ParsedArgs, getStringFlag, hasFlag } from '../utils/args.js';
 import { validatePath } from '../utils/io.js';
-import { CliError } from '../utils/error.js';
+import { CliError, ErrorCode } from '../utils/error.js';
+import { isJsonMode, isDryRun } from '../utils/agent.js';
 import { style } from '../utils/colors.js';
 import { render } from './render.js';
 
@@ -71,8 +72,10 @@ async function runPool<T>(
 export async function batch(args: ParsedArgs): Promise<void> {
     const inputDir = getStringFlag(args.flags, 'input-dir');
     const outputDir = getStringFlag(args.flags, 'output-dir');
-    const format = getStringFlag(args.flags, 'format') ?? 'text';
+    // Agent mode (global --json) forces a machine-readable summary on stdout.
+    const format = isJsonMode() ? 'json' : (getStringFlag(args.flags, 'format') ?? 'text');
     const failFast = hasFlag(args.flags, 'fail-fast');
+    const dryRun = hasFlag(args.flags, 'dry-run') || isDryRun();
 
     if (inputDir === undefined) {
         throw new CliError('batch requires --input-dir <dir>.', 2);
@@ -100,14 +103,18 @@ export async function batch(args: ParsedArgs): Promise<void> {
     try {
         entries = await readdir(inputDir);
     } catch {
-        throw new CliError(`Cannot read --input-dir: ${inputDir}`, 1);
+        throw new CliError(`Cannot read --input-dir: ${inputDir}`, 1, ErrorCode.IO);
     }
     const inputs = entries.filter((e) => extname(e).toLowerCase() === '.json').sort();
     if (inputs.length === 0) {
-        throw new CliError(`No .json files found in ${inputDir}.`, 1);
+        throw new CliError(`No .json files found in ${inputDir}.`, 1, ErrorCode.INPUT);
     }
 
-    await mkdir(outputDir, { recursive: true });
+    // In dry-run we validate every input via render (which short-circuits before
+    // writing); no output directory is created and no PDF is written.
+    if (!dryRun) {
+        await mkdir(outputDir, { recursive: true });
+    }
 
     const results: FileResult[] = [];
     let aborted = false;

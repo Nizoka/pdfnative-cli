@@ -1,0 +1,9 @@
+{
+  "blocks": [
+    { "type": "heading", "level": 1, "text": "Large-Report Guard Demo" },
+    { "type": "paragraph", "text": "This document has five top-level blocks. The --max-blocks flag caps how many blocks pdfnative will lay out before it aborts, so a runaway or accidentally huge payload fails fast instead of exhausting memory." },
+    { "type": "heading", "level": 2, "text": "Why cap blocks?" },
+    { "type": "list", "items": ["Bound worst-case memory on untrusted input", "Fail fast in CI when a generator misbehaves", "Raise the ceiling for legitimate multi-thousand-page reports"] },
+    { "type": "paragraph", "text": "Render this with a generous cap to succeed, or with a cap below five to watch the guard trip." }
+  ]
+}

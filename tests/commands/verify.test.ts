@@ -5,7 +5,7 @@ import * as fs from 'node:fs/promises';
 import { verify } from '../../src/commands/verify.js';
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
-import { CliError } from '../../src/utils/error.js';
+import { CliError, ErrorCode } from '../../src/utils/error.js';
 
 const minimalParams = JSON.stringify({
     title: 'Verify Test',
@@ -97,5 +97,23 @@ describe('verify', () => {
         ).catch((e: unknown) => e);
         expect(err).toBeInstanceOf(CliError);
         expect((err as CliError).exitCode).toBe(1);
+    });
+
+    it('tags an unreadable PDF with E_PARSE', async () => {
+        const bad = path.join(os.tmpdir(), `verify-badcode-${Date.now()}.pdf`);
+        tmpFiles.push(bad);
+        await fs.writeFile(bad, 'not a pdf', 'utf8');
+        const err = await verify(parseArgs(['--input', bad])).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(CliError);
+        expect((err as CliError).code).toBe(ErrorCode.PARSE);
+    });
+
+    it('tags a --strict failure with E_VERIFY_FAILED', async () => {
+        const pdf = await makeUnsignedPdf();
+        const err = await captureStdout(() =>
+            verify(parseArgs(['--input', pdf, '--strict'])),
+        ).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(CliError);
+        expect((err as CliError).code).toBe(ErrorCode.VERIFY_FAILED);
     });
 });

@@ -53,7 +53,7 @@ pdfnative render `
 samples/
 ├── run-all.js                    Cross-platform batch renderer (Node.js ≥ 20)
 ├── render/                       JSON payloads for pdfnative render
-│   ├── document/                 General-purpose documents
+│   ├── document/                 General-purpose documents (06-max-blocks.* = --max-blocks guard, v1.1.0)
 │   ├── table/                    Table-heavy layouts
 │   ├── barcode/                  QR codes, Code 128, EAN-13
 │   ├── form/                     Interactive PDF form fields
@@ -74,24 +74,40 @@ samples/
 │   │   └── 04-multilingual.js    Node.js driver: registerFonts(th,ja,ar,ru) → render 04-multilingual.json
 │   ├── table-variant/            (v0.2.0) Table-centric PdfParams (--variant table)
 │   ├── font/                     (v0.3.0) `--font` / `--lang` flag demo (latin preset)
+│   │   ├── 01-latin.*            Latin preset shortcut
+│   │   ├── 02-new-scripts.*      (v1.1.0) Six new 1.3.0 scripts + COLRv1 colour emoji
+│   │   └── 03-emoji.*            (v1.1.0) Monochrome emoji preset (`--font emoji`)
 │   ├── template/                 (v0.3.0) `--template` deep-merge demo (base + override)
 │   ├── watch/                    (v0.3.0) `--watch` interactive auto-rebuild demo
 │   └── table-smart/              (v1.0.0) Smart tables: zebra, caption, repeat-header, wrap
 ├── batch/                        (v1.0.0) Parallel directory render (pdfnative batch)
+├── agent/                        (v1.1.0) Agent-native contract: --json envelope, --dry-run, schema
+│   ├── 01-json-and-dry-run.*     --json status envelope + --dry-run validation
+│   ├── 02-schema.*               `schema` command — versioned JSON Schemas
+│   └── 03-error-envelope.*       Deterministic failures (stable E_* error codes)
 ├── completion/                   (v1.0.0) Shell-completion script generation
 ├── config/                       (v1.0.0) `.pdfnativerc.json` default-flags demo
 ├── sign/                         Digital signature shell / PowerShell scripts
 │   ├── 01-basic.*                Self-signed RSA-SHA256 sign
 │   ├── 02-with-metadata.*        (v0.2.0) Sign with reason / location / signing-time
 │   ├── 03-ecdsa.*                (v0.3.0) P-256 ECDSA-SHA256 sign
-│   └── 04-roundtrip.*            (v0.3.0) render → sign → verify pipeline
+│   ├── 04-roundtrip.*            (v0.3.0) render → sign → verify pipeline
+│   ├── 05-cert-chain.*           (v1.1.0) Root-CA → signer chain via --cert-chain + verify --trust
+│   └── 06-timestamp-reserved.*   (v1.1.0) --timestamp is reserved → exit 2 (E_UNSUPPORTED)
 ├── inspect/                      PDF inspection shell / PowerShell scripts
+│   ├── 01-json.*                 JSON metadata report
+│   ├── 02-text.*                 Human-readable text report
+│   ├── 03-verbose-pages.*        Per-page detail + verbose trailer/catalog keys
+│   ├── 04-check-pdfa.*           CI gate: assert PDF/A conformance
+│   ├── 05-pdfua.*                (v1.1.0) PDF/UA (ISO 14289-1) structural validation gate
+│   └── 06-check-signed-encrypted.* (v1.1.0) CI gates for --check signed / --check encrypted
 ├── verify/                       Signature verification shell / PowerShell scripts
 │   ├── 01-self-signed.*          (v0.2.0) Verify a self-signed PDF
 │   ├── 02-strict-mode.*          (v0.2.0) `--strict` exits non-zero on failure
 │   ├── 03-cms-rsa.*              (v0.3.0) Verify CMS RSA-SHA256 signature value
 │   ├── 04-cms-ecdsa.*            (v0.3.0) Verify CMS ECDSA-SHA256 signature value
-│   └── 05-revocation.*           (v1.0.0) OCSP/CRL revocation + timestamp (PAdES-T)
+│   ├── 05-revocation.*           (v1.0.0) OCSP/CRL revocation + timestamp (PAdES-T)
+│   └── 06-online-revocation.*    (v1.1.0) Offline default + commented SSRF-guarded online variant
 └── streaming/                    Streaming render Node.js scripts
 ```
 
@@ -108,6 +124,9 @@ samples/
 | [03-all-blocks.json](render/document/03-all-blocks.json) | **Reference** — every block type in one document (heading, paragraph, list, table, barcode, link, form fields, page break, spacer) |
 | [04-invoice.json](render/document/04-invoice.json) | Invoice with line-item table, totals, and company branding |
 | [05-technical-spec.json](render/document/05-technical-spec.json) | Technical specification with multi-level headings and code-style paragraphs |
+| [06-max-blocks.json](render/document/06-max-blocks.json) | (v1.1.0) Document body for the `--max-blocks` large-report guard demo |
+| [06-max-blocks.sh](render/document/06-max-blocks.sh) | (v1.1.0) Render with a generous `--max-blocks 10000`, then trip the guard with `--max-blocks 3` |
+| [06-max-blocks.ps1](render/document/06-max-blocks.ps1) | (v1.1.0) PowerShell equivalent |
 
 ### `render/table/` — Tables
 
@@ -149,8 +168,11 @@ samples/
 |------|-------------|
 | [01-draft.json](render/watermark/01-draft.json) | Document with DRAFT status indicator (heading + footer) |
 | [02-confidential.json](render/watermark/02-confidential.json) | Document with CONFIDENTIAL status indicator (heading + footer) |
+| [03-cli-flags.json](render/watermark/03-cli-flags.json) | (v1.1.0) Document body for the CLI watermark-flag demo |
+| [03-cli-flags.sh](render/watermark/03-cli-flags.sh) | (v1.1.0) Overlay a real watermark via `--watermark-text/-opacity/-angle/-color/-font-size/-position` |
+| [03-cli-flags.ps1](render/watermark/03-cli-flags.ps1) | (v1.1.0) PowerShell equivalent |
 
-**Note:** Visual watermark overlays are supported by `pdfnative` but not yet exposed through the CLI JSON interface. These samples demonstrate using heading and footer text to indicate document status. For programmatic watermarks, use the `pdfnative` Node.js API directly:
+**Note:** Visual watermark overlays are exposed through the CLI via the `--watermark-text` / `--watermark-image` flags (plus `--watermark-opacity`, `--watermark-angle`, `--watermark-color`, `--watermark-font-size`, `--watermark-position`) — see `03-cli-flags.*`. The `01`/`02` samples instead show the heading/footer-text approach for status indication. Watermarks can also be set programmatically:
 ```typescript
 import { buildDocumentPDFBytes } from 'pdfnative';
 const pdf = buildDocumentPDFBytes(params, {
@@ -173,6 +195,7 @@ const pdf = buildDocumentPDFBytes(params, {
 | [01-pdfa-1b.json](render/pdfa/01-pdfa-1b.json) | PDF/A-1b | ISO 19005-1 — baseline archival |
 | [02-pdfa-2b.json](render/pdfa/02-pdfa-2b.json) | PDF/A-2b | ISO 19005-2 — transparency, JPEG 2000 |
 | [03-pdfa-3b.json](render/pdfa/03-pdfa-3b.json) | PDF/A-3b | ISO 19005-3 — embedded file attachments |
+| [04-pdfa-2u.json](render/pdfa/04-pdfa-2u.json) | PDF/A-2u | ISO 19005-2 — every glyph mapped to Unicode |
 
 PDF/A conformance can also be set from the CLI via the `--tagged` flag (or the deprecated `--conformance` alias) instead of the JSON `layout.tagged` field:
 
@@ -191,6 +214,9 @@ pdfnative render --input doc.json --output doc.pdf --conformance 2b
 | [01-aes128-protected.json](render/encryption/01-aes128-protected.json) | Document body for an AES-128 encrypted PDF |
 | [01-aes128-protected.sh](render/encryption/01-aes128-protected.sh) | Bash driver — sets `$PDFNATIVE_ENCRYPT_OWNER_PASS` / `$PDFNATIVE_ENCRYPT_USER_PASS` and calls `--encrypt-algorithm aes128 --encrypt-permissions print` |
 | [01-aes128-protected.ps1](render/encryption/01-aes128-protected.ps1) | PowerShell equivalent |
+| [02-aes256-protected.json](render/encryption/02-aes256-protected.json) | (v1.1.0) Document body for an AES-256 encrypted PDF |
+| [02-aes256-protected.sh](render/encryption/02-aes256-protected.sh) | (v1.1.0) Bash driver — `--encrypt-algorithm aes256 --encrypt-permissions print` |
+| [02-aes256-protected.ps1](render/encryption/02-aes256-protected.ps1) | (v1.1.0) PowerShell equivalent |
 
 **Security:** owner / user passwords are read from environment variables first, then `--encrypt-owner-pass` / `--encrypt-user-pass` flags. Encryption is mutually exclusive with `--tagged pdfa*` (ISO 19005 forbids encrypted PDF/A).
 
@@ -322,8 +348,14 @@ const pdf = buildDocumentPDFBytes({
 | [01-latin.json](render/font/01-latin.json) | Plain Latin-1 document body |
 | [01-latin.sh](render/font/01-latin.sh) | Renders with `--font latin --lang latin` |
 | [01-latin.ps1](render/font/01-latin.ps1) | PowerShell equivalent |
+| [02-new-scripts.json](render/font/02-new-scripts.json) | (v1.1.0) Six 1.3.0 scripts (Telugu, Sinhala, Khmer, Burmese, Tibetan, Amharic) + COLRv1 colour emoji |
+| [02-new-scripts.sh](render/font/02-new-scripts.sh) | (v1.1.0) Renders the new scripts with per-script `--font`/`--lang` flags |
+| [02-new-scripts.ps1](render/font/02-new-scripts.ps1) | (v1.1.0) PowerShell equivalent |
+| [03-emoji.json](render/font/03-emoji.json) | (v1.1.0) Monochrome emoji document body |
+| [03-emoji.sh](render/font/03-emoji.sh) | (v1.1.0) Renders with `--font emoji --lang emoji` |
+| [03-emoji.ps1](render/font/03-emoji.ps1) | (v1.1.0) PowerShell equivalent |
 
-The `--font` and `--lang` flags select a preset from pdfnative's bundled font registry without requiring a `registerFonts` driver script. `latin` is the safe baseline; non-Latin presets still need a driver (see `render/multilang/`).
+The `--font` and `--lang` flags select a preset (or, repeated, multiple scripts) from pdfnative's bundled font registry without requiring a `registerFonts` driver script. `latin` is the safe baseline; non-Latin presets can be selected directly by code (`te`, `si`, `km`, `my`, `bo`, `am`, `emoji`, `color-emoji`, …).
 
 ### `render/template/` — `--template` Deep Merge (v0.3.0)
 
@@ -371,6 +403,10 @@ Demonstrate the `pdfnative sign` command. Both Unix shell and PowerShell scripts
 | [sign/03-ecdsa.ps1](sign/03-ecdsa.ps1) | (v0.3.0) PowerShell equivalent |
 | [sign/04-roundtrip.sh](sign/04-roundtrip.sh) | (v0.3.0) Full **render → sign → verify** pipeline; asserts `signatureValid: true` via `jq` |
 | [sign/04-roundtrip.ps1](sign/04-roundtrip.ps1) | (v0.3.0) PowerShell equivalent |
+| [sign/05-cert-chain.sh](sign/05-cert-chain.sh) | (v1.1.0) Build a root-CA → signer chain, sign with `--cert-chain`, then `verify --trust <root>` |
+| [sign/05-cert-chain.ps1](sign/05-cert-chain.ps1) | (v1.1.0) PowerShell equivalent |
+| [sign/06-timestamp-reserved.sh](sign/06-timestamp-reserved.sh) | (v1.1.0) Shows `--timestamp` is reserved and exits 2 (`E_UNSUPPORTED`) — sign-side LTV is upstream-blocked |
+| [sign/06-timestamp-reserved.ps1](sign/06-timestamp-reserved.ps1) | (v1.1.0) PowerShell equivalent |
 
 **Prerequisites:** `openssl` on your PATH (ships with Git for Windows).
 
@@ -400,6 +436,10 @@ Demonstrate the `pdfnative inspect` command.
 | [inspect/03-verbose-pages.ps1](inspect/03-verbose-pages.ps1) | (v0.2.0) PowerShell equivalent |
 | [inspect/04-check-pdfa.sh](inspect/04-check-pdfa.sh) | (v0.2.0) Assert PDF/A conformance via `--check pdfa` (CI-friendly exit code) |
 | [inspect/04-check-pdfa.ps1](inspect/04-check-pdfa.ps1) | (v0.2.0) PowerShell equivalent |
+| [inspect/05-pdfua.sh](inspect/05-pdfua.sh) | (v1.1.0) PDF/UA (ISO 14289-1) structural validation gate via `--check pdfua` |
+| [inspect/05-pdfua.ps1](inspect/05-pdfua.ps1) | (v1.1.0) PowerShell equivalent |
+| [inspect/06-check-signed-encrypted.sh](inspect/06-check-signed-encrypted.sh) | (v1.1.0) CI gates for `--check encrypted` (PASS) and `--check signed` (FAIL on unsigned) |
+| [inspect/06-check-signed-encrypted.ps1](inspect/06-check-signed-encrypted.ps1) | (v1.1.0) PowerShell equivalent |
 
 ---
 
@@ -419,6 +459,8 @@ Demonstrate the `pdfnative verify` command — verifies CMS/PKCS#7 signatures em
 | [verify/04-cms-ecdsa.ps1](verify/04-cms-ecdsa.ps1) | (v0.3.0) PowerShell equivalent |
 | [verify/05-revocation.sh](verify/05-revocation.sh) | (v1.0.0) Revocation checking — `--revocation offline\|online` + `--revocation-policy strict\|soft-fail` (OCSP/CRL + PAdES-T timestamp) |
 | [verify/05-revocation.ps1](verify/05-revocation.ps1) | (v1.0.0) PowerShell equivalent |
+| [verify/06-online-revocation.sh](verify/06-online-revocation.sh) | (v1.1.0) Offline-by-default verify, with a commented SSRF-guarded `--revocation online` variant |
+| [verify/06-online-revocation.ps1](verify/06-online-revocation.ps1) | (v1.1.0) PowerShell equivalent |
 
 **Scope (v1.0.0):** verify checks **integrity** (byte-range SHA-256), **CMS signature value** (RSA-PKCS#1 v1.5 SHA-256 and ECDSA-SHA256 over P-256), **certificate chain signatures**, **trust** (against `--trust <root.pem>` PEM roots, or self-signed acceptance), **RFC 3161 timestamp validation (PAdES-T)**, and **OCSP (RFC 6960) + CRL (RFC 5280) revocation** — embedded from the PDF `/DSS` offline by default, with opt-in SSRF-guarded online fetching via `--revocation online`. Sign-side LTV (embedding timestamps/DSS at signing time) is upstream-blocked in pdfnative — see [ROADMAP.md](../ROADMAP.md) and [SECURITY.md](../SECURITY.md#network-access--revocation-checking).
 
@@ -432,6 +474,8 @@ Demonstrate the `pdfnative batch` command — renders every `*.json` in a direct
 |--------|-------------|
 | [batch/01-batch.sh](batch/01-batch.sh) | Batch-render `render/document/*.json` with `--concurrency 4 --compress` (Bash) |
 | [batch/01-batch.ps1](batch/01-batch.ps1) | PowerShell equivalent |
+| [batch/02-fail-fast.sh](batch/02-fail-fast.sh) | (v1.1.0) `--fail-fast` aborts on the first failure (one valid + one invalid input); asserts non-zero exit |
+| [batch/02-fail-fast.ps1](batch/02-fail-fast.ps1) | (v1.1.0) PowerShell equivalent |
 
 Render flags other than `--input-dir` / `--output-dir` / `--concurrency` / `--fail-fast` / `--format` are forwarded to every file.
 
@@ -477,10 +521,16 @@ Demonstrates piping a large JSON payload directly to `pdfnative render --stream`
 
 | Script | Description |
 |--------|-------------|
-| [streaming/01-large-document.js](streaming/01-large-document.js) | Generates a 200-section document via the streaming render path |
+| [streaming/01-large-document.js](streaming/01-large-document.js) | Generates a 200-section document via the `--stream` render path |
+| [streaming/02-page-by-page.sh](streaming/02-page-by-page.sh) | (v1.0.0) `--stream-page-by-page` — emit one page at a time (bounded memory; no TOC) |
+| [streaming/02-page-by-page.ps1](streaming/02-page-by-page.ps1) | PowerShell equivalent |
+| [streaming/03-true-streaming.sh](streaming/03-true-streaming.sh) | (v1.1.0) `--stream-true` — fully incremental streaming render |
+| [streaming/03-true-streaming.ps1](streaming/03-true-streaming.ps1) | PowerShell equivalent |
 
 ```bash
 node samples/streaming/01-large-document.js
+bash samples/streaming/02-page-by-page.sh
+bash samples/streaming/03-true-streaming.sh
 ```
 
 ---

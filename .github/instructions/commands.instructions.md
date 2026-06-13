@@ -2,70 +2,66 @@
 description: "Use when implementing or modifying render, sign, or inspect commands. Covers flag conventions, stdin/stdout, streaming, secret handling, and error contracts."
 applyTo: "src/commands/**"
 ---
-# Command Implementation Standards
+# Command Implementation
 
-## Shared Conventions
+> Shared conventions and security constraints are in `.github/copilot-instructions.md`
+> (Command Conventions + Security Constraints). This file only adds per-command deltas.
 
-- Signature: `export async function <name>(args: ParsedArgs): Promise<void>`
-- `--input` = file path; omit → read from stdin
-- `--output` = file path; omit → write to stdout (binary: `process.stdout.write(buffer)`)
-- Validation/usage errors → `throw new CliError('message', 2)`
-- Runtime errors → `throw new CliError('message', 1)`
-- Never catch and swallow errors — let `main()` handle exit
+## Shared
 
-## `render` Command
+- Signature: `export async function <name>(args: ParsedArgs): Promise<void>`.
+- `--input` omitted → stdin; `--output` omitted → stdout (binary via `process.stdout.write`).
+- Usage error → `CliError(msg, 2)`; runtime error → `CliError(msg, 1)`. Never swallow errors.
+- Validate every path arg against `..` traversal before read/write.
 
-```
-pdfnative render [--input <file.json>] [--output <out.pdf>] [--stream] [--conformance 1b|2b|3b]
-```
+## Agent contract (cross-cutting)
 
-- Reads JSON from `--input` or stdin.
-- Parses as `DocumentParams` (full pdfnative API surface).
-- Input size cap: **50 MB** before `JSON.parse` — throw `CliError` if exceeded.
-- `--stream` flag: use `streamDocumentPdf` (AsyncGenerator) instead of `buildDocumentPDFBytes`.
-  - When streaming to a file, pipe chunks via `fs.createWriteStream`.
-  - When streaming to stdout, call `process.stdout.write(chunk)` per chunk.
-- `--conformance`: inject `pdfaConformance` into the parsed params.
+- **Error codes:** pass a stable `ErrorCode` as the 3rd `CliError` arg
+  (`E_USAGE`/`E_INPUT`/`E_PARSE`/`E_IO`/`E_SIGN`/`E_VERIFY_FAILED`/`E_CHECK_FAILED`/
+  `E_UNSUPPORTED`/`E_RUNTIME`). Omitting it derives `E_USAGE` from exit 2, else `E_RUNTIME`.
+- **`--json`:** never write the envelope yourself in the dispatcher path — `index.ts` emits
+  the failure envelope. Use `emitStatus({...})` (from `utils/agent.ts`) for success status on
+  `render`/`sign`/`batch`; it is a no-op outside `--json`. stdout stays artifact-only.
+- **`--dry-run`:** read `hasFlag(args.flags, 'dry-run') || isDryRun()`; validate fully, then
+  short-circuit before producing/writing output.
+- In `--json` mode, do NOT pre-print a detail to stderr that the envelope already carries
+  (e.g. `inspect --check` detail rides in the `CliError` message instead).
 
-## `sign` Command
+## `render`
 
-```
-pdfnative sign --input <file.pdf> [--output <out.pdf>] [--key <key.pem>] [--cert <cert.pem>]
-```
+- JSON → `DocumentParams` (or `PdfParams` when `--variant table`). 50 MB cap before `JSON.parse`.
+- Streaming flags are mutually exclusive: `--stream`, `--stream-page-by-page`, `--stream-true`
+  (1.3.0 `buildDocumentPDFStreamTrue` / `buildPDFStreamTrue`). `--stream` and `--stream-true`
+  reject TOC blocks and `{pages}`.
+- `--font` allow-list: `latin`, `emoji`, `color-emoji`, and 22 script codes
+  (`ar hy bn ru hi am ka el he ja km ko my pl zh si ta te th bo tr vi`). Name doubles as `--lang`.
+- `--max-blocks <n>` → positive integer → `layout.maxBlocks` (invalid → `CliError` exit 2).
 
-- Secret loading priority (highest first):
-  1. `PDFNATIVE_SIGN_KEY` env var (PEM string of private key)
-  2. `--key <path>` flag (file path to PEM)
-  - Same logic for cert: `PDFNATIVE_SIGN_CERT` → `--cert`.
-- **Never log key material** — not on error, not on debug. Truncate or omit from messages.
-- If neither env var nor flag is provided for key or cert → `CliError` exit code 2.
-- Path traversal: validate `--input`, `--output`, `--key`, `--cert` against `../` sequences.
-- Call `signPdfBytes(pdfBytes, { privateKeyPem, certificatePem })` from core-bridge.
+## `sign`
 
-## `inspect` Command
+- Secret priority: env (`PDFNATIVE_SIGN_KEY` / `PDFNATIVE_SIGN_CERT`) over `--key` / `--cert`.
+- **Never log key material.** Replace any `signPdfBytes` error with the fixed string
+  `'Failed to sign PDF.'`. Missing key or cert → `CliError` exit 2.
+- `--timestamp` is reserved and must error clearly (sign-side LTV upstream-blocked).
 
-```
-pdfnative inspect [--input <file.pdf>] [--format json|text]
-```
+## `inspect`
 
-- Default output format: `json`.
-- `--format text`: human-readable table (key: value lines).
-- Output shape (JSON):
-  ```json
-  {
-    "version": "1.7",
-    "pageCount": 3,
-    "encrypted": false,
-    "pdfaConformance": "2b",
-    "signatures": 1,
-    "metadata": { "title": "...", "author": "...", "creationDate": "..." }
-  }
-  ```
-- No raw binary blobs in output — sanitize all fields.
-- Uses `PdfReader` from core-bridge.
+- Default `--format json`; `--text` is human-readable. No raw binary blobs in output.
+- `--pdfua` adds a `validatePdfUA` report `{ valid, errors, warnings }`.
+- `--check` allow-list: `pdfa`, `signed`, `encrypted`, `pdfua` (sets exit code 0/1).
 
-## Security Checklist
+## `verify` / `batch` / `completion`
 
-- All file paths: validate no `..` segments before read/write.
-- JSON input: size-check buffer before parsing (50 MB cap).
-- Signing keys: zero from memory isn't guaranteed in JS, but never persist or log.
+- `verify`: offline by default; online revocation only through `utils/fetch-guard.ts`.
+  Redact CMS parse errors — never leak byte offsets / parser state. Strict fail →
+  `CliError('', 1, ErrorCode.VERIFY_FAILED)`.
+- `batch`: parallel directory render, reuse render logic, per-file summary. Global `--json`
+  forces the JSON summary. `--dry-run` skips `mkdir` and forwards to each `render`.
+- `completion`: emit static bash/zsh/fish scripts only (keep `schema` + `--json`/`--dry-run`
+  in the flag/command tables).
+
+## `schema`
+
+- `pdfnative schema [render|inspect|verify|batch|list]` — print a hand-authored, versioned
+  JSON Schema (Draft 2020-12). `$id` embeds the CLI version. Pure data, zero deps; the CLI
+  only PRODUCES schemas (no bundled validator). Unknown subject → `CliError(..., 2, USAGE)`.

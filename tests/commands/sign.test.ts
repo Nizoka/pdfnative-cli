@@ -1,11 +1,16 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { sign } from '../../src/commands/sign.js';
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { CliError } from '../../src/utils/error.js';
+
+const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
+const RSA_KEY = path.join(FIXTURES, 'rsa-key.pem');
+const RSA_CERT = path.join(FIXTURES, 'rsa-cert.pem');
 
 // Minimal self-signed RSA key + cert for testing.
 // Generated with: openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 3650 -nodes -subj "/CN=Test"
@@ -214,5 +219,59 @@ describe('sign', () => {
         expect((err as CliError).exitCode).toBe(1);
         // Generic message — must not leak crypto internals.
         expect((err as CliError).message).not.toMatch(/-----BEGIN/);
+    });
+
+    describe('agent mode', () => {
+        const origJson = process.env['PDFNATIVE_JSON'];
+
+        afterEach(() => {
+            if (origJson === undefined) delete process.env['PDFNATIVE_JSON'];
+            else process.env['PDFNATIVE_JSON'] = origJson;
+        });
+
+        it('--dry-run validates credentials and PDF without writing output', async () => {
+            const pdfPath = await makeTestPdf();
+            const outPath = path.join(os.tmpdir(), `sign-dryrun-${Date.now()}.pdf`);
+            await sign(parseArgs([
+                '--input', pdfPath,
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+                '--output', outPath,
+                '--dry-run',
+            ]));
+            await expect(fs.stat(outPath)).rejects.toThrow();
+        });
+
+        it('--json --dry-run emits an ok:true envelope and never leaks key material', async () => {
+            const pdfPath = await makeTestPdf();
+            const outPath = path.join(os.tmpdir(), `sign-dryrun-json-${Date.now()}.pdf`);
+            process.env['PDFNATIVE_JSON'] = '1';
+            const lines: string[] = [];
+            const spy = vi.spyOn(process.stderr, 'write').mockImplementation((c: unknown) => {
+                lines.push(String(c));
+                return true;
+            });
+            try {
+                await sign(parseArgs([
+                    '--input', pdfPath,
+                    '--key', RSA_KEY,
+                    '--cert', RSA_CERT,
+                    '--output', outPath,
+                    '--dry-run',
+                ]));
+            } finally {
+                spy.mockRestore();
+            }
+            await expect(fs.stat(outPath)).rejects.toThrow();
+            const joined = lines.join('');
+            expect(joined).not.toMatch(/-----BEGIN/);
+            const envelope = lines.map((l) => l.trim()).filter(Boolean).map((l) => JSON.parse(l)).at(-1);
+            expect(envelope).toMatchObject({
+                ok: true,
+                command: 'sign',
+                dryRun: true,
+                algorithm: 'rsa-sha256',
+            });
+        });
     });
 });
