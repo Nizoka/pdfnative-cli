@@ -14,16 +14,24 @@ We will acknowledge receipt within 48 hours and aim to provide a fix within 7 da
 
 | Version | Supported |
 |---------|-----------|
-| 0.3.x   | ✅        |
-| 0.2.x   | ✅        |
-| 0.1.x   | ✅        |
-| < 0.1   | ❌        |
+| 1.1.x   | ✅        |
+| 1.0.x   | ✅        |
+| < 1.0   | ❌        |
 
 ## Security Model
 
 pdfnative-cli is a thin dispatch layer over the [`pdfnative`](https://github.com/Nizoka/pdfnative) library. It introduces zero additional runtime dependencies. All PDF cryptographic operations are performed inside `pdfnative` — see the [pdfnative security policy](https://github.com/Nizoka/pdfnative/blob/main/SECURITY.md) for the full cryptographic implementation notes (RSA, ECDSA, AES).
 
-The CLI exposes four commands (`render`, `sign`, `inspect`, `verify`). The `sign` and `verify` commands handle key material and certificate chain loading; security invariants for each are described below.
+The CLI exposes six commands (`render`, `sign`, `inspect`, `verify`, `batch`, `completion`), plus a `schema` helper. The `sign` and `verify` commands handle key material and certificate chain loading; security invariants for each are described below.
+
+### Agent Mode (`--json`, `--dry-run`)
+
+The agent-native contract is a **pure local presentation/validation layer** and adds **no network surface**:
+
+- `--json` only changes how diagnostics are formatted on **stderr** (a machine-readable envelope). It never opens sockets, never alters what is written to stdout, and never relaxes any security check.
+- `--dry-run` validates inputs and short-circuits **before** producing or writing output. For `sign` it stops after credentials are parsed and the PDF is prepared, before any signature value is computed — and still never logs key material.
+- Stable `E_*` error codes carry only a failure class and a redacted message; internal byte offsets, parser state, and key bytes are never exposed (the `sign` failure message stays the fixed `Failed to sign PDF.`).
+- The CLI remains **offline by default** in every mode; only `verify --revocation online` performs network requests, and only through the SSRF guard.
 
 ### Signing Key Handling
 

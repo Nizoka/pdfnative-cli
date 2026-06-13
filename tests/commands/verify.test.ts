@@ -5,7 +5,7 @@ import * as fs from 'node:fs/promises';
 import { verify } from '../../src/commands/verify.js';
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
-import { CliError } from '../../src/utils/error.js';
+import { CliError, ErrorCode } from '../../src/utils/error.js';
 
 const minimalParams = JSON.stringify({
     title: 'Verify Test',
@@ -97,5 +97,56 @@ describe('verify', () => {
         ).catch((e: unknown) => e);
         expect(err).toBeInstanceOf(CliError);
         expect((err as CliError).exitCode).toBe(1);
+    });
+
+    it('tags an unreadable PDF with E_PARSE', async () => {
+        const bad = path.join(os.tmpdir(), `verify-badcode-${Date.now()}.pdf`);
+        tmpFiles.push(bad);
+        await fs.writeFile(bad, 'not a pdf', 'utf8');
+        const err = await verify(parseArgs(['--input', bad])).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(CliError);
+        expect((err as CliError).code).toBe(ErrorCode.PARSE);
+    });
+
+    it('tags a --strict failure with E_VERIFY_FAILED', async () => {
+        const pdf = await makeUnsignedPdf();
+        const err = await captureStdout(() =>
+            verify(parseArgs(['--input', pdf, '--strict'])),
+        ).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(CliError);
+        expect((err as CliError).code).toBe(ErrorCode.VERIFY_FAILED);
+    });
+
+    describe('agent output projection', () => {
+        const origJson = process.env['PDFNATIVE_JSON'];
+
+        afterEach(() => {
+            if (origJson === undefined) delete process.env['PDFNATIVE_JSON'];
+            else process.env['PDFNATIVE_JSON'] = origJson;
+        });
+
+        it('--summary emits the canonical minimal verdict', async () => {
+            const pdf = await makeUnsignedPdf();
+            const out = await captureStdout(() =>
+                verify(parseArgs(['--input', pdf, '--summary'])),
+            );
+            expect(JSON.parse(out)).toEqual({ valid: false, signatures: 0, invalid: 0 });
+        });
+
+        it('--json compacts the output (no indentation)', async () => {
+            process.env['PDFNATIVE_JSON'] = '1';
+            const pdf = await makeUnsignedPdf();
+            const out = await captureStdout(() => verify(parseArgs(['--input', pdf])));
+            expect(out.trimEnd()).not.toContain('\n');
+            expect(out).not.toContain('  ');
+        });
+
+        it('--fields projects only the requested paths', async () => {
+            const pdf = await makeUnsignedPdf();
+            const out = await captureStdout(() =>
+                verify(parseArgs(['--input', pdf, '--fields', 'allValid'])),
+            );
+            expect(JSON.parse(out)).toEqual({ allValid: false });
+        });
     });
 });

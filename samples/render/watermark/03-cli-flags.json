@@ -1,0 +1,24 @@
+{
+  "title": "Watermark via CLI Flags",
+  "blocks": [
+    { "type": "heading",   "text": "Applying a Watermark Without Touching the JSON", "level": 1 },
+    { "type": "paragraph", "text": "This document body carries NO watermark of its own. The diagonal stamp you see is layered on entirely from the command line, so the same JSON can be reused unstamped, stamped DRAFT, or stamped CONFIDENTIAL just by changing flags." },
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Flags used by the accompanying script", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "--watermark-text — the stamp string",
+        "--watermark-opacity — 0.0 (invisible) to 1.0 (opaque)",
+        "--watermark-angle — rotation in degrees",
+        "--watermark-color — any CSS-style colour, e.g. #FF3B30",
+        "--watermark-font-size — glyph size in points",
+        "--watermark-position — background (behind text) or foreground"
+    ]},
+    { "type": "spacer",    "height": 12 },
+    { "type": "paragraph", "text": "CLI flags override any layout.watermark embedded in the JSON, which makes them ideal for CI pipelines that stamp build metadata onto an otherwise clean document." }
+  ],
+  "footerText": "Watermark applied via CLI flags",
+  "metadata": {
+    "subject": "Watermark applied through --watermark-* CLI flags",
+    "keywords": "watermark, cli, draft, confidential"
+  }
+}

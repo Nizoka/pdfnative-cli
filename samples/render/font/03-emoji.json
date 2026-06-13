@@ -1,0 +1,22 @@
+{
+  "title": "Monochrome Emoji — the --font emoji shortcut",
+  "blocks": [
+    { "type": "heading",   "text": "Monochrome Emoji", "level": 1 },
+    { "type": "paragraph", "text": "The --font emoji shortcut registers the bundled Noto Emoji (monochrome) font. Unlike --font color-emoji (COLRv1 vector colour), this renders emoji as single-colour glyphs that follow the surrounding text colour — ideal for print, faxable documents, and archives that must stay grayscale." },
+    { "type": "spacer",    "height": 12 },
+    { "type": "paragraph", "text": "Status icons: ✅ ❌ ⚠️ ℹ️ ⭐" },
+    { "type": "paragraph", "text": "Objects: 📄 📌 🔒 🔑 📎" },
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Colour vs monochrome", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "--font emoji — monochrome Noto Emoji, inherits text colour",
+        "--font color-emoji — full-colour COLRv1 vector glyphs",
+        "Both register through the same --font / --lang shortcut mechanism"
+    ]}
+  ],
+  "footerText": "Monochrome emoji — --font emoji",
+  "metadata": {
+    "subject": "Monochrome emoji demonstrating the --font emoji shortcut",
+    "keywords": "emoji, monochrome, noto, font"
+  }
+}

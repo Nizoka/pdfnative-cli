@@ -5,12 +5,18 @@ message: >-
 title: "pdfnative-cli — Official CLI for the pdfnative PDF generation library"
 abstract: >-
   A zero-dependency command-line interface for pdfnative — a pure-TypeScript,
-  ISO 32000-1 compliant PDF generation library. pdfnative-cli exposes four
-  composable commands: render (JSON → PDF, including PDF/A conformance and
-  streaming output), sign (CMS/PKCS#7 digital signatures via RSA or ECDSA),
-  inspect (structured PDF metadata analysis), and verify (CMS/PKCS#7 signature
-  verification with certificate chain and trust evaluation). Designed for shell
-  pipelines, CI/CD automation, and server-side document generation.
+  ISO 32000-1 compliant PDF generation library. pdfnative-cli exposes six
+  composable commands: render (JSON → PDF, including PDF/A conformance, 22
+  Unicode scripts, COLRv1 colour emoji, and true constant-memory streaming),
+  sign (CMS/PKCS#7 digital signatures via RSA or ECDSA), inspect (structured
+  PDF metadata analysis and PDF/UA structural validation), verify (CMS/PKCS#7
+  signature verification with certificate-chain, trust, RFC 3161 timestamp and
+  OCSP/CRL revocation evaluation), batch (parallel directory rendering), and
+  completion (shell-completion scripts). An agent-native contract — a global
+  --json envelope, stable error codes, --dry-run, and a schema command —
+  lets autonomous AI agents and CI pipelines drive the CLI deterministically.
+  Designed for shell pipelines, CI/CD automation, and server-side document
+  generation.
 type: software
 authors:
   - name: "Nizoka"
@@ -19,20 +25,24 @@ authors:
 repository-code: "https://github.com/Nizoka/pdfnative-cli"
 url: "https://pdfnative.dev"
 license: MIT
-version: 0.3.0
-date-released: "2026-05-05"
+version: 1.1.0
+date-released: "2026-06-30"
 keywords:
   - pdf
   - cli
   - pdf-generation
   - pdf-signing
   - pdf-inspection
+  - pdf-ua
+  - accessibility
   - typescript
   - nodejs
   - zero-dependencies
   - document-generation
   - digital-signature
   - pdf-a
+  - ai-agent
+  - automation
   - shell
   - pipeline
 references:

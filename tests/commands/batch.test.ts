@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { batch } from '../../src/commands/batch.js';
 import { parseArgs } from '../../src/utils/args.js';
-import { CliError } from '../../src/utils/error.js';
+import { CliError, ErrorCode } from '../../src/utils/error.js';
 
 function capture(fn: () => Promise<void>): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -108,5 +108,83 @@ describe('batch', () => {
         await expect(
             batch(parseArgs(['--input-dir', inDir, '--output-dir', path.join(inDir, 'o')])),
         ).rejects.toBeInstanceOf(CliError);
+    });
+
+    it('tags an empty directory failure with E_INPUT', async () => {
+        const inDir = await makeInputDir({ 'note.txt': 'x' });
+        const err = await batch(parseArgs(['--input-dir', inDir, '--output-dir', path.join(inDir, 'o')]))
+            .catch((e: unknown) => e);
+        expect((err as CliError).code).toBe(ErrorCode.INPUT);
+    });
+
+    it('--dry-run validates inputs without creating the output directory', async () => {
+        process.env['PDFNATIVE_QUIET'] = '1';
+        const inDir = await makeInputDir({ 'a.json': DOC, 'b.json': DOC });
+        const outDir = path.join(inDir, 'out');
+        await capture(() =>
+            batch(parseArgs(['--input-dir', inDir, '--output-dir', outDir, '--dry-run'])),
+        );
+        await expect(fs.stat(outDir)).rejects.toThrow();
+    });
+
+    it('agent json mode forces a machine-readable summary on stdout', async () => {
+        const origJson = process.env['PDFNATIVE_JSON'];
+        process.env['PDFNATIVE_JSON'] = '1';
+        process.env['PDFNATIVE_QUIET'] = '1';
+        try {
+            const inDir = await makeInputDir({ 'a.json': DOC });
+            const outDir = path.join(inDir, 'out');
+            const out = await capture(() =>
+                batch(parseArgs(['--input-dir', inDir, '--output-dir', outDir])),
+            );
+            const summary = JSON.parse(out) as { total: number; succeeded: number; failed: number };
+            expect(summary).toMatchObject({ total: 1, succeeded: 1, failed: 0 });
+        } finally {
+            if (origJson === undefined) delete process.env['PDFNATIVE_JSON'];
+            else process.env['PDFNATIVE_JSON'] = origJson;
+        }
+    });
+
+    describe('agent output projection', () => {
+        const origJson = process.env['PDFNATIVE_JSON'];
+
+        afterEach(() => {
+            if (origJson === undefined) delete process.env['PDFNATIVE_JSON'];
+            else process.env['PDFNATIVE_JSON'] = origJson;
+        });
+
+        it('--summary drops the per-file results array', async () => {
+            process.env['PDFNATIVE_QUIET'] = '1';
+            const inDir = await makeInputDir({ 'a.json': DOC, 'b.json': DOC });
+            const outDir = path.join(inDir, 'out');
+            const out = await capture(() =>
+                batch(parseArgs(['--input-dir', inDir, '--output-dir', outDir, '--format', 'json', '--summary'])),
+            );
+            const doc = JSON.parse(out) as Record<string, unknown>;
+            expect(doc).toEqual({ total: 2, succeeded: 2, failed: 0 });
+            expect(doc).not.toHaveProperty('results');
+        });
+
+        it('--json compacts the summary output (no indentation)', async () => {
+            process.env['PDFNATIVE_JSON'] = '1';
+            process.env['PDFNATIVE_QUIET'] = '1';
+            const inDir = await makeInputDir({ 'a.json': DOC });
+            const outDir = path.join(inDir, 'out');
+            const out = await capture(() =>
+                batch(parseArgs(['--input-dir', inDir, '--output-dir', outDir])),
+            );
+            expect(out.trimEnd()).not.toContain('\n');
+            expect(out).not.toContain('  ');
+        });
+
+        it('--fields projects only the requested paths', async () => {
+            process.env['PDFNATIVE_QUIET'] = '1';
+            const inDir = await makeInputDir({ 'a.json': DOC });
+            const outDir = path.join(inDir, 'out');
+            const out = await capture(() =>
+                batch(parseArgs(['--input-dir', inDir, '--output-dir', outDir, '--format', 'json', '--fields', 'total,failed'])),
+            );
+            expect(JSON.parse(out)).toEqual({ total: 1, failed: 0 });
+        });
     });
 });

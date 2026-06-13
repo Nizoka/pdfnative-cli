@@ -175,7 +175,7 @@ function validatePath(p: string): void  // throws CliError if ../  found
 **Purpose:** Convert a `DocumentParams` JSON file to a PDF.
 
 ```bash
-pdfnative render [--input <file.json>] [--output <out.pdf>] [--stream] [--conformance 1b|2b|3b]
+pdfnative render [--input <file.json>] [--output <out.pdf>] [--stream|--stream-page-by-page|--stream-true] [--tagged pdfa2b] [--font <code>] [--lang <code>] [--max-blocks <n>]
 ```
 
 **Flags:**
@@ -184,8 +184,13 @@ pdfnative render [--input <file.json>] [--output <out.pdf>] [--stream] [--confor
 |------|------|---------|-------------|
 | `--input` | string | stdin | Path to JSON file |
 | `--output` | string | stdout | Output PDF path |
-| `--stream` | boolean | false | Use `streamDocumentPdf` (AsyncGenerator) |
-| `--conformance` | `1b`\|`2b`\|`3b` | — | Inject `pdfaConformance` into params |
+| `--stream` | boolean | false | Single-pass streaming (`buildDocumentPDFStream`); no TOC, no `{pages}` |
+| `--stream-page-by-page` | boolean | false | Object-boundary streaming; TOC- and `{pages}`-compatible |
+| `--stream-true` | boolean | false | True constant-memory streaming (`buildDocumentPDFStreamTrue`); parts freed as emitted; byte-identical |
+| `--max-blocks` | integer | 100000 | Maximum document blocks (`layout.maxBlocks`) before pdfnative aborts |
+| `--font` | string (repeatable) | — | Register a bundled font shortcut (see Multilingual rendering below) |
+| `--lang` | string (comma list) | — | Preferred font code per script (`th`, `ja`, `ar`, …) |
+| `--conformance` | `1b`\|`2b`\|`3b` | — | **Deprecated** — use `--tagged pdfa<level>` |
 
 **JSON schema:** Full [`DocumentParams`](https://github.com/Nizoka/pdfnative) — same object passed to `buildDocumentPDFBytes()`.
 
@@ -240,11 +245,33 @@ See [`samples/`](../samples/) for complete working examples of every supported b
 
 **Security:** JSON buffer size is checked before parse. If > 50 MB → `CliError(exit 1)`.
 
-**Streaming behaviour:** When `--stream` is set, the command uses `streamDocumentPdf()` and writes each `Uint8Array` chunk immediately to the output. Compatible with piping to file compression tools.
+**Streaming behaviour:** Three mutually-exclusive modes. `--stream` uses a single-pass
+AsyncGenerator; `--stream-page-by-page` streams at PDF object boundaries (TOC- and
+`{pages}`-compatible); `--stream-true` (pdfnative 1.3.0) emits and frees parts as it goes for
+the lowest peak memory and is byte-identical to the buffered builders. Each writes every
+`Uint8Array` chunk immediately to the output and is compatible with piping to compression tools.
 
-**Multilingual rendering (`--lang` flag):**
+**Multilingual rendering (`--font` / `--lang` flags):**
 
-The `--lang <code,code>` flag tells pdfnative which font loaders to activate. Because the CLI process starts fresh for every invocation, font loaders must be registered programmatically **before** the render call. The recommended pattern is a thin Node.js wrapper script:
+The `--font <code>` flag (repeatable) registers a **bundled** pdfnative font for the duration of
+the render — no wrapper script required. The allow-list is `latin`, `emoji`, `color-emoji`, and
+the 22 script codes `ar hy bn ru hi am ka el he ja km ko my pl zh si ta te th bo tr vi`. Each
+name doubles as its `--lang` code; pdfnative routes each code point to the font whose cmap
+covers it, so mixed-script and colour-emoji text renders automatically.
+
+```bash
+# Telugu (one of the six scripts new in pdfnative 1.3.0)
+pdfnative render --input te.json --font te --lang te --output te.pdf
+
+# COLRv1 colour emoji
+pdfnative render --input party.json --font color-emoji --lang color-emoji --output party.pdf
+
+# Mixed: English (built-in) + Japanese + Arabic in one document
+pdfnative render --input multi.json --font ja --font ar --output multi.pdf
+```
+
+**Advanced (custom / non-bundled fonts):** to supply your own `fontData`, use the pdfnative
+Node.js API directly from a thin wrapper script:
 
 ```js
 // myscript.js (Node.js >= 20, ESM)
@@ -357,6 +384,10 @@ pdfnative inspect [--input <file.pdf>] [--format json|text]
 |------|------|---------|-------------|
 | `--input` | string | stdin | Input PDF path |
 | `--format` | `json`\|`text` | `json` | Output format |
+| `--verbose` | boolean | false | Add trailer keys, catalog keys, object count, XMP |
+| `--pages` | boolean | false | Add per-page metadata array |
+| `--pdfua` | boolean | false | Add a PDF/UA (ISO 14289-1) structural validation report |
+| `--check` | `pdfa`\|`signed`\|`encrypted`\|`pdfua` (repeatable) | — | CI assertion; sets exit code (0 = pass, 1 = fail) |
 
 **JSON output shape:**
 ```json
@@ -374,7 +405,9 @@ pdfnative inspect [--input <file.pdf>] [--format json|text]
 }
 ```
 
-**pdfnative API used:** `openPdf(bytes: Uint8Array): PdfReader`
+**pdfnative API used:** `openPdf(bytes: Uint8Array): PdfReader`, and (for `--pdfua` / `--check pdfua`) `validatePdfUA(bytes: Uint8Array): { valid: boolean; errors: readonly string[]; warnings: readonly string[] }`.
+
+**PDF/UA validation (`--pdfua`):** a fast, read-only structural check (`/MarkInfo /Marked`, `/StructTreeRoot` + `/ParentTree`, `/Metadata`, `/Lang`, per-page `/MCID` uniqueness). It is a developer-time gate, not a substitute for a full reference validator such as veraPDF. With `--check pdfua` the command exits 1 when the structural prerequisites fail.
 
 `PdfReader` interface (relevant methods):
 ```typescript
@@ -396,7 +429,115 @@ pdfnative also exports typed accessors: `dictGet`, `dictGetName`, `dictGetNum`, 
 
 ---
 
-## 5. Security Model
+## 5. Agent Automation Contract
+
+The CLI is designed so an autonomous AI agent — or any program — can drive it
+deterministically. There is **no separate runtime**: agent support is a thin
+presentation layer over the normal dispatch (the official pdfnative MCP server
+is a different integration; this is about driving the CLI process directly).
+
+### Channels
+
+| Channel | Carries |
+|---------|---------|
+| **stdout** | The primary artifact: PDF (`render`, `sign`), JSON report (`inspect`, `verify`, `batch --format json`), JSON Schema (`schema`), or completion script. |
+| **stderr** | All diagnostics: progress, warnings, and the agent JSON envelopes. |
+| **exit code** | `0` success · `1` runtime · `2` usage. Unchanged in every mode. |
+
+### `--json` envelope
+
+Global `--json` sets `PDFNATIVE_JSON=1` (in `index.ts`). In that mode:
+
+- On **failure**, a single object is written to stderr:
+  `{ "ok": false, "command": <name|null>, "error": { "code": "E_*", "message": "…" } }`.
+- On **success**, `render` / `sign` / `batch` emit a status line:
+  `{ "ok": true, "command": "render", "variant": "document", "dryRun": false, "output": "out.pdf", "bytes": 12345 }`.
+- `inspect` / `verify` / `batch` already put their result document on stdout as
+  JSON; `--json` only adds the stderr failure envelope (and forces `batch`'s
+  JSON summary).
+
+The helpers live in [`src/utils/agent.ts`](../src/utils/agent.ts):
+`isJsonMode()`, `isDryRun()`, `buildErrorEnvelope()`, `emitJsonError()`,
+`emitStatus()` (a no-op outside `--json`, so commands call it unconditionally).
+
+### Stable error codes
+
+Defined in [`src/utils/error.ts`](../src/utils/error.ts) as `ErrorCode` and
+carried on every `CliError.code`:
+
+| Code | Meaning |
+|------|---------|
+| `E_USAGE` | Missing/invalid flag or argument (exit 2) |
+| `E_INPUT` | Input payload wrong shape / failed validation |
+| `E_PARSE` | Could not parse JSON / PDF / DER |
+| `E_IO` | Filesystem or stream I/O failure |
+| `E_SIGN` | Signing failed (generic message — never leaks key material) |
+| `E_VERIFY_FAILED` | `verify --strict` found an invalid signature |
+| `E_CHECK_FAILED` | `inspect --check` assertion failed |
+| `E_UNSUPPORTED` | Reserved / not-yet-available capability |
+| `E_RUNTIME` | Catch-all runtime error |
+
+When no code is passed, `CliError` derives one from the exit code
+(`2 → E_USAGE`, otherwise `E_RUNTIME`), so legacy call sites get a sensible
+code for free.
+
+### `--dry-run`
+
+`render`, `sign`, and `batch` accept `--dry-run` (sets `PDFNATIVE_DRY_RUN=1`).
+Inputs are fully validated — and for `sign`, credentials are parsed and the PDF
+is placeholder-prepared — but **no output is produced or written**. Commands
+read `hasFlag(args.flags, 'dry-run') || isDryRun()` so a direct command call and
+the global flag both work.
+
+### Token economy — output projection
+
+The JSON `inspect` / `verify` / `batch` write to stdout is the bulk of an agent's
+token cost. The projection layer in
+[`src/utils/projection.ts`](../src/utils/projection.ts) shrinks it ~90 % through
+three composable levers (`selectFields`, `serializeJson`, `parseFieldList` — all
+pure, zero-dep):
+
+| Lever | Flag | Effect |
+|-------|------|--------|
+| Compact serialization | *(auto under `--json`)* | Minified JSON (no indentation); `--pretty` opts back into 2-space output. Non-`--json` runs stay pretty for humans. |
+| Canonical summary | `--summary` | Collapses the report to a minimal verdict (see below). |
+| Dot-path projection | `--fields a,b.c` | Keeps only the named paths; an array segment maps over its elements; unknown paths are silently omitted. |
+
+Precedence: `--summary` is applied first, then `--fields` projects the result.
+
+| Command | `--summary` shape |
+|---------|-------------------|
+| `inspect` | `{ pages, encrypted, signatures, pdfa }` |
+| `verify`  | `{ valid, signatures, invalid }` |
+| `batch`   | `{ total, succeeded, failed }` (drops the per-file `results` array) |
+
+```bash
+pdfnative verify  --input doc.pdf --json --summary        # {"valid":false,"signatures":0,"invalid":0}
+pdfnative inspect --input doc.pdf --json --fields pageCount,signatures
+pdfnative batch   --input-dir in --output-dir out --json --summary
+```
+
+The summary shapes are schema-pinned: `schema inspect-summary`,
+`schema verify-summary`, `schema batch-summary`.
+
+Why compact-under-`--json` is not a breaking change: agent mode (`--json`) is new
+in this release, so no prior consumer relied on its stdout being pretty-printed.
+Human invocations (no `--json`) are unchanged.
+
+### `schema` command
+
+[`src/commands/schema.ts`](../src/commands/schema.ts) prints a hand-authored,
+versioned JSON Schema (Draft 2020-12) for `render` input, `inspect` / `verify`
+/ `batch` output, or the `inspect-summary` / `verify-summary` / `batch-summary`
+compact shapes. The `$id` embeds the CLI version
+(`https://pdfnative.dev/schema/cli/<version>/<subject>.schema.json`) so callers
+can detect drift. `schema list` enumerates the subjects.
+
+See [AGENTS.md](../AGENTS.md) for the agent-facing summary.
+
+---
+
+## 6. Security Model
 
 | Threat | Mitigation |
 |--------|-----------|
@@ -404,13 +545,13 @@ pdfnative also exports typed accessors: `dictGet`, `dictGetName`, `dictGetNum`, 
 | Memory exhaustion via large JSON | 50 MB size check before `JSON.parse` |
 | Key material leakage via logs | Keys never included in error messages; `sign` command silences all key-related debug output |
 | Binary injection via inspect output | All metadata fields are string-coerced; no raw binary blobs emitted |
-| Supply-chain risk | Zero extra runtime dependencies; OIDC-signed npm provenance; CodeQL + Scorecard CI |
+| Supply-chain risk | Zero extra runtime dependencies; OIDC-signed npm provenance; CodeQL + Scorecard CI; CycloneDX SBOM attached to each release |
 
 See [SECURITY.md](../SECURITY.md) for the full policy.
 
 ---
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 ### `Error: PDFNATIVE_SIGN_KEY is not set`
 
@@ -449,12 +590,14 @@ With `--stream`, the entire PDF must be consumed before the process exits. Use `
 
 ---
 
-## 7. pdfnative API Mapping
+## 8. pdfnative API Mapping
 
 | CLI action | pdfnative function | Return type | Notes |
 |------------|--------------------|-------------|-------|
 | `render` (default) | `buildDocumentPDFBytes(params)` | `Uint8Array` | Synchronous |
-| `render --stream` | `buildDocumentPDFStream(params)` | `AsyncGenerator<Uint8Array>` | Streams chunks |
+| `render --stream` | `buildDocumentPDFStream(params)` | `AsyncGenerator<Uint8Array>` | Single-pass streaming |
+| `render --stream-page-by-page` | `buildDocumentPDFPageStream(params)` | `AsyncGenerator<Uint8Array>` | Object-boundary streaming |
+| `render --stream-true` | `buildDocumentPDFStreamTrue(params)` | `AsyncGenerator<Uint8Array>` | True constant-memory streaming |
 | `sign` | `signPdfBytes(bytes, options)` | `Uint8Array` | Synchronous; PEM parsed via `parseRsaPrivateKey` + `parseCertificate` |
 | `inspect` (open) | `openPdf(bytes)` | `PdfReader` | Returns reader with `.getCatalog()`, `.getInfo()`, `.pageCount` etc. |
 
@@ -470,7 +613,7 @@ dictGetArray(dict, key)  // PdfArray | undefined
 
 ---
 
-## 8. Development Quick Reference
+## 9. Development Quick Reference
 
 ```bash
 # Install
@@ -498,7 +641,7 @@ echo '{"blocks":[{"type":"paragraph","text":"Hello"}]}' | node dist/cli.cjs rend
 
 ---
 
-## 9. Samples
+## 10. Samples
 
 Complete, runnable examples live in [`samples/`](../samples/), organized by feature category:
 
@@ -527,7 +670,7 @@ See [`samples/README.md`](../samples/README.md) for the full block type referenc
 
 ---
 
-## 10. Integration Patterns
+## 11. Integration Patterns
 
 ### Shell pipeline
 ```bash
@@ -574,9 +717,30 @@ function renderToFile(params: object, outputPath: string): Promise<void> {
 }
 ```
 
+### Autonomous agent (JSON envelope + error codes)
+```typescript
+import { spawnSync } from 'node:child_process';
+
+const r = spawnSync('pdfnative', ['inspect', '--input', 'doc.pdf', '--json'], {
+    encoding: 'utf8',
+});
+if (r.status !== 0) {
+    // Diagnostics (including the failure envelope) are on stderr.
+    const env = JSON.parse(r.stderr.trim().split('\n').at(-1)!);
+    // Branch on the stable class, not the message text.
+    if (env.error.code === 'E_PARSE') {
+        // … the input was not a readable PDF
+    }
+} else {
+    const report = JSON.parse(r.stdout); // primary artifact on stdout
+}
+```
+
+See [AGENTS.md](../AGENTS.md) for the full agent contract.
+
 ---
 
-## 11. Frequently Asked Questions
+## 12. Frequently Asked Questions
 
 ### Why are watermarks not visible in `render/watermark/` samples?
 

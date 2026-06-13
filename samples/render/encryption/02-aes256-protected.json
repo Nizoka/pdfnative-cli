@@ -1,0 +1,27 @@
+{
+  "title": "AES-256 Encrypted Memo",
+  "blocks": [
+    { "type": "heading",   "text": "Strongly Encrypted Internal Memo", "level": 1 },
+    { "type": "paragraph", "text": "This document is encrypted with AES-256 — the strongest cipher the CLI exposes. As with AES-128, opening it requires the user password, and the owner password grants unrestricted access." },
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "How encryption was applied", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Algorithm: AES-256 (--encrypt-algorithm aes256)",
+        "Owner password sourced from $PDFNATIVE_ENCRYPT_OWNER_PASS",
+        "User password sourced from $PDFNATIVE_ENCRYPT_USER_PASS",
+        "Permissions: print allowed; copy/modify/extractText denied"
+    ]},
+    { "type": "spacer",    "height": 12 },
+    { "type": "heading",   "text": "Choosing 128 vs 256", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "AES-128: broad reader compatibility, lower CPU cost",
+        "AES-256: maximum confidentiality for sensitive archives",
+        "Both rely on the same owner/user password model and permissions"
+    ]}
+  ],
+  "footerText": "CONFIDENTIAL — AES-256 Encrypted",
+  "metadata": {
+    "subject": "Encrypted document demonstrating --encrypt-algorithm aes256",
+    "keywords": "encryption, aes256, confidential, owner-password"
+  }
+}

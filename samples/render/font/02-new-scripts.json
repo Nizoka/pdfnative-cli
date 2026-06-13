@@ -1,0 +1,26 @@
+{
+    "title": "pdfnative 1.3.0 — new Unicode scripts + colour emoji",
+    "blocks": [
+        {
+            "type": "heading",
+            "text": "Six new scripts in pdfnative 1.3.0",
+            "level": 1
+        },
+        {
+            "type": "paragraph",
+            "text": "Each line below is shaped with the bundled Noto font registered via the --font shortcut. pdfnative routes every code point to the font whose cmap covers it."
+        },
+        { "type": "paragraph", "text": "Telugu (te): తెలుగు లిపి" },
+        { "type": "paragraph", "text": "Sinhala (si): සිංහල අකුරු" },
+        { "type": "paragraph", "text": "Khmer (km): អក្សរខ្មែរ" },
+        { "type": "paragraph", "text": "Myanmar (my): မြန်မာအက္ခရာ" },
+        { "type": "paragraph", "text": "Tibetan (bo): བོད་ཡིག" },
+        { "type": "paragraph", "text": "Amharic / Ethiopic (am): የአማርኛ ፊደል" },
+        {
+            "type": "heading",
+            "text": "COLRv1 colour emoji",
+            "level": 2
+        },
+        { "type": "paragraph", "text": "Colour emoji: 🎨 😀 🌍 🚀 ✅" }
+    ]
+}

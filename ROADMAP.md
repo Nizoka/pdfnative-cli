@@ -70,6 +70,24 @@ This document outlines the planned development direction for pdfnative-cli. Prio
 
 ## In Progress
 
+### v1.1.0 — pdfnative 1.3.0 coverage _(released 2026-06-30)_
+
+- [x] **`pdfnative` bumped** to `^1.3.0` (was `^1.2.0`).
+- [x] **22 Unicode scripts + COLRv1 colour emoji** — `render --font` allow-list expanded to
+  every bundled pdfnative font, including the six new 1.3.0 scripts (Telugu `te`, Sinhala
+  `si`, Tibetan `bo`, Khmer `km`, Myanmar `my`, Amharic/Ethiopic `am`) and `color-emoji`.
+- [x] **`render --stream-true`** — true constant-memory streaming
+  (`buildDocumentPDFStreamTrue` / `buildPDFStreamTrue`); byte-identical to the buffered
+  builders, lowest peak memory.
+- [x] **`render --max-blocks <n>`** — expose `layout.maxBlocks` (default 100 000).
+- [x] **`inspect --pdfua` / `--check pdfua`** — read-only PDF/UA (ISO 14289-1) structural
+  validation via `validatePdfUA`, for CI accessibility gates.
+- [x] **Agent-native contract** — global `--json` status/error envelopes, stable `E_*`
+  error codes, a `--dry-run` validation mode for `render` / `sign` / `batch`, and a new
+  `schema` command exporting versioned JSON Schemas. Documented in `AGENTS.md`.
+- [x] **Supply-chain transparency** — CycloneDX SBOM attached to each release; OpenSSF
+  Scorecard badge published.
+
 ### Next — Sign-side LTV (PAdES-T / LT / LTA), upstream-coordinated
 
 Sign-side LTV is **PDF-writing logic that belongs in pdfnative**; the CLI exposes the

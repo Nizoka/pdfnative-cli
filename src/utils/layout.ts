@@ -390,6 +390,19 @@ export async function buildLayoutOptions(
         out.compress = true;
     }
 
+    // --max-blocks (pdfnative 1.3.0 layout.maxBlocks; default DEFAULT_MAX_BLOCKS = 100000)
+    const maxBlocks = getStringFlag(args.flags, 'max-blocks');
+    if (maxBlocks !== undefined) {
+        const n = Number.parseInt(maxBlocks, 10);
+        if (!Number.isInteger(n) || n <= 0 || String(n) !== maxBlocks.trim()) {
+            throw new CliError(
+                `Invalid --max-blocks value "${maxBlocks}". Expected a positive integer.`,
+                2,
+            );
+        }
+        out.maxBlocks = n;
+    }
+
     // --tagged / deprecated --conformance
     const tagged = getStringFlag(args.flags, 'tagged');
     const conformance = getStringFlag(args.flags, 'conformance');

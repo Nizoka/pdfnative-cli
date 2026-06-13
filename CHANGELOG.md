@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] – 2026-06-30
+
+Built on **pdfnative 1.3.0**. Surfaces the new engine capabilities through the CLI:
+22 Unicode scripts, COLRv1 colour emoji, true constant-memory streaming, a configurable
+document-block cap, and a read-only PDF/UA structural validator. 100% backward-compatible.
+
+### Added
+
+#### `render`
+
+- **22 Unicode scripts + COLRv1 colour emoji.** The `--font` allow-list now covers every
+  bundled pdfnative font: `latin`, `emoji`, `color-emoji`, and the 22 script codes
+  (`ar hy bn ru hi am ka el he ja km ko my pl zh si ta te th bo tr vi`), including the six
+  scripts new in pdfnative 1.3.0 (Telugu `te`, Sinhala `si`, Tibetan `bo`, Khmer `km`,
+  Myanmar `my`, Amharic/Ethiopic `am`). Each shortcut name doubles as its `--lang` code;
+  pdfnative routes each code point to the font whose cmap covers it.
+- **`--stream-true`** — true constant-memory streaming via pdfnative 1.3.0
+  `buildDocumentPDFStreamTrue` / `buildPDFStreamTrue`. PDF parts are emitted and freed as
+  they go, so the joined binary never materialises. Byte-identical to the buffered builders.
+  Same constraints as `--stream` (no TOC, no `{pages}`); mutually exclusive with the other
+  `--stream*` flags.
+- **`--max-blocks <n>`** — expose pdfnative 1.3.0 `layout.maxBlocks` (default 100 000) so
+  very large multi-thousand-page reports no longer hit a spurious ceiling.
+
+#### `inspect`
+
+- **PDF/UA (ISO 14289-1) structural validation** via pdfnative 1.3.0 `validatePdfUA`.
+  `--pdfua` adds a `{ valid, errors, warnings }` report to JSON/text output; `--check pdfua`
+  turns it into a CI accessibility gate (exit 1 when the structural prerequisites fail).
+
+#### Agent-native automation contract
+
+- **Global `--json` envelope.** Any command run with `--json` emits a single
+  machine-readable object on **stderr**: `{ ok: false, command, error: { code, message } }`
+  on failure, and a `{ ok: true, … }` status line for `render` / `sign` / `batch` on
+  success. stdout stays reserved for the primary artifact (PDF, report, schema, script).
+- **Stable `E_*` error codes** on every `CliError` (`E_USAGE`, `E_INPUT`, `E_PARSE`,
+  `E_IO`, `E_SIGN`, `E_VERIFY_FAILED`, `E_CHECK_FAILED`, `E_UNSUPPORTED`, `E_RUNTIME`),
+  so autonomous callers branch on a failure class without parsing prose. Numeric exit
+  codes (0/1/2) are unchanged.
+- **`--dry-run`** for `render`, `sign`, and `batch` — fully validate inputs (and, for
+  `sign`, parse credentials and prepare the PDF) without producing or writing output.
+- **Token-economy output projection for agents** (`inspect` / `verify` / `batch`):
+  stdout JSON is **compact by default under `--json`** (`--pretty` opts back into the
+  human 2-space form), a new **`--summary`** flag emits a canonical minimal verdict
+  (inspect `{ pages, encrypted, signatures, pdfa }`, verify `{ valid, signatures, invalid }`,
+  batch `{ total, succeeded, failed }`), and **`--fields a,b.c`** projects the result to
+  named dot-paths (array segments map over elements; unknown paths are omitted). Composable
+  — typically ~90 % fewer output tokens with no loss of the fields agents branch on.
+  Non-`--json` (human) output is unchanged. New `utils/projection.ts` (zero-dep).
+- **`schema` command** — print a versioned JSON Schema (Draft 2020-12) for the
+  `render` input, the `inspect` / `verify` / `batch` JSON output, or the new
+  `inspect-summary` / `verify-summary` / `batch-summary` compact shapes, with a `$id`
+  embedding the CLI version. `schema list` enumerates the subjects.
+- **[AGENTS.md](AGENTS.md)** documents the full contract for AI agents and CI pipelines.
+
+#### Supply chain
+
+- **CycloneDX SBOM** (`sbom.cdx.json`) is generated in CI and attached to every GitHub
+  release; an **OpenSSF Scorecard** badge is published in the README. No new runtime
+  dependencies — the SBOM generator runs build-time only.
+
+### Changed
+
+- **`pdfnative` bumped** to `^1.3.0` (was `^1.2.0`).
+- **npm keywords** expanded for discoverability (`pdf-ua`, `accessibility`, `colr`,
+  `color-emoji`, `unicode`, `text-shaping`, `opentype`, `bidi`, `streaming`, `ai-agent`,
+  `agentic`, `automation`, `json-output`, `json-schema`, and the new script names).
+
 ## [1.0.0] – 2026-06-30
 
 First stable release. **Verify-side Long-Term Validation (LTV)** lands in full, the

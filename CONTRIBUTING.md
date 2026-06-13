@@ -52,6 +52,19 @@ All must pass before opening a PR.
 - **No `console.log`** — use `process.stdout.write(msg + '\n')` / `process.stderr.write(msg + '\n')`
 - **`readonly`** on interface props where mutation is unnecessary
 
+## Agent contract
+
+The CLI is agent-native (see [AGENTS.md](AGENTS.md)). When you add or change a command:
+
+- Throw `CliError(message, exitCode, ErrorCode.X)` with a stable code from `utils/error.ts`.
+  Numeric exit codes (0/1/2) must not change.
+- Keep **stdout** for the artifact and **stderr** for diagnostics. For success status on
+  `render`/`sign`/`batch`, call `emitStatus({...})` (no-op outside `--json`).
+- Honour `--dry-run` via `hasFlag(args.flags, 'dry-run') || isDryRun()`.
+- If a command gains a new input/output shape, update the matching schema in
+  `commands/schema.ts` (hand-authored Draft 2020-12; bump nothing — the `$id` tracks the
+  package version automatically) and add a `schema.test.ts` assertion.
+
 ## Project Structure
 
 ```
@@ -78,6 +91,8 @@ tests/                 # vitest test suite (mirrors src/)
 - **Never log key material** from the `sign` command — not in error messages, not debug output.
 - Validate file paths against path traversal before filesystem access.
 - Cap JSON input at 50 MB before parsing.
+- A CycloneDX **SBOM** (`sbom.cdx.json`) is generated in CI and attached to each release; the
+  generator is build-time only — do not add it as a runtime dependency.
 
 ## Commit Convention
 

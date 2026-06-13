@@ -13,6 +13,25 @@ dispatch layer over it.
 
 **Targets:** Node.js ≥ 20, Bun, Deno (via `node dist/cli.cjs`).
 
+## Working Modes & Token Economy
+
+Default to the cheapest mode that fits the request. Do not over-explore.
+
+- **Plan mode** — for vague, multi-file, or risky requests. Produce a short numbered plan
+  (files to touch + approach), then stop for confirmation. No edits yet. Keep it to a handful
+  of bullets; do not dump file contents.
+- **Implement mode** — for clear, scoped requests. Edit directly, then validate. Skip the plan.
+
+Token discipline (this file loads on every request — keep edits to it minimal):
+
+- Read in **wide ranges**, not many small reads. Batch independent searches/reads in parallel.
+- Stop searching once you can act. Don't re-search for facts already in context or in
+  `/memories/repo/`.
+- Don't restate file contents back to the user; summarize in 1–3 sentences.
+- Reuse the per-area instruction files (`.github/instructions/*`) instead of re-deriving
+  conventions; they hold the deltas, this file holds the globals.
+- After code changes, run the smallest sufficient check (targeted test) before the full suite.
+
 ## Architecture
 
 ```
@@ -31,6 +50,7 @@ src/
 │   ├── error.ts           # CliError class, die() helper
 │   ├── config.ts          # `.pdfnativerc.json` discovery + flag-default merge
 │   ├── colors.ts          # NO_COLOR/TTY-aware ANSI helper
+│   ├── projection.ts      # Agent output projection (compact JSON, --summary, --fields)
 │   ├── keys.ts            # PEM/DER loaders for RSA + EC private keys + X.509 certs
 │   ├── layout.ts          # `--layout` flag parsing & `PdfLayoutOptions` assembly
 │   ├── asn1-walk.ts       # ASN.1/DER walker with absolute byte offsets (50 MiB cap)

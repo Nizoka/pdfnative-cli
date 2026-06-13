@@ -5,7 +5,7 @@ import * as fs from 'node:fs/promises';
 import { inspect } from '../../src/commands/inspect.js';
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
-import { CliError } from '../../src/utils/error.js';
+import { CliError, ErrorCode } from '../../src/utils/error.js';
 
 const minimalParams = JSON.stringify({
     title: 'Inspect Test',
@@ -239,5 +239,236 @@ describe('inspect', () => {
         }
         // No throw → success.
         expect(true).toBe(true);
+    });
+
+    it('--pdfua includes a structural report in JSON output', async () => {
+        const pdfPath = await generateTestPdf();
+        const chunks: string[] = [];
+        const original = process.stdout.write.bind(process.stdout);
+        process.stdout.write = (c: unknown) => {
+            chunks.push(String(c));
+            return true;
+        };
+        try {
+            await inspect(parseArgs(['--input', pdfPath, '--pdfua', '--format', 'json']));
+        } finally {
+            process.stdout.write = original;
+        }
+        const result = JSON.parse(chunks.join('')) as {
+            pdfua?: { valid: boolean; errors: string[]; warnings: string[] };
+        };
+        expect(result.pdfua).toBeDefined();
+        expect(typeof result.pdfua?.valid).toBe('boolean');
+        expect(Array.isArray(result.pdfua?.errors)).toBe(true);
+        expect(Array.isArray(result.pdfua?.warnings)).toBe(true);
+    });
+
+    it('--pdfua renders a report section in text output', async () => {
+        const pdfPath = await generateTestPdf();
+        const chunks: string[] = [];
+        const original = process.stdout.write.bind(process.stdout);
+        process.stdout.write = (c: unknown) => {
+            chunks.push(String(c));
+            return true;
+        };
+        try {
+            await inspect(parseArgs(['--input', pdfPath, '--pdfua', '--format', 'text']));
+        } finally {
+            process.stdout.write = original;
+        }
+        expect(chunks.join('')).toContain('PDF/UA:');
+    });
+
+    it('--check pdfua fails on a non-tagged PDF', async () => {
+        const pdfPath = await generateTestPdf();
+        const errStream: string[] = [];
+        const origStdout = process.stdout.write.bind(process.stdout);
+        const origStderr = process.stderr.write.bind(process.stderr);
+        process.stdout.write = () => true;
+        process.stderr.write = (c: unknown) => {
+            errStream.push(String(c));
+            return true;
+        };
+        try {
+            const err = await inspect(parseArgs(['--input', pdfPath, '--check', 'pdfua']))
+                .catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(1);
+            expect(errStream.join('')).toContain('pdfua=fail');
+        } finally {
+            process.stdout.write = origStdout;
+            process.stderr.write = origStderr;
+        }
+    });
+
+    it('--check pdfua passes on a tagged (PDF/A) document', async () => {
+        const inputPath = path.join(os.tmpdir(), `inspect-ua-in-${Date.now()}.json`);
+        const outputPath = path.join(os.tmpdir(), `inspect-ua-out-${Date.now()}.pdf`);
+        tmpFiles.push(inputPath, outputPath);
+        await fs.writeFile(inputPath, minimalParams, 'utf8');
+        await render(parseArgs(['--input', inputPath, '--output', outputPath, '--tagged', 'pdfa2b']));
+
+        const original = process.stdout.write.bind(process.stdout);
+        process.stdout.write = () => true;
+        try {
+            // No throw → check passed (exit 0).
+            await inspect(parseArgs(['--input', outputPath, '--check', 'pdfua']));
+        } finally {
+            process.stdout.write = original;
+        }
+        expect(true).toBe(true);
+    });
+
+    it('detects PDF/A conformance from XMP metadata', async () => {
+        const inputPath = path.join(os.tmpdir(), `inspect-pdfa-in-${Date.now()}.json`);
+        const outputPath = path.join(os.tmpdir(), `inspect-pdfa-out-${Date.now()}.pdf`);
+        tmpFiles.push(inputPath, outputPath);
+        await fs.writeFile(inputPath, minimalParams, 'utf8');
+        await render(parseArgs(['--input', inputPath, '--output', outputPath, '--tagged', 'pdfa2b']));
+
+        const chunks: string[] = [];
+        const original = process.stdout.write.bind(process.stdout);
+        process.stdout.write = (chunk: unknown) => {
+            chunks.push(String(chunk));
+            return true;
+        };
+        try {
+            await inspect(parseArgs(['--input', outputPath, '--format', 'json']));
+        } finally {
+            process.stdout.write = original;
+        }
+
+        const result = JSON.parse(chunks.join('')) as InspectResult;
+        expect(result.pdfaConformance).toBe('2b');
+
+        // No throw → check passed (exit 0).
+        const silenced = process.stdout.write.bind(process.stdout);
+        process.stdout.write = () => true;
+        try {
+            await inspect(parseArgs(['--input', outputPath, '--check', 'pdfa']));
+        } finally {
+            process.stdout.write = silenced;
+        }
+    });
+
+    describe('agent mode (error codes)', () => {
+        const origJson = process.env['PDFNATIVE_JSON'];
+
+        afterEach(() => {
+            if (origJson === undefined) delete process.env['PDFNATIVE_JSON'];
+            else process.env['PDFNATIVE_JSON'] = origJson;
+        });
+
+        it('tags an unreadable PDF with E_PARSE', async () => {
+            const badPath = path.join(os.tmpdir(), `inspect-bad-${Date.now()}.pdf`);
+            tmpFiles.push(badPath);
+            await fs.writeFile(badPath, 'not a pdf', 'utf8');
+            const err = await inspect(parseArgs(['--input', badPath])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).code).toBe(ErrorCode.PARSE);
+        });
+
+        it('tags a failed --check with E_CHECK_FAILED', async () => {
+            const pdfPath = await generateTestPdf();
+            const origStdout = process.stdout.write.bind(process.stdout);
+            const origStderr = process.stderr.write.bind(process.stderr);
+            process.stdout.write = () => true;
+            process.stderr.write = () => true;
+            try {
+                const err = await inspect(parseArgs(['--input', pdfPath, '--check', 'encrypted']))
+                    .catch((e: unknown) => e);
+                expect(err).toBeInstanceOf(CliError);
+                expect((err as CliError).code).toBe(ErrorCode.CHECK_FAILED);
+            } finally {
+                process.stdout.write = origStdout;
+                process.stderr.write = origStderr;
+            }
+        });
+
+        it('in --json mode the check detail rides in the error message (not stderr text)', async () => {
+            process.env['PDFNATIVE_JSON'] = '1';
+            const pdfPath = await generateTestPdf();
+            const errStream: string[] = [];
+            const origStdout = process.stdout.write.bind(process.stdout);
+            const origStderr = process.stderr.write.bind(process.stderr);
+            process.stdout.write = () => true;
+            process.stderr.write = (c: unknown) => {
+                errStream.push(String(c));
+                return true;
+            };
+            let thrown: unknown;
+            try {
+                thrown = await inspect(parseArgs(['--input', pdfPath, '--check', 'encrypted']))
+                    .catch((e: unknown) => e);
+            } finally {
+                process.stdout.write = origStdout;
+                process.stderr.write = origStderr;
+            }
+            // In JSON mode the command does NOT pre-print the detail to stderr
+            // (the dispatcher serialises the envelope); the message carries it.
+            expect(errStream.join('')).toBe('');
+            expect(thrown).toBeInstanceOf(CliError);
+            expect((thrown as CliError).code).toBe(ErrorCode.CHECK_FAILED);
+            expect((thrown as CliError).message).toContain('encrypted');
+        });
+    });
+
+    describe('agent output projection', () => {
+        const origJson = process.env['PDFNATIVE_JSON'];
+
+        afterEach(() => {
+            if (origJson === undefined) delete process.env['PDFNATIVE_JSON'];
+            else process.env['PDFNATIVE_JSON'] = origJson;
+        });
+
+        async function runJson(flags: string[]): Promise<string> {
+            const pdfPath = await generateTestPdf();
+            const chunks: string[] = [];
+            const original = process.stdout.write.bind(process.stdout);
+            process.stdout.write = (c: unknown) => {
+                chunks.push(String(c));
+                return true;
+            };
+            try {
+                await inspect(parseArgs(['--input', pdfPath, ...flags]));
+            } finally {
+                process.stdout.write = original;
+            }
+            return chunks.join('');
+        }
+
+        it('--summary emits the canonical minimal verdict', async () => {
+            const out = await runJson(['--summary']);
+            const doc = JSON.parse(out);
+            expect(Object.keys(doc).sort()).toEqual(['encrypted', 'pages', 'pdfa', 'signatures']);
+            expect(typeof doc.pages).toBe('number');
+            expect(typeof doc.encrypted).toBe('boolean');
+        });
+
+        it('--json compacts the output (no indentation)', async () => {
+            process.env['PDFNATIVE_JSON'] = '1';
+            const out = await runJson([]);
+            expect(out.endsWith('\n')).toBe(true);
+            expect(out.trimEnd()).not.toContain('\n');
+            expect(out).not.toContain('  ');
+        });
+
+        it('--pretty restores indentation even in --json mode', async () => {
+            process.env['PDFNATIVE_JSON'] = '1';
+            const out = await runJson(['--pretty']);
+            expect(out).toContain('\n  ');
+        });
+
+        it('--fields projects only the requested paths', async () => {
+            const out = await runJson(['--fields', 'pageCount,metadata.title']);
+            const doc = JSON.parse(out);
+            expect(Object.keys(doc).sort()).toEqual(['metadata', 'pageCount']);
+            expect(doc.metadata).toEqual({ title: expect.anything() });
+        });
+
+        it('--summary and --fields compose', async () => {
+            const out = await runJson(['--summary', '--fields', 'pages']);
+            expect(JSON.parse(out)).toEqual({ pages: expect.any(Number) });
+        });
     });
 });

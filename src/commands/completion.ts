@@ -16,19 +16,25 @@ interface CommandSpec {
     readonly flags: readonly string[];
 }
 
-const GLOBAL_FLAGS = ['--help', '--version', '--no-color', '--quiet', '--config', '--no-config'];
+const GLOBAL_FLAGS = ['--help', '--version', '--no-color', '--quiet', '--json', '--dry-run', '--config', '--no-config'];
 
 const COMMANDS: readonly CommandSpec[] = [
     {
         name: 'render',
         summary: 'Render a JSON document definition to PDF',
         flags: [
-            '--input', '--output', '--stream', '--stream-page-by-page', '--watch', '--template',
+            '--input', '--output', '--stream', '--stream-page-by-page', '--stream-true',
+            '--max-blocks', '--watch', '--template',
             '--variant', '--table-wrap', '--repeat-header', '--zebra', '--min-row-height',
             '--cell-padding', '--layout', '--page-size', '--margin', '--tagged', '--compress',
-            '--lang', '--font', '--watermark-text', '--watermark-image', '--watermark-opacity',
-            '--watermark-rotation', '--encrypt', '--owner-password', '--user-password',
-            '--permissions', '--attachment',
+            '--lang', '--font',
+            '--header-left', '--header-center', '--header-right',
+            '--footer-left', '--footer-center', '--footer-right',
+            '--watermark-text', '--watermark-image', '--watermark-opacity',
+            '--watermark-angle', '--watermark-color', '--watermark-font-size',
+            '--watermark-position',
+            '--encrypt-algorithm', '--encrypt-owner-pass', '--encrypt-user-pass',
+            '--encrypt-permissions', '--attachment',
         ],
     },
     {
@@ -36,23 +42,28 @@ const COMMANDS: readonly CommandSpec[] = [
         summary: 'Apply a digital signature to a PDF',
         flags: [
             '--input', '--output', '--key', '--cert', '--cert-chain', '--algorithm',
-            '--reason', '--name', '--location', '--contact', '--signing-time',
+            '--reason', '--name', '--location', '--contact', '--signing-time', '--timestamp',
         ],
     },
     {
         name: 'verify',
         summary: 'Verify embedded PDF signatures',
-        flags: ['--input', '--trust', '--strict', '--revocation', '--revocation-policy', '--format'],
+        flags: ['--input', '--trust', '--strict', '--revocation', '--revocation-policy', '--format', '--summary', '--fields', '--pretty'],
     },
     {
         name: 'inspect',
         summary: 'Analyse a PDF and output metadata',
-        flags: ['--input', '--format', '--verbose', '--pages', '--check'],
+        flags: ['--input', '--format', '--verbose', '--pages', '--pdfua', '--check', '--summary', '--fields', '--pretty'],
     },
     {
         name: 'batch',
         summary: 'Render many JSON inputs to PDF in parallel',
-        flags: ['--input-dir', '--output-dir', '--concurrency', '--continue-on-error', '--layout', '--variant'],
+        flags: ['--input-dir', '--output-dir', '--concurrency', '--fail-fast', '--format', '--layout', '--variant', '--summary', '--fields', '--pretty'],
+    },
+    {
+        name: 'schema',
+        summary: 'Print a JSON Schema for a CLI input/output shape',
+        flags: [],
     },
     {
         name: 'completion',

@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { parseArgs, hasFlag, getStringFlag } from './utils/args.js';
 import { CliError } from './utils/error.js';
+import { isJsonMode, emitJsonError } from './utils/agent.js';
 import { loadConfig, applyConfigDefaults } from './utils/config.js';
 
 // Lazy-import commands to keep startup fast for --help / --version
@@ -18,6 +19,7 @@ Commands:
   verify    Verify embedded PDF signatures
   inspect   Analyse a PDF and output metadata / conformance info
   batch     Render every JSON file in a directory to PDF (parallel)
+  schema    Print a JSON Schema for a CLI input/output shape
   completion  Emit a shell completion script (bash|zsh|fish)
 
 Options:
@@ -29,7 +31,12 @@ Global options (any command):
   --no-config       Ignore any .pdfnativerc.json
   --quiet,   -q     Suppress progress output on stderr
   --no-color        Disable ANSI colour (also respects NO_COLOR)
+  --json            Agent mode: emit a JSON status/error envelope on stderr
+                    (data stays on stdout). Errors carry a stable code.
+  --dry-run         Validate inputs and exit without writing output
+                    (render, sign, batch).
 
+For autonomous/agent usage see AGENTS.md.
 Run \`pdfnative <command> --help\` for per-command options.
 `;
 
@@ -49,6 +56,11 @@ I/O:
                   Stream output chunked at PDF object boundaries. Assembles
                   the full document first, so TOC blocks and {pages} ARE
                   supported. Mutually exclusive with --stream.
+  --stream-true   True constant-memory streaming (pdfnative 1.3.0): parts are
+                  emitted and freed as they go, so the joined binary never
+                  materialises. Same constraints as --stream (no TOC, no
+                  {pages}); byte-identical output. Mutually exclusive with the
+                  other --stream* flags.
   --watch         Re-render on input file change (requires --input and a
                   file --output; logs to stderr; debounce 200 ms).
   --template      Path to JSON template file. Stdin / --input is deep-merged
@@ -72,9 +84,13 @@ Layout (flags override values from --layout file):
   --tagged        none|pdfa1b|pdfa2b|pdfa2u|pdfa3b (PDF/A flag)
   --conformance   DEPRECATED — alias for --tagged pdfa{1b|2b|3b}
   --compress      Enable Flate compression (initialises Node compression)
-  --lang          Comma-separated language packs (e.g. th,ja,ar)
-  --font          Register a bundled font shortcut (repeatable). Allowed:
-                  latin, emoji. The registered name is then usable via --lang.
+  --max-blocks    Max document blocks before pdfnative aborts (default 100000)
+  --lang          Comma-separated language packs (e.g. th,ja,ar,te,si,km)
+  --font          Register a bundled font shortcut (repeatable). The name
+                  doubles as the --lang code. Allowed: latin, emoji,
+                  color-emoji, and the 22 script codes ar, hy, bn, ru, hi, am,
+                  ka, el, he, ja, km, ko, my, pl, zh, si, ta, te, th, bo, tr,
+                  vi.
 
 Header / Footer:
   --header-left, --header-center, --header-right
@@ -162,6 +178,9 @@ Options:
                          soft-fail  only an explicit "revoked" status fails
                          strict     a non-"good" status fails the signature
   --format,  -f        json (default) or text
+  --summary            Emit only the minimal verdict { valid, signatures, invalid }
+  --fields             Comma-separated dot-paths to keep (e.g. valid,signatures.signatureValid)
+  --pretty             Force indented JSON even under --json (agent mode is compact)
   --help,    -h        Show this help message
 
 Reported per signature:
@@ -189,8 +208,13 @@ Options:
   --verbose,  -v  Include trailerKeys, catalogKeys, objectCount,
                   XMP metadata length
   --pages         Per-page width/height/rotation/annotation/formField counts
+  --pdfua         Include a PDF/UA (ISO 14289-1) structural validation report
+                  (valid + errors + warnings)
   --check         Assert a property; repeatable; AND semantics; exits 1 on
-                  failure. Values: pdfa | signed | encrypted
+                  failure. Values: pdfa | signed | encrypted | pdfua
+  --summary       Emit only the minimal verdict { pages, encrypted, signatures, pdfa }
+  --fields        Comma-separated dot-paths to keep (e.g. pageCount,metadata.title)
+  --pretty        Force indented JSON even under --json (agent mode is compact)
   --help,    -h   Show this help message
 `;
 
@@ -206,11 +230,35 @@ Options:
   --concurrency      Maximum parallel renders (default: 4)
   --fail-fast        Stop at the first failure (default: render all, then report)
   --format,  -f      Summary format: text (default) or json
+  --summary          Emit only the minimal verdict { total, succeeded, failed }
+  --fields           Comma-separated dot-paths to keep (e.g. total,failed)
+  --pretty           Force indented JSON even under --json (agent mode is compact)
   --help,    -h      Show this help message
 
 All other flags (--variant, --layout, --page-size, --tagged, --compress,
 smart-table flags, …) are forwarded to each render. Per-file --input/--output
 are managed automatically. Exit code 1 if any file fails.
+`;
+
+const SCHEMA_USAGE = `\
+pdfnative schema — Print a JSON Schema for a CLI input/output shape
+
+Usage:
+  pdfnative schema [subject]
+
+Subjects:
+  render          Input for \`render\` (document or table variant) — default
+  inspect         Output of \`inspect --format json\`
+  verify          Output of \`verify --format json\`
+  batch           Output of \`batch --format json\`
+  inspect-summary Output of \`inspect --summary\`
+  verify-summary  Output of \`verify --summary\`
+  batch-summary   Output of \`batch --summary\`
+  list            Print the available subjects as JSON
+
+With no subject, the \`render\` input schema is printed. Schemas are JSON Schema
+Draft 2020-12 and carry a versioned \\$id, so agents can self-validate input
+before invoking the CLI.
 `;
 
 const COMPLETION_USAGE = `\
@@ -257,12 +305,19 @@ async function loadCommand(name: string): Promise<CommandFn> {
             const m = await import('./commands/completion.js');
             return m.completion;
         }
+        case 'schema': {
+            const m = await import('./commands/schema.js');
+            return m.schema;
+        }
         default:
             return Promise.reject(
                 new CliError(`Unknown command: ${name}. Run pdfnative --help for usage.`, 1),
             );
     }
 }
+
+// The command being dispatched, captured for the agent JSON error envelope.
+let activeCommand: string | null = null;
 
 async function main(): Promise<void> {
     const argv = process.argv.slice(2);
@@ -274,6 +329,12 @@ async function main(): Promise<void> {
     }
     if (hasFlag(args.flags, 'quiet', 'q')) {
         process.env['PDFNATIVE_QUIET'] = '1';
+    }
+    if (hasFlag(args.flags, 'json')) {
+        process.env['PDFNATIVE_JSON'] = '1';
+    }
+    if (hasFlag(args.flags, 'dry-run')) {
+        process.env['PDFNATIVE_DRY_RUN'] = '1';
     }
 
     if (hasFlag(args.flags, 'help', 'h') && args.positionals.length === 0) {
@@ -298,6 +359,8 @@ async function main(): Promise<void> {
         process.exit(0);
     }
 
+    activeCommand = commandName;
+
     if (hasFlag(args.flags, 'help', 'h')) {
         switch (commandName) {
             case 'render': process.stdout.write(RENDER_USAGE); break;
@@ -305,6 +368,7 @@ async function main(): Promise<void> {
             case 'verify': process.stdout.write(VERIFY_USAGE); break;
             case 'inspect': process.stdout.write(INSPECT_USAGE); break;
             case 'batch': process.stdout.write(BATCH_USAGE); break;
+            case 'schema': process.stdout.write(SCHEMA_USAGE); break;
             case 'completion': process.stdout.write(COMPLETION_USAGE); break;
             default:
                 process.stderr.write(`Unknown command: ${commandName}. Run pdfnative --help for usage.\n`);
@@ -338,6 +402,14 @@ async function main(): Promise<void> {
 }
 
 main().catch((e: unknown) => {
+    // Agent mode: a single JSON error envelope on stderr, with a stable code.
+    if (isJsonMode()) {
+        emitJsonError(activeCommand, e);
+        if (process.env['PDFNATIVE_DEBUG'] === '1' && e instanceof Error) {
+            process.stderr.write((e.stack ?? e.message) + '\n');
+        }
+        process.exit(e instanceof CliError ? e.exitCode : 1);
+    }
     if (e instanceof CliError) {
         if (e.message.length > 0) {
             process.stderr.write(e.message + '\n');
