@@ -50,6 +50,7 @@ src/
 │   ├── error.ts           # CliError class, die() helper
 │   ├── config.ts          # `.pdfnativerc.json` discovery + flag-default merge
 │   ├── colors.ts          # NO_COLOR/TTY-aware ANSI helper
+│   ├── projection.ts      # Agent output projection (compact JSON, --summary, --fields)
 │   ├── keys.ts            # PEM/DER loaders for RSA + EC private keys + X.509 certs
 │   ├── layout.ts          # `--layout` flag parsing & `PdfLayoutOptions` assembly
 │   ├── asn1-walk.ts       # ASN.1/DER walker with absolute byte offsets (50 MiB cap)

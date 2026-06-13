@@ -116,4 +116,37 @@ describe('verify', () => {
         expect(err).toBeInstanceOf(CliError);
         expect((err as CliError).code).toBe(ErrorCode.VERIFY_FAILED);
     });
+
+    describe('agent output projection', () => {
+        const origJson = process.env['PDFNATIVE_JSON'];
+
+        afterEach(() => {
+            if (origJson === undefined) delete process.env['PDFNATIVE_JSON'];
+            else process.env['PDFNATIVE_JSON'] = origJson;
+        });
+
+        it('--summary emits the canonical minimal verdict', async () => {
+            const pdf = await makeUnsignedPdf();
+            const out = await captureStdout(() =>
+                verify(parseArgs(['--input', pdf, '--summary'])),
+            );
+            expect(JSON.parse(out)).toEqual({ valid: false, signatures: 0, invalid: 0 });
+        });
+
+        it('--json compacts the output (no indentation)', async () => {
+            process.env['PDFNATIVE_JSON'] = '1';
+            const pdf = await makeUnsignedPdf();
+            const out = await captureStdout(() => verify(parseArgs(['--input', pdf])));
+            expect(out.trimEnd()).not.toContain('\n');
+            expect(out).not.toContain('  ');
+        });
+
+        it('--fields projects only the requested paths', async () => {
+            const pdf = await makeUnsignedPdf();
+            const out = await captureStdout(() =>
+                verify(parseArgs(['--input', pdf, '--fields', 'allValid'])),
+            );
+            expect(JSON.parse(out)).toEqual({ allValid: false });
+        });
+    });
 });

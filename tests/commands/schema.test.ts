@@ -25,7 +25,7 @@ describe('schema', () => {
         expect(Array.isArray(doc.oneOf)).toBe(true);
     });
 
-    it.each(['render', 'inspect', 'verify', 'batch'])(
+    it.each(['render', 'inspect', 'verify', 'batch', 'inspect-summary', 'verify-summary', 'batch-summary'])(
         'prints a valid Draft 2020-12 schema for "%s"',
         async (subject) => {
             const out = captureStdout();
@@ -52,7 +52,26 @@ describe('schema', () => {
         await schema(parseArgs(['list']));
         out.restore();
         const doc = JSON.parse(out.calls.join(''));
-        expect(doc.subjects).toEqual(['render', 'inspect', 'verify', 'batch']);
+        expect(doc.subjects).toEqual([
+            'render',
+            'inspect',
+            'verify',
+            'batch',
+            'inspect-summary',
+            'verify-summary',
+            'batch-summary',
+        ]);
+    });
+
+    it('embeds the CLI version in a summary schema $id', async () => {
+        const out = captureStdout();
+        await schema(parseArgs(['verify-summary']));
+        out.restore();
+        const doc = JSON.parse(out.calls.join(''));
+        expect(doc.$id).toMatch(
+            /^https:\/\/pdfnative\.dev\/schema\/cli\/\d+\.\d+\.\d+\/verify-summary\.schema\.json$/,
+        );
+        expect(doc.required).toEqual(['valid', 'signatures', 'invalid']);
     });
 
     it('rejects an unknown subject with a usage error', async () => {

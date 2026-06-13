@@ -84,7 +84,8 @@ samples/
 ├── agent/                        (v1.1.0) Agent-native contract: --json envelope, --dry-run, schema
 │   ├── 01-json-and-dry-run.*     --json status envelope + --dry-run validation
 │   ├── 02-schema.*               `schema` command — versioned JSON Schemas
-│   └── 03-error-envelope.*       Deterministic failures (stable E_* error codes)
+│   ├── 03-error-envelope.*       Deterministic failures (stable E_* error codes)
+│   └── 04-token-economy.*        ~90% smaller output via --summary / --fields / compact JSON
 ├── completion/                   (v1.0.0) Shell-completion script generation
 ├── config/                       (v1.0.0) `.pdfnativerc.json` default-flags demo
 ├── sign/                         Digital signature shell / PowerShell scripts

@@ -144,4 +144,47 @@ describe('batch', () => {
             else process.env['PDFNATIVE_JSON'] = origJson;
         }
     });
+
+    describe('agent output projection', () => {
+        const origJson = process.env['PDFNATIVE_JSON'];
+
+        afterEach(() => {
+            if (origJson === undefined) delete process.env['PDFNATIVE_JSON'];
+            else process.env['PDFNATIVE_JSON'] = origJson;
+        });
+
+        it('--summary drops the per-file results array', async () => {
+            process.env['PDFNATIVE_QUIET'] = '1';
+            const inDir = await makeInputDir({ 'a.json': DOC, 'b.json': DOC });
+            const outDir = path.join(inDir, 'out');
+            const out = await capture(() =>
+                batch(parseArgs(['--input-dir', inDir, '--output-dir', outDir, '--format', 'json', '--summary'])),
+            );
+            const doc = JSON.parse(out) as Record<string, unknown>;
+            expect(doc).toEqual({ total: 2, succeeded: 2, failed: 0 });
+            expect(doc).not.toHaveProperty('results');
+        });
+
+        it('--json compacts the summary output (no indentation)', async () => {
+            process.env['PDFNATIVE_JSON'] = '1';
+            process.env['PDFNATIVE_QUIET'] = '1';
+            const inDir = await makeInputDir({ 'a.json': DOC });
+            const outDir = path.join(inDir, 'out');
+            const out = await capture(() =>
+                batch(parseArgs(['--input-dir', inDir, '--output-dir', outDir])),
+            );
+            expect(out.trimEnd()).not.toContain('\n');
+            expect(out).not.toContain('  ');
+        });
+
+        it('--fields projects only the requested paths', async () => {
+            process.env['PDFNATIVE_QUIET'] = '1';
+            const inDir = await makeInputDir({ 'a.json': DOC });
+            const outDir = path.join(inDir, 'out');
+            const out = await capture(() =>
+                batch(parseArgs(['--input-dir', inDir, '--output-dir', outDir, '--format', 'json', '--fields', 'total,failed'])),
+            );
+            expect(JSON.parse(out)).toEqual({ total: 1, failed: 0 });
+        });
+    });
 });

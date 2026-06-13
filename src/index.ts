@@ -178,6 +178,9 @@ Options:
                          soft-fail  only an explicit "revoked" status fails
                          strict     a non-"good" status fails the signature
   --format,  -f        json (default) or text
+  --summary            Emit only the minimal verdict { valid, signatures, invalid }
+  --fields             Comma-separated dot-paths to keep (e.g. valid,signatures.signatureValid)
+  --pretty             Force indented JSON even under --json (agent mode is compact)
   --help,    -h        Show this help message
 
 Reported per signature:
@@ -209,6 +212,9 @@ Options:
                   (valid + errors + warnings)
   --check         Assert a property; repeatable; AND semantics; exits 1 on
                   failure. Values: pdfa | signed | encrypted | pdfua
+  --summary       Emit only the minimal verdict { pages, encrypted, signatures, pdfa }
+  --fields        Comma-separated dot-paths to keep (e.g. pageCount,metadata.title)
+  --pretty        Force indented JSON even under --json (agent mode is compact)
   --help,    -h   Show this help message
 `;
 
@@ -224,6 +230,9 @@ Options:
   --concurrency      Maximum parallel renders (default: 4)
   --fail-fast        Stop at the first failure (default: render all, then report)
   --format,  -f      Summary format: text (default) or json
+  --summary          Emit only the minimal verdict { total, succeeded, failed }
+  --fields           Comma-separated dot-paths to keep (e.g. total,failed)
+  --pretty           Force indented JSON even under --json (agent mode is compact)
   --help,    -h      Show this help message
 
 All other flags (--variant, --layout, --page-size, --tagged, --compress,
@@ -238,11 +247,14 @@ Usage:
   pdfnative schema [subject]
 
 Subjects:
-  render        Input for \`render\` (document or table variant) — default
-  inspect       Output of \`inspect --format json\`
-  verify        Output of \`verify --format json\`
-  batch         Output of \`batch --format json\`
-  list          Print the available subjects as JSON
+  render          Input for \`render\` (document or table variant) — default
+  inspect         Output of \`inspect --format json\`
+  verify          Output of \`verify --format json\`
+  batch           Output of \`batch --format json\`
+  inspect-summary Output of \`inspect --summary\`
+  verify-summary  Output of \`verify --summary\`
+  batch-summary   Output of \`batch --summary\`
+  list            Print the available subjects as JSON
 
 With no subject, the \`render\` input schema is printed. Schemas are JSON Schema
 Draft 2020-12 and carry a versioned \\$id, so agents can self-validate input

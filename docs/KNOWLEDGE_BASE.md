@@ -489,11 +489,47 @@ is placeholder-prepared — but **no output is produced or written**. Commands
 read `hasFlag(args.flags, 'dry-run') || isDryRun()` so a direct command call and
 the global flag both work.
 
+### Token economy — output projection
+
+The JSON `inspect` / `verify` / `batch` write to stdout is the bulk of an agent's
+token cost. The projection layer in
+[`src/utils/projection.ts`](../src/utils/projection.ts) shrinks it ~90 % through
+three composable levers (`selectFields`, `serializeJson`, `parseFieldList` — all
+pure, zero-dep):
+
+| Lever | Flag | Effect |
+|-------|------|--------|
+| Compact serialization | *(auto under `--json`)* | Minified JSON (no indentation); `--pretty` opts back into 2-space output. Non-`--json` runs stay pretty for humans. |
+| Canonical summary | `--summary` | Collapses the report to a minimal verdict (see below). |
+| Dot-path projection | `--fields a,b.c` | Keeps only the named paths; an array segment maps over its elements; unknown paths are silently omitted. |
+
+Precedence: `--summary` is applied first, then `--fields` projects the result.
+
+| Command | `--summary` shape |
+|---------|-------------------|
+| `inspect` | `{ pages, encrypted, signatures, pdfa }` |
+| `verify`  | `{ valid, signatures, invalid }` |
+| `batch`   | `{ total, succeeded, failed }` (drops the per-file `results` array) |
+
+```bash
+pdfnative verify  --input doc.pdf --json --summary        # {"valid":false,"signatures":0,"invalid":0}
+pdfnative inspect --input doc.pdf --json --fields pageCount,signatures
+pdfnative batch   --input-dir in --output-dir out --json --summary
+```
+
+The summary shapes are schema-pinned: `schema inspect-summary`,
+`schema verify-summary`, `schema batch-summary`.
+
+Why compact-under-`--json` is not a breaking change: agent mode (`--json`) is new
+in this release, so no prior consumer relied on its stdout being pretty-printed.
+Human invocations (no `--json`) are unchanged.
+
 ### `schema` command
 
 [`src/commands/schema.ts`](../src/commands/schema.ts) prints a hand-authored,
-versioned JSON Schema (Draft 2020-12) for `render` input or `inspect` / `verify`
-/ `batch` output. The `$id` embeds the CLI version
+versioned JSON Schema (Draft 2020-12) for `render` input, `inspect` / `verify`
+/ `batch` output, or the `inspect-summary` / `verify-summary` / `batch-summary`
+compact shapes. The `$id` embeds the CLI version
 (`https://pdfnative.dev/schema/cli/<version>/<subject>.schema.json`) so callers
 can detect drift. `schema list` enumerates the subjects.
 

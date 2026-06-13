@@ -15,8 +15,10 @@ Two themes, one release, zero breaking changes:
 2. **Agent-native automation** — a thin presentation layer over the existing
    dispatch lets autonomous AI agents and CI drive the CLI deterministically:
    a global **`--json`** status/error envelope, stable **`E_*` error codes**, a
-   **`--dry-run`** validation mode, and a new **`schema`** command. No MCP
-   server, no daemon, no new runtime dependency — just the process contract.
+   **`--dry-run`** validation mode, a new **`schema`** command, and a
+   **token-economy output projection** (`--summary` / `--fields` + compact JSON
+   under `--json`) that cuts agent output ~90 %. No MCP server, no daemon, no new
+   runtime dependency — just the process contract.
 
 Plus supply-chain transparency: a **CycloneDX SBOM** attached to every release
 and an **OpenSSF Scorecard** badge.
@@ -45,6 +47,18 @@ and an **OpenSSF Scorecard** badge.
   `E_CHECK_FAILED`, `verify --strict` failures carry `E_VERIFY_FAILED`. In
   `--json` mode the check detail rides in the error message instead of being
   pre-printed to stderr (avoids a double-print through the dispatcher).
+- **Output projection.** The JSON-on-stdout branch now routes through
+  `utils/projection.ts`: `--summary` emits a canonical minimal verdict
+  (inspect `{ pages, encrypted, signatures, pdfa }`, verify
+  `{ valid, signatures, invalid }`), `--fields a,b.c` projects to named dot-paths,
+  and output is **compact by default under `--json`** (`--pretty` opts back into
+  2-space). Non-`--json` human output is unchanged.
+
+### `src/commands/batch.ts` (projection)
+- `--summary` emits `{ total, succeeded, failed }` (drops the per-file `results`
+  array — the largest token sink); `--fields` / compact / `--pretty` behave as
+  above. `summary`/`fields`/`pretty` are added to `BATCH_ONLY_FLAGS` so they are
+  not forwarded to per-file `render`.
 
 ### `src/commands/completion.ts`
 - Added the `schema` command and the `--json` / `--dry-run` global flags to the
@@ -60,13 +74,17 @@ and an **OpenSSF Scorecard** badge.
 ### New files
 - `src/utils/agent.ts` — `isJsonMode`, `isDryRun`, `buildErrorEnvelope`,
   `emitJsonError`, `emitStatus` (no-op outside `--json`).
-- `src/commands/schema.ts` — `pdfnative schema [render|inspect|verify|batch|list]`,
-  hand-authored versioned JSON Schemas (Draft 2020-12); `$id` embeds the CLI
-  version. Pure data, zero deps.
+- `src/utils/projection.ts` — `selectFields` (dot-path projection, array map,
+  lenient on unknown paths), `serializeJson` (compact/pretty), `parseFieldList`.
+  Pure data, zero deps.
+- `src/commands/schema.ts` — `pdfnative schema [render|inspect|verify|batch|
+  inspect-summary|verify-summary|batch-summary|list]`, hand-authored versioned
+  JSON Schemas (Draft 2020-12); `$id` embeds the CLI version. Pure data, zero deps.
 - `AGENTS.md` — agent-facing contract (channels, `--json`, error codes,
   `--dry-run`, `schema`, recommended loop, safety notes).
 - `tests/utils/error.test.ts`, `tests/utils/agent.test.ts`,
-  `tests/commands/schema.test.ts`; agent-mode cases appended to
+  `tests/utils/projection.test.ts`, `tests/commands/schema.test.ts`; agent-mode
+  and output-projection cases appended to
   `tests/commands/{render,sign,inspect,verify,batch,completion}.test.ts`.
 - `samples/agent/{01-json-and-dry-run,02-schema,03-error-envelope}.{sh,ps1}`,
   `samples/render/font/02-new-scripts.{json,sh,ps1}`,

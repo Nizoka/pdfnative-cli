@@ -23,7 +23,9 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 > very large documents. `inspect` gains a **PDF/UA (ISO 14289-1) structural validator**
 > via `--pdfua` and `--check pdfua` for CI accessibility gates. This release also adds an
 > **agent-native contract** — a global `--json` status/error envelope, stable `E_*` error
-> codes, a `--dry-run` validation mode, and a new **`schema`** command — so autonomous AI
+> codes, a `--dry-run` validation mode, a new **`schema`** command, and a **token-economy
+> output projection** (`--summary` / `--fields` + compact JSON) that cuts agent output
+> ~90 % — so autonomous AI
 > agents and CI pipelines can drive the CLI deterministically (see
 > [AGENTS.md](AGENTS.md)). A CycloneDX **SBOM** (`sbom.cdx.json`) is now attached to every
 > [GitHub release](https://github.com/Nizoka/pdfnative-cli/releases).
@@ -55,7 +57,9 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
   shape, so agents can self-validate before invoking a command.
 - **Agent-native** — a global `--json` status/error envelope, stable `E_*` error codes, and
   a `--dry-run` validation mode let autonomous AI agents and CI drive the CLI
-  deterministically. See [AGENTS.md](AGENTS.md).
+  deterministically. Token-economy levers — **`--summary`** (minimal verdict), **`--fields`**
+  (dot-path projection), and compact JSON under `--json` — shrink agent output ~90 %.
+  See [AGENTS.md](AGENTS.md).
 - **`.pdfnativerc.json`** — optional config file for default flags (global + per-command);
   precedence is CLI flags > env > config.
 - **Zero extra dependencies** — `pdfnative` is the sole runtime dependency.

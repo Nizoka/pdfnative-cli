@@ -26,6 +26,13 @@ applyTo: "src/commands/**"
   short-circuit before producing/writing output.
 - In `--json` mode, do NOT pre-print a detail to stderr that the envelope already carries
   (e.g. `inspect --check` detail rides in the `CliError` message instead).
+- **Output projection (`inspect`/`verify`/`batch`):** route the JSON-on-stdout branch through
+  `utils/projection.ts`. Order: `out = --summary ? toSummary(full) : full`, then
+  `if (--fields) out = selectFields(out, parseFieldList(raw))`, then
+  `serializeJson(out, hasFlag('pretty') || !isJsonMode())`. Compact is the default under
+  `--json`; `--pretty` opts back in; non-`--json` stays pretty. Keep `--summary` shapes minimal
+  and in lock-step with the `*-summary` `schema` subjects. Strip `summary`/`fields`/`pretty`
+  from any flags forwarded to a sub-command (see `batch`'s `BATCH_ONLY_FLAGS`).
 
 ## `render`
 

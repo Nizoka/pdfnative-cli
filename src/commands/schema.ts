@@ -16,7 +16,15 @@ import { CliError, ErrorCode } from '../utils/error.js';
 
 type JsonSchema = Readonly<Record<string, unknown>>;
 
-const SUBJECTS = ['render', 'inspect', 'verify', 'batch'] as const;
+const SUBJECTS = [
+    'render',
+    'inspect',
+    'verify',
+    'batch',
+    'inspect-summary',
+    'verify-summary',
+    'batch-summary',
+] as const;
 type Subject = (typeof SUBJECTS)[number];
 
 function cliVersion(): string {
@@ -213,11 +221,70 @@ function batchSchema(): JsonSchema {
     };
 }
 
+// --- Agent summary shapes (`--summary`) -----------------------------------
+// Compact, canonical verdicts emitted when a command is run with `--summary`.
+// Pinned here so agents can validate the minimal output independently.
+
+function inspectSummarySchema(): JsonSchema {
+    return {
+        $schema: DRAFT,
+        $id: id('inspect-summary'),
+        title: 'pdfnative-cli inspect summary output',
+        description: 'JSON emitted by `pdfnative inspect --summary` (minimal verdict).',
+        type: 'object',
+        required: ['pages', 'encrypted', 'signatures', 'pdfa'],
+        additionalProperties: false,
+        properties: {
+            pages: { type: 'integer', minimum: 0 },
+            encrypted: { type: 'boolean' },
+            signatures: { type: 'integer', minimum: 0 },
+            pdfa: { type: ['string', 'null'] },
+        },
+    };
+}
+
+function verifySummarySchema(): JsonSchema {
+    return {
+        $schema: DRAFT,
+        $id: id('verify-summary'),
+        title: 'pdfnative-cli verify summary output',
+        description: 'JSON emitted by `pdfnative verify --summary` (minimal verdict).',
+        type: 'object',
+        required: ['valid', 'signatures', 'invalid'],
+        additionalProperties: false,
+        properties: {
+            valid: { type: 'boolean' },
+            signatures: { type: 'integer', minimum: 0 },
+            invalid: { type: 'integer', minimum: 0 },
+        },
+    };
+}
+
+function batchSummarySchema(): JsonSchema {
+    return {
+        $schema: DRAFT,
+        $id: id('batch-summary'),
+        title: 'pdfnative-cli batch summary output',
+        description: 'JSON emitted by `pdfnative batch --summary` (minimal verdict, no per-file results).',
+        type: 'object',
+        required: ['total', 'succeeded', 'failed'],
+        additionalProperties: false,
+        properties: {
+            total: { type: 'integer', minimum: 0 },
+            succeeded: { type: 'integer', minimum: 0 },
+            failed: { type: 'integer', minimum: 0 },
+        },
+    };
+}
+
 const BUILDERS: Readonly<Record<Subject, () => JsonSchema>> = {
     render: renderSchema,
     inspect: inspectSchema,
     verify: verifySchema,
     batch: batchSchema,
+    'inspect-summary': inspectSummarySchema,
+    'verify-summary': verifySummarySchema,
+    'batch-summary': batchSummarySchema,
 };
 
 function isSubject(value: string): value is Subject {

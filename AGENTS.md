@@ -65,7 +65,45 @@ Branch on `error.code`, never on the human message:
 
 ---
 
-## 3. Validate first — `--dry-run`
+## 3. Token economy — compact JSON, `--summary`, `--fields`
+
+The JSON `inspect` / `verify` / `batch` write to **stdout** is the bulk of what an
+agent pays for in tokens. Three composable levers shrink it — typically by ~90 %
+— without losing the fields you branch on. They apply to all three JSON-on-stdout
+commands.
+
+**Compact by default under `--json`.** In agent mode the stdout JSON is minified
+(no indentation, no padding) instead of the human 2-space form. Pass `--pretty`
+to force indentation back on. Outside `--json` the output stays pretty for humans.
+
+**`--summary` — the canonical minimal verdict.** Collapses the full report to the
+handful of fields an orchestrator actually gates on:
+
+| Command | `--summary` shape |
+|---------|-------------------|
+| `inspect` | `{ "pages": <int>, "encrypted": <bool>, "signatures": <int>, "pdfa": <string\|null> }` |
+| `verify`  | `{ "valid": <bool>, "signatures": <int>, "invalid": <int> }` |
+| `batch`   | `{ "total": <int>, "succeeded": <int>, "failed": <int> }` (drops the per-file `results` array) |
+
+**`--fields a,b.c` — dot-path projection.** Keep only the paths you name. A
+segment landing on an array maps over every element; unknown paths are silently
+omitted (so a conditionally-absent field never crashes the run). Precedence:
+`--summary` is applied first, then `--fields` projects the result.
+
+```bash
+# Smallest possible "is this PDF signed and valid?" probe:
+pdfnative verify --input doc.pdf --json --summary            # → {"valid":false,"signatures":0,"invalid":0}
+pdfnative verify --input doc.pdf --json --fields valid        # → {"valid":false}
+pdfnative inspect --input doc.pdf --json --fields pageCount,signatures
+pdfnative batch  --input-dir in --output-dir out --json --summary
+```
+
+The compact shapes are schema-pinned — validate them with
+`schema inspect-summary`, `schema verify-summary`, `schema batch-summary`.
+
+---
+
+## 4. Validate first — `--dry-run`
 
 `render`, `sign`, and `batch` accept `--dry-run`: inputs are fully validated
 (JSON parsed, document/table shape checked, layout assembled, signing credentials
@@ -78,21 +116,22 @@ pdfnative render --input doc.json --dry-run --json
 
 ---
 
-## 4. Discover shapes — `schema`
+## 5. Discover shapes — `schema`
 
 Fetch a versioned JSON Schema (Draft 2020-12) and validate input with your own
 tooling before invoking a command. Each schema carries a `$id` embedding the CLI
 version so you can detect drift.
 
 ```bash
-pdfnative schema list        # → { "subjects": ["render","inspect","verify","batch"] }
-pdfnative schema render      # input accepted by `render`
-pdfnative schema inspect     # output of `inspect --format json`
+pdfnative schema list             # → { "subjects": ["render","inspect","verify","batch","inspect-summary","verify-summary","batch-summary"] }
+pdfnative schema render           # input accepted by `render`
+pdfnative schema inspect          # output of `inspect --format json`
+pdfnative schema verify-summary   # output of `verify --summary`
 ```
 
 ---
 
-## 5. Recommended agent loop
+## 6. Recommended agent loop
 
 1. `pdfnative --version --json` → confirm the CLI is present and pin the version.
 2. `pdfnative schema render` → validate the document you intend to render.
@@ -102,11 +141,12 @@ pdfnative schema inspect     # output of `inspect --format json`
 5. On any non-zero exit, parse the stderr envelope and branch on `error.code`.
 
 For `verify`/`inspect`, read the JSON result on stdout and use `--strict` /
-`--check` to turn findings into exit codes for unattended gating.
+`--check` to turn findings into exit codes for unattended gating. Add
+`--summary` (or `--fields`) to keep that stdout JSON token-cheap — see §3.
 
 ---
 
-## 6. Safety notes for unattended use
+## 7. Safety notes for unattended use
 
 - **Offline by default.** Only `verify --revocation online` makes network requests,
   and only through an SSRF guard. Nothing else touches the network.

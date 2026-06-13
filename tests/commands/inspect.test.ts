@@ -412,4 +412,63 @@ describe('inspect', () => {
             expect((thrown as CliError).message).toContain('encrypted');
         });
     });
+
+    describe('agent output projection', () => {
+        const origJson = process.env['PDFNATIVE_JSON'];
+
+        afterEach(() => {
+            if (origJson === undefined) delete process.env['PDFNATIVE_JSON'];
+            else process.env['PDFNATIVE_JSON'] = origJson;
+        });
+
+        async function runJson(flags: string[]): Promise<string> {
+            const pdfPath = await generateTestPdf();
+            const chunks: string[] = [];
+            const original = process.stdout.write.bind(process.stdout);
+            process.stdout.write = (c: unknown) => {
+                chunks.push(String(c));
+                return true;
+            };
+            try {
+                await inspect(parseArgs(['--input', pdfPath, ...flags]));
+            } finally {
+                process.stdout.write = original;
+            }
+            return chunks.join('');
+        }
+
+        it('--summary emits the canonical minimal verdict', async () => {
+            const out = await runJson(['--summary']);
+            const doc = JSON.parse(out);
+            expect(Object.keys(doc).sort()).toEqual(['encrypted', 'pages', 'pdfa', 'signatures']);
+            expect(typeof doc.pages).toBe('number');
+            expect(typeof doc.encrypted).toBe('boolean');
+        });
+
+        it('--json compacts the output (no indentation)', async () => {
+            process.env['PDFNATIVE_JSON'] = '1';
+            const out = await runJson([]);
+            expect(out.endsWith('\n')).toBe(true);
+            expect(out.trimEnd()).not.toContain('\n');
+            expect(out).not.toContain('  ');
+        });
+
+        it('--pretty restores indentation even in --json mode', async () => {
+            process.env['PDFNATIVE_JSON'] = '1';
+            const out = await runJson(['--pretty']);
+            expect(out).toContain('\n  ');
+        });
+
+        it('--fields projects only the requested paths', async () => {
+            const out = await runJson(['--fields', 'pageCount,metadata.title']);
+            const doc = JSON.parse(out);
+            expect(Object.keys(doc).sort()).toEqual(['metadata', 'pageCount']);
+            expect(doc.metadata).toEqual({ title: expect.anything() });
+        });
+
+        it('--summary and --fields compose', async () => {
+            const out = await runJson(['--summary', '--fields', 'pages']);
+            expect(JSON.parse(out)).toEqual({ pages: expect.any(Number) });
+        });
+    });
 });

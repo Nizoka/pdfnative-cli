@@ -49,9 +49,18 @@ document-block cap, and a read-only PDF/UA structural validator. 100% backward-c
   codes (0/1/2) are unchanged.
 - **`--dry-run`** for `render`, `sign`, and `batch` — fully validate inputs (and, for
   `sign`, parse credentials and prepare the PDF) without producing or writing output.
+- **Token-economy output projection for agents** (`inspect` / `verify` / `batch`):
+  stdout JSON is **compact by default under `--json`** (`--pretty` opts back into the
+  human 2-space form), a new **`--summary`** flag emits a canonical minimal verdict
+  (inspect `{ pages, encrypted, signatures, pdfa }`, verify `{ valid, signatures, invalid }`,
+  batch `{ total, succeeded, failed }`), and **`--fields a,b.c`** projects the result to
+  named dot-paths (array segments map over elements; unknown paths are omitted). Composable
+  — typically ~90 % fewer output tokens with no loss of the fields agents branch on.
+  Non-`--json` (human) output is unchanged. New `utils/projection.ts` (zero-dep).
 - **`schema` command** — print a versioned JSON Schema (Draft 2020-12) for the
-  `render` input or the `inspect` / `verify` / `batch` JSON output, with a `$id` embedding
-  the CLI version. `schema list` enumerates the subjects.
+  `render` input, the `inspect` / `verify` / `batch` JSON output, or the new
+  `inspect-summary` / `verify-summary` / `batch-summary` compact shapes, with a `$id`
+  embedding the CLI version. `schema list` enumerates the subjects.
 - **[AGENTS.md](AGENTS.md)** documents the full contract for AI agents and CI pipelines.
 
 #### Supply chain

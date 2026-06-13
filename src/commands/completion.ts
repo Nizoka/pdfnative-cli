@@ -48,17 +48,17 @@ const COMMANDS: readonly CommandSpec[] = [
     {
         name: 'verify',
         summary: 'Verify embedded PDF signatures',
-        flags: ['--input', '--trust', '--strict', '--revocation', '--revocation-policy', '--format'],
+        flags: ['--input', '--trust', '--strict', '--revocation', '--revocation-policy', '--format', '--summary', '--fields', '--pretty'],
     },
     {
         name: 'inspect',
         summary: 'Analyse a PDF and output metadata',
-        flags: ['--input', '--format', '--verbose', '--pages', '--pdfua', '--check'],
+        flags: ['--input', '--format', '--verbose', '--pages', '--pdfua', '--check', '--summary', '--fields', '--pretty'],
     },
     {
         name: 'batch',
         summary: 'Render many JSON inputs to PDF in parallel',
-        flags: ['--input-dir', '--output-dir', '--concurrency', '--fail-fast', '--format', '--layout', '--variant'],
+        flags: ['--input-dir', '--output-dir', '--concurrency', '--fail-fast', '--format', '--layout', '--variant', '--summary', '--fields', '--pretty'],
     },
     {
         name: 'schema',

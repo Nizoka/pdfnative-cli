@@ -4,6 +4,7 @@ import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../ut
 import { readFileOrStdin } from '../utils/io.js';
 import { CliError, ErrorCode } from '../utils/error.js';
 import { isJsonMode } from '../utils/agent.js';
+import { selectFields, serializeJson, parseFieldList } from '../utils/projection.js';
 
 const VALID_CHECKS = new Set(['pdfa', 'signed', 'encrypted', 'pdfua']);
 
@@ -184,6 +185,16 @@ function buildVerbose(reader: PdfReader): InspectResult['verbose'] {
     };
 }
 
+/** Canonical minimal verdict for agents (`--summary`). Stable, schema-pinned. */
+function toInspectSummary(result: InspectResult): Record<string, unknown> {
+    return {
+        pages: result.pageCount,
+        encrypted: result.encrypted,
+        signatures: result.signatures,
+        pdfa: result.pdfaConformance,
+    };
+}
+
 function evaluateChecks(checks: readonly string[], result: InspectResult): CheckResult {
     const out: { name: string; passed: boolean }[] = [];
     for (const c of checks) {
@@ -251,7 +262,15 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     };
 
     if (format === 'json') {
-        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+        const summary = hasFlag(args.flags, 'summary');
+        const fieldsRaw = getStringFlag(args.flags, 'fields');
+        let out: unknown = summary ? toInspectSummary(result) : result;
+        if (fieldsRaw !== undefined) {
+            out = selectFields(out, parseFieldList(fieldsRaw));
+        }
+        // Compact for agents (--json), pretty for humans; --pretty forces pretty.
+        const pretty = hasFlag(args.flags, 'pretty') || !isJsonMode();
+        process.stdout.write(serializeJson(out, pretty) + '\n');
     } else {
         const lines = [
             `Version:        ${result.version}`,
