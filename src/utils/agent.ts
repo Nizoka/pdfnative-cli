@@ -45,6 +45,7 @@ const DEFAULT_MESSAGE: Readonly<Record<ErrorCodeValue, string>> = {
     [ErrorCode.SIGN]: 'failed to sign PDF',
     [ErrorCode.VERIFY_FAILED]: 'one or more signatures failed verification',
     [ErrorCode.CHECK_FAILED]: 'one or more checks failed',
+    [ErrorCode.POLICY]: 'AI-governance policy violation',
     [ErrorCode.UNSUPPORTED]: 'unsupported operation',
     [ErrorCode.RUNTIME]: 'runtime error',
 };

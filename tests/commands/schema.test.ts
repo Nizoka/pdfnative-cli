@@ -57,9 +57,11 @@ describe('schema', () => {
             'inspect',
             'verify',
             'batch',
+            'annotate',
             'inspect-summary',
             'verify-summary',
             'batch-summary',
+            'govern-verify',
         ]);
     });
 

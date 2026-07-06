@@ -15,6 +15,7 @@ import {
     loadFontData,
     hasFontLoader,
     registerFont,
+    inspectDocumentLayout,
 } from '../core-bridge/index.js';
 import type {
     DocumentParams,
@@ -22,6 +23,7 @@ import type {
     PdfParams,
     PdfColor,
     FontEntry,
+    OutlineItem,
 } from '../core-bridge/index.js';
 import {
     type ParsedArgs,
@@ -37,7 +39,8 @@ import {
     assertJsonSizeLimit,
 } from '../utils/io.js';
 import { CliError, ErrorCode } from '../utils/error.js';
-import { emitStatus, isDryRun } from '../utils/agent.js';
+import { emitStatus, isDryRun, isJsonMode } from '../utils/agent.js';
+import { serializeJson } from '../utils/projection.js';
 import {
     buildLayoutOptions,
     assertStreamingCompatible,
@@ -59,6 +62,9 @@ const BUNDLED_FONT_MODULES: Readonly<Record<string, string>> = Object.freeze({
     latin: 'noto-sans-data.js',
     emoji: 'noto-emoji-data.js',
     'color-emoji': 'noto-color-emoji-data.js',
+    // Mathematical / technical symbols (pdfnative ≥ 1.5.0). Code points in the
+    // math operator / geometric-shape blocks are auto-routed to this font.
+    math: 'noto-sans-math-data.js',
     // 22 Unicode scripts (pdfnative ≥ 1.3.0). The shortcut name doubles as the
     // `--lang` code; pdfnative routes each code point to the font whose cmap
     // covers it, so any registered script font is used automatically.
@@ -325,7 +331,35 @@ interface RenderConfig {
     readonly langs: readonly string[];
     readonly layout: Partial<PdfLayoutOptions>;
     readonly tableDefaults: TableDefaults | undefined;
+    readonly outline: readonly OutlineItem[] | 'auto' | undefined;
+    readonly inspectLayout: boolean;
+    readonly pretty: boolean;
     readonly dryRun: boolean;
+}
+
+/** Parse `--outline`: `auto` selects heading-derived bookmarks; any other value
+ *  is a path to a JSON file holding an `OutlineItem[]` tree. */
+async function loadOutline(
+    spec: string,
+): Promise<readonly OutlineItem[] | 'auto'> {
+    if (spec.trim().toLowerCase() === 'auto') return 'auto';
+    const buf = await readFileOrStdin(spec);
+    assertJsonSizeLimit(buf);
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(buf.toString('utf8'));
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new CliError(`Failed to parse --outline JSON: ${message}`, 1, ErrorCode.PARSE);
+    }
+    if (!Array.isArray(parsed)) {
+        throw new CliError(
+            '--outline file must be a JSON array of OutlineItem objects (or use --outline auto).',
+            1,
+            ErrorCode.INPUT,
+        );
+    }
+    return parsed as readonly OutlineItem[];
 }
 
 async function loadTemplate(templatePath: string): Promise<unknown> {
@@ -402,6 +436,12 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
         params = applyTableDefaults(params, cfg.tableDefaults);
     }
 
+    // --outline (pdfnative 1.4.0 bookmarks). Flag wins over any JSON-embedded
+    // outline so the CLI stays authoritative.
+    if (cfg.outline !== undefined) {
+        params = { ...params, outline: cfg.outline as DocumentParams['outline'] };
+    }
+
     if (cfg.langs.length > 0) {
         const existing = (params.fontEntries ?? []) as readonly FontEntry[];
         // /F1 = Helvetica, /F2 = Bold; user fonts start at /F3 + (existing count).
@@ -418,6 +458,25 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
         params.layout !== undefined && params.layout !== null
             ? { ...params.layout, ...cfg.layout }
             : cfg.layout;
+
+    // --inspect-layout (pdfnative 1.5.0): emit the deterministic layout report
+    // as JSON instead of rendering a PDF. A read-only pre-flight for agents.
+    if (cfg.inspectLayout) {
+        let report: unknown;
+        try {
+            report = inspectDocumentLayout(params, effectiveLayout);
+        } catch (e) {
+            const message = e instanceof Error ? e.message : String(e);
+            throw new CliError(`Failed to inspect layout: ${message}`, 1, ErrorCode.INPUT);
+        }
+        const pretty = cfg.pretty || !isJsonMode();
+        await writeOutput(
+            new TextEncoder().encode(serializeJson(report, pretty) + '\n'),
+            cfg.outputPath,
+        );
+        emitStatus({ command: 'render', variant: 'document', inspectLayout: true, output: cfg.outputPath ?? '-' });
+        return;
+    }
 
     if (cfg.useStream && hasTocBlock(params)) {
         throw new CliError(
@@ -474,6 +533,9 @@ export async function render(args: ParsedArgs): Promise<void> {
     const templatePath = getStringFlag(args.flags, 'template');
     const fontFlags = getStringFlagAll(args.flags, 'font');
     const tableDefaults = parseTableDefaults(args);
+    const outlineSpec = getStringFlag(args.flags, 'outline');
+    const inspectLayout = hasFlag(args.flags, 'inspect-layout');
+    const pretty = hasFlag(args.flags, 'pretty');
 
     if (!VALID_VARIANTS.has(variant)) {
         throw new CliError(
@@ -514,6 +576,11 @@ export async function render(args: ParsedArgs): Promise<void> {
         : langsRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
 
     const template = templatePath !== undefined ? await loadTemplate(templatePath) : undefined;
+    const outline = outlineSpec !== undefined ? await loadOutline(outlineSpec) : undefined;
+
+    if (inspectLayout && variant !== 'document') {
+        throw new CliError('--inspect-layout is only available for the document variant.', 2);
+    }
 
     const cfg: RenderConfig = {
         variant,
@@ -525,6 +592,9 @@ export async function render(args: ParsedArgs): Promise<void> {
         langs,
         layout,
         tableDefaults,
+        outline,
+        inspectLayout,
+        pretty,
         dryRun,
     };
 

@@ -79,7 +79,15 @@ samples/
 │   │   └── 03-emoji.*            (v1.1.0) Monochrome emoji preset (`--font emoji`)
 │   ├── template/                 (v0.3.0) `--template` deep-merge demo (base + override)
 │   ├── watch/                    (v0.3.0) `--watch` interactive auto-rebuild demo
-│   └── table-smart/              (v1.0.0) Smart tables: zebra, caption, repeat-header, wrap
+│   ├── table-smart/              (v1.0.0) Smart tables: zebra, caption, repeat-header, wrap
+│   ├── outline/                  (v1.2.0) PDF bookmarks — `--outline auto` + explicit tree
+│   ├── math/                     (v1.2.0) Math/technical symbols via `--font math`
+│   └── inspect-layout/           (v1.2.0) `--inspect-layout` report + `--debug-layout` guides
+├── merge/                        (v1.2.0) Concatenate PDFs (pdfnative page-tree)
+├── split/                        (v1.2.0) Split one PDF into many (per-page or per-range)
+├── extract/                      (v1.2.0) Pull selected pages into a new PDF
+├── annotate/                     (v1.2.0) Attach markup annotations (incremental save)
+├── govern/                       (v1.2.0) AI-governance / HITL: rules, policy, verify-issue
 ├── batch/                        (v1.0.0) Parallel directory render (pdfnative batch)
 ├── agent/                        (v1.1.0) Agent-native contract: --json envelope, --dry-run, schema
 │   ├── 01-json-and-dry-run.*     --json status envelope + --dry-run validation
@@ -94,14 +102,16 @@ samples/
 │   ├── 03-ecdsa.*                (v0.3.0) P-256 ECDSA-SHA256 sign
 │   ├── 04-roundtrip.*            (v0.3.0) render → sign → verify pipeline
 │   ├── 05-cert-chain.*           (v1.1.0) Root-CA → signer chain via --cert-chain + verify --trust
-│   └── 06-timestamp-reserved.*   (v1.1.0) --timestamp is reserved → exit 2 (E_UNSUPPORTED)
+│   ├── 06-timestamp-reserved.*   (v1.1.0) --timestamp is reserved → exit 2 (E_UNSUPPORTED)
+│   └── 07-native-crypto.*        (v1.2.0) Native node:crypto (default) vs pure-JS (--pure-crypto)
 ├── inspect/                      PDF inspection shell / PowerShell scripts
 │   ├── 01-json.*                 JSON metadata report
 │   ├── 02-text.*                 Human-readable text report
 │   ├── 03-verbose-pages.*        Per-page detail + verbose trailer/catalog keys
 │   ├── 04-check-pdfa.*           CI gate: assert PDF/A conformance
 │   ├── 05-pdfua.*                (v1.1.0) PDF/UA (ISO 14289-1) structural validation gate
-│   └── 06-check-signed-encrypted.* (v1.1.0) CI gates for --check signed / --check encrypted
+│   ├── 06-check-signed-encrypted.* (v1.1.0) CI gates for --check signed / --check encrypted
+│   └── 07-annotations.*          (v1.2.0) List markup + link annotations (inspect --annotations)
 ├── verify/                       Signature verification shell / PowerShell scripts
 │   ├── 01-self-signed.*          (v0.2.0) Verify a self-signed PDF
 │   ├── 02-strict-mode.*          (v0.2.0) `--strict` exits non-zero on failure
@@ -388,6 +398,95 @@ The CLI deep-merges `--template` into `--input` before rendering. Use this to sh
 
 Smart-table fields live on the `table` block in the JSON payload (no extra CLI flags required), so `run-all.js` renders this category automatically. Document-wide defaults can also be supplied via the `--table-wrap` and `--zebra` render flags.
 
+### `render/outline/` — PDF Bookmarks (v1.2.0)
+
+| File | Description |
+|------|-------------|
+| [01-headings.json](render/outline/01-headings.json) | Multi-section document used for both bookmark demos |
+| [02-outline-tree.json](render/outline/02-outline-tree.json) | Explicit `OutlineItem[]` tree (nested, bold, coloured, collapsed) |
+| [01-outline.sh](render/outline/01-outline.sh) | Renders bookmarks two ways: `--outline auto` (from headings) and `--outline <tree.json>` |
+| [01-outline.ps1](render/outline/01-outline.ps1) | PowerShell equivalent |
+
+`--outline auto` derives the bookmark tree from the document's headings; `--outline <file.json>` supplies an explicit tree. `run-all.js` renders `01-headings.json` with `--outline auto` and skips the non-document `02-outline-tree.json`.
+
+### `render/math/` — Mathematical Symbols (v1.2.0)
+
+| File | Description |
+|------|-------------|
+| [01-math.json](render/math/01-math.json) | Identities using operators, Greek letters, set relations, blackboard-bold |
+| [01-math.sh](render/math/01-math.sh) | Renders with the bundled math font (`--font math`) registered alongside Latin |
+| [01-math.ps1](render/math/01-math.ps1) | PowerShell equivalent |
+
+Registering `--font math` lets pdfnative auto-route math/technical code points to the Noto Sans Math font instead of rendering `.notdef` tofu.
+
+### `render/inspect-layout/` — Layout Introspection (v1.2.0)
+
+| File | Description |
+|------|-------------|
+| [01-inspect-layout.sh](render/inspect-layout/01-inspect-layout.sh) | `--inspect-layout` emits a `LayoutInspection` JSON report; `--debug-layout` overlays margin/content/cell guides on a PDF |
+| [01-inspect-layout.ps1](render/inspect-layout/01-inspect-layout.ps1) | PowerShell equivalent |
+
+`--inspect-layout` replaces the PDF output with a JSON report describing every page's blocks, positions and sizes — ideal for regression-testing layout. `--debug-layout [margins,content,cells]` instead renders a normal PDF with visual guides overlaid.
+
+---
+
+## Page-Tree Samples (v1.2.0)
+
+pdfnative 1.5.0's page-tree API powers three composable document operations. Each ships Bash + PowerShell drivers that render their inputs first, then transform them.
+
+### `merge/` — Concatenate PDFs
+
+| File | Description |
+|------|-------------|
+| [01-merge.sh](merge/01-merge.sh) | Renders three documents, then merges them into one PDF (sources as positional args) |
+| [01-merge.ps1](merge/01-merge.ps1) | PowerShell equivalent |
+
+### `split/` — Split One PDF Into Many
+
+| File | Description |
+|------|-------------|
+| [multipage.json](split/multipage.json) | Four-page source document |
+| [01-split.sh](split/01-split.sh) | Splits per-page (default) and per-range (`--pages 1-2,3-4`) |
+| [01-split.ps1](split/01-split.ps1) | PowerShell equivalent |
+
+### `extract/` — Pull Selected Pages
+
+| File | Description |
+|------|-------------|
+| [01-extract.sh](extract/01-extract.sh) | Extracts pages in arbitrary order (`--pages 4,1-2`; order preserved, repeats allowed) |
+| [01-extract.ps1](extract/01-extract.ps1) | PowerShell equivalent |
+
+---
+
+## Annotate Samples (v1.2.0)
+
+### `annotate/` — Markup Annotations
+
+| File | Description |
+|------|-------------|
+| [01-annotations.json](annotate/01-annotations.json) | Three markup annotations (highlight, sticky text note, review square) on page 1 |
+| [01-annotate.sh](annotate/01-annotate.sh) | Attaches the annotations with an incremental save (original bytes preserved) |
+| [01-annotate.ps1](annotate/01-annotate.ps1) | PowerShell equivalent |
+
+Annotations are attached with an incremental save, so any existing signature stays intact. Read them back with `inspect --annotations`.
+
+---
+
+## Govern Samples — AI Governance / HITL (v1.2.0)
+
+### `govern/` — Human-in-the-Loop Contract
+
+| File | Description |
+|------|-------------|
+| [draft-good.md](govern/draft-good.md) | A compliant issue draft (repro block + environment; no runtime dependency) |
+| [draft-bad.md](govern/draft-bad.md) | A non-compliant draft (proposes `npm install …`, no repro) |
+| [01-rules.sh](govern/01-rules.sh) | Prints the human/agent protocol (`govern rules`) and machine policy (`govern policy`) |
+| [01-rules.ps1](govern/01-rules.ps1) | PowerShell equivalent |
+| [02-verify-issue.sh](govern/02-verify-issue.sh) | Gates a draft: PASS (exit 0) for the compliant one, BLOCK (exit 1, `E_POLICY`) for the bad one |
+| [02-verify-issue.ps1](govern/02-verify-issue.ps1) | PowerShell equivalent |
+
+Agents act as **draftsmen**: `govern verify-issue` is a local pre-flight, but a **human** must always review and submit under their own GitHub identity. Nothing here touches the network.
+
 ---
 
 ## Sign Samples
@@ -408,6 +507,8 @@ Demonstrate the `pdfnative sign` command. Both Unix shell and PowerShell scripts
 | [sign/05-cert-chain.ps1](sign/05-cert-chain.ps1) | (v1.1.0) PowerShell equivalent |
 | [sign/06-timestamp-reserved.sh](sign/06-timestamp-reserved.sh) | (v1.1.0) Shows `--timestamp` is reserved and exits 2 (`E_UNSUPPORTED`) — sign-side LTV is upstream-blocked |
 | [sign/06-timestamp-reserved.ps1](sign/06-timestamp-reserved.ps1) | (v1.1.0) PowerShell equivalent |
+| [sign/07-native-crypto.sh](sign/07-native-crypto.sh) | (v1.2.0) Signs the same PDF with native `node:crypto` (default) and pure-JS (`--pure-crypto`), verifying both |
+| [sign/07-native-crypto.ps1](sign/07-native-crypto.ps1) | (v1.2.0) PowerShell equivalent |
 
 **Prerequisites:** `openssl` on your PATH (ships with Git for Windows).
 
@@ -441,6 +542,8 @@ Demonstrate the `pdfnative inspect` command.
 | [inspect/05-pdfua.ps1](inspect/05-pdfua.ps1) | (v1.1.0) PowerShell equivalent |
 | [inspect/06-check-signed-encrypted.sh](inspect/06-check-signed-encrypted.sh) | (v1.1.0) CI gates for `--check encrypted` (PASS) and `--check signed` (FAIL on unsigned) |
 | [inspect/06-check-signed-encrypted.ps1](inspect/06-check-signed-encrypted.ps1) | (v1.1.0) PowerShell equivalent |
+| [inspect/07-annotations.sh](inspect/07-annotations.sh) | (v1.2.0) Render → annotate → `inspect --annotations` to list markup + link annotations |
+| [inspect/07-annotations.ps1](inspect/07-annotations.ps1) | (v1.2.0) PowerShell equivalent |
 
 ---
 

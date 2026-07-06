@@ -88,6 +88,30 @@ This document outlines the planned development direction for pdfnative-cli. Prio
 - [x] **Supply-chain transparency** — CycloneDX SBOM attached to each release; OpenSSF
   Scorecard badge published.
 
+### v1.2.0 — pdfnative 1.5.0: page-tree, annotations & governance _(released 2026-07-06)_
+
+- [x] **`pdfnative` bumped** to `^1.5.0` (was `^1.3.0`).
+- [x] **`merge` command** — concatenate PDFs via pdfnative 1.5.0 `mergePdfs`
+  (`--drop-annotations`, `--max-output-size`).
+- [x] **`split` command** — split one PDF into many via `splitPdf` (per-page default or
+  per-range `--pages`; `--output-dir`, `--prefix`).
+- [x] **`extract` command** — pull selected pages via `extractPages` (1-based `--pages`,
+  order preserved, repeats allowed).
+- [x] **`annotate` command** — attach markup annotations (`createModifier` +
+  `buildAnnotationBody`) with an incremental save so existing signatures stay valid.
+- [x] **`govern` command** — surface pdfnative's AI-governance / HITL contract
+  (`rules` / `policy` / `verify-issue`); gates drafts with the new `E_POLICY` code.
+- [x] **`render --outline`** — PDF bookmarks (`auto` from headings or an explicit
+  `OutlineItem[]` tree).
+- [x] **`render --font math`** — bundled Noto Sans Math for math/technical symbols.
+- [x] **`render --inspect-layout` / `--debug-layout`** — layout introspection report and
+  debug-guide overlay.
+- [x] **Native constant-time signing** — `sign` uses `node:crypto` by default;
+  `--pure-crypto` opts out.
+- [x] **`inspect --annotations` + page labels** — list markup/link annotations and report
+  `/PageLabels`.
+- [x] **`schema annotate` / `schema govern-verify`** — new agent-validation subjects.
+
 ### Next — Sign-side LTV (PAdES-T / LT / LTA), upstream-coordinated
 
 Sign-side LTV is **PDF-writing logic that belongs in pdfnative**; the CLI exposes the
@@ -104,6 +128,6 @@ surface and will light it up once the upstream primitives ship.
 
 ## Future Considerations
 
-- **`merge` / `encrypt` / `modify` standalone commands** — once pdfnative exposes the
-  matching primitives.
+- **`merge`** — ✅ shipped in v1.2.0 (page-tree). **`encrypt` / `modify` standalone
+  commands** — once pdfnative exposes the matching primitives.
 - **Additional shell integrations** — PowerShell completion, man pages.

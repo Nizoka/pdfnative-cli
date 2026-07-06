@@ -19,6 +19,8 @@ export const ErrorCode = {
     VERIFY_FAILED: 'E_VERIFY_FAILED',
     /** `inspect --check` assertion failed. */
     CHECK_FAILED: 'E_CHECK_FAILED',
+    /** `govern verify-issue` found an AI-governance policy violation. */
+    POLICY: 'E_POLICY',
     /** Requested capability is reserved / not yet available. */
     UNSUPPORTED: 'E_UNSUPPORTED',
     /** Catch-all runtime error (exit 1). */

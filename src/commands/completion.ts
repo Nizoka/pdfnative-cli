@@ -27,7 +27,7 @@ const COMMANDS: readonly CommandSpec[] = [
             '--max-blocks', '--watch', '--template',
             '--variant', '--table-wrap', '--repeat-header', '--zebra', '--min-row-height',
             '--cell-padding', '--layout', '--page-size', '--margin', '--tagged', '--compress',
-            '--lang', '--font',
+            '--lang', '--font', '--outline', '--debug-layout', '--inspect-layout',
             '--header-left', '--header-center', '--header-right',
             '--footer-left', '--footer-center', '--footer-right',
             '--watermark-text', '--watermark-image', '--watermark-opacity',
@@ -43,6 +43,7 @@ const COMMANDS: readonly CommandSpec[] = [
         flags: [
             '--input', '--output', '--key', '--cert', '--cert-chain', '--algorithm',
             '--reason', '--name', '--location', '--contact', '--signing-time', '--timestamp',
+            '--pure-crypto',
         ],
     },
     {
@@ -53,12 +54,37 @@ const COMMANDS: readonly CommandSpec[] = [
     {
         name: 'inspect',
         summary: 'Analyse a PDF and output metadata',
-        flags: ['--input', '--format', '--verbose', '--pages', '--pdfua', '--check', '--summary', '--fields', '--pretty'],
+        flags: ['--input', '--format', '--verbose', '--pages', '--pdfua', '--annotations', '--check', '--summary', '--fields', '--pretty'],
+    },
+    {
+        name: 'merge',
+        summary: 'Concatenate multiple PDFs into one',
+        flags: ['--input', '--output', '--drop-annotations', '--max-output-size'],
+    },
+    {
+        name: 'split',
+        summary: 'Split a PDF into multiple PDFs',
+        flags: ['--input', '--output-dir', '--pages', '--prefix', '--drop-annotations', '--max-output-size'],
+    },
+    {
+        name: 'extract',
+        summary: 'Extract selected pages into a new PDF',
+        flags: ['--input', '--output', '--pages', '--drop-annotations', '--max-output-size'],
+    },
+    {
+        name: 'annotate',
+        summary: 'Attach markup annotations to a PDF',
+        flags: ['--input', '--output', '--annotations'],
     },
     {
         name: 'batch',
         summary: 'Render many JSON inputs to PDF in parallel',
         flags: ['--input-dir', '--output-dir', '--concurrency', '--fail-fast', '--format', '--layout', '--variant', '--summary', '--fields', '--pretty'],
+    },
+    {
+        name: 'govern',
+        summary: 'AI-governance / HITL contract',
+        flags: ['--input', '--format', '--pretty'],
     },
     {
         name: 'schema',

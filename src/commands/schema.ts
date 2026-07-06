@@ -21,9 +21,11 @@ const SUBJECTS = [
     'inspect',
     'verify',
     'batch',
+    'annotate',
     'inspect-summary',
     'verify-summary',
     'batch-summary',
+    'govern-verify',
 ] as const;
 type Subject = (typeof SUBJECTS)[number];
 
@@ -119,6 +121,31 @@ function inspectSchema(): JsonSchema {
                         rotation: { type: 'number' },
                         annotations: { type: 'integer' },
                         formFields: { type: 'integer' },
+                    },
+                },
+            },
+            pageLabels: {
+                type: 'array',
+                items: {
+                    type: 'object',
+                    properties: {
+                        startPage: { type: 'integer', minimum: 0 },
+                        style: { type: ['string', 'null'] },
+                        prefix: { type: ['string', 'null'] },
+                        start: { type: ['integer', 'null'] },
+                    },
+                },
+            },
+            annotations: {
+                type: 'array',
+                items: {
+                    type: 'object',
+                    properties: {
+                        page: { type: 'integer', minimum: 1 },
+                        subtype: { type: 'string' },
+                        contents: { type: ['string', 'null'] },
+                        title: { type: ['string', 'null'] },
+                        url: { type: ['string', 'null'] },
                     },
                 },
             },
@@ -221,6 +248,71 @@ function batchSchema(): JsonSchema {
     };
 }
 
+function annotateSchema(): JsonSchema {
+    const annotation: JsonSchema = {
+        type: 'object',
+        required: ['page', 'type', 'rect'],
+        properties: {
+            page: { type: 'integer', minimum: 1, description: '1-based target page.' },
+            type: {
+                type: 'string',
+                enum: ['text', 'highlight', 'underline', 'strikeout', 'squiggly',
+                    'square', 'circle', 'line', 'freetext'],
+            },
+            rect: {
+                type: 'array', minItems: 4, maxItems: 4, items: { type: 'number' },
+                description: '[x1, y1, x2, y2] in PDF user space (points).',
+            },
+            contents: { type: 'string' },
+            color: { description: 'PdfColor: hex "#rrggbb", "r g b", or tuple.' },
+            interiorColor: { description: 'Fill colour for square/circle.' },
+            opacity: { type: 'number', minimum: 0, maximum: 1 },
+            title: { type: 'string' },
+            modified: { type: 'string' },
+            flags: { type: 'integer' },
+            quadPoints: { type: 'array', items: { type: 'number' } },
+            borderWidth: { type: 'number' },
+            open: { type: 'boolean' },
+            icon: { type: 'string' },
+            fontSize: { type: 'number' },
+            start: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } },
+            end: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } },
+        },
+    };
+    return {
+        $schema: DRAFT,
+        $id: id('annotate'),
+        title: 'pdfnative-cli annotate input',
+        description: 'JSON accepted via --annotations by `pdfnative annotate`: an array '
+            + 'of markup annotations, each with a 1-based "page".',
+        oneOf: [
+            { type: 'array', items: annotation },
+            {
+                type: 'object',
+                required: ['annotations'],
+                properties: { annotations: { type: 'array', items: annotation } },
+            },
+        ],
+    };
+}
+
+function governVerifySchema(): JsonSchema {
+    return {
+        $schema: DRAFT,
+        $id: id('govern-verify'),
+        title: 'pdfnative-cli govern verify-issue output',
+        description: 'JSON emitted by `pdfnative govern verify-issue --format json`.',
+        type: 'object',
+        required: ['ok', 'errors', 'warnings'],
+        additionalProperties: false,
+        properties: {
+            ok: { type: 'boolean' },
+            errors: { type: 'array', items: { type: 'string' } },
+            warnings: { type: 'array', items: { type: 'string' } },
+        },
+    };
+}
+
 // --- Agent summary shapes (`--summary`) -----------------------------------
 // Compact, canonical verdicts emitted when a command is run with `--summary`.
 // Pinned here so agents can validate the minimal output independently.
@@ -282,9 +374,11 @@ const BUILDERS: Readonly<Record<Subject, () => JsonSchema>> = {
     inspect: inspectSchema,
     verify: verifySchema,
     batch: batchSchema,
+    annotate: annotateSchema,
     'inspect-summary': inspectSummarySchema,
     'verify-summary': verifySummarySchema,
     'batch-summary': batchSummarySchema,
+    'govern-verify': governVerifySchema,
 };
 
 function isSubject(value: string): value is Subject {

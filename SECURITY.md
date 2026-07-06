@@ -14,6 +14,7 @@ We will acknowledge receipt within 48 hours and aim to provide a fix within 7 da
 
 | Version | Supported |
 |---------|-----------|
+| 1.2.x   | ✅        |
 | 1.1.x   | ✅        |
 | 1.0.x   | ✅        |
 | < 1.0   | ❌        |
@@ -36,21 +37,26 @@ The agent-native contract is a **pure local presentation/validation layer** and 
 ### Signing Key Handling
 
 - Private keys are loaded from the `PDFNATIVE_SIGN_KEY` environment variable (PEM string) or from a file via `--key`. **Environment variable takes precedence** over file paths.
-- Keys are never written to disk, logged, or included in error messages.
+- Keys are never written to disk, logged, or included in error messages. All `signPdfBytes` failures are replaced with the fixed string `Failed to sign PDF.` (error code `E_SIGN`).
 - PEM strings are consumed directly from memory and not persisted beyond the signing call.
+- **Native constant-time crypto by default.** CMS signing routes through Node's `node:crypto` (`createNativeCryptoProvider`) for side-channel-resistant RSA/ECDSA. `--pure-crypto` selects pdfnative's portable pure-JS bignum path; both keep key material in memory only.
 - **Recommendation for high-frequency pipelines:** use `PDFNATIVE_SIGN_KEY` with a secrets manager (AWS Secrets Manager, Vault, GitHub Actions secrets) rather than a file on disk.
 
 ### Input Validation
 
-- All file path arguments (`--input`, `--output`, `--key`, `--cert`, `--cert-chain`, `--layout`, `--attachment`, `--watermark-image`, `--trust`) are validated against path traversal (`../`) sequences before any filesystem access.
-- JSON input size is capped at **50 MB** before `JSON.parse` to prevent memory exhaustion.
+- All file path arguments (`--input`, `--output`, `--output-dir`, `--key`, `--cert`, `--cert-chain`, `--layout`, `--attachment`, `--watermark-image`, `--outline`, `--annotations`, `--trust`, and the positional source paths of `merge`) are validated against path traversal (`../`) sequences before any filesystem access.
+- JSON input size is capped at **50 MB** before `JSON.parse` to prevent memory exhaustion (this also covers the `annotate --annotations` spec and `govern verify-issue` drafts).
+- `merge` / `split` / `extract` enforce an optional `--max-output-size` cap and bound the number of source PDFs; `extract` / `annotate` bounds-check every page reference against the document before writing.
+- `annotate` re-keys only the annotation fields pdfnative's builders understand — the raw JSON is never spread into the emitted dictionary, so unknown keys cannot be injected.
 - `inspect` JSON output sanitizes all values — no raw binary blobs are emitted in default mode.
 
 ### Code Safety
 
 - No `eval()`, `Function()`, or dynamic code execution.
 - **Offline by default** — no command opens a socket unless you explicitly pass
-  `verify --revocation online`. See *Network Access* below.
+  `verify --revocation online`. The `govern` command (AI-governance / HITL) is fully
+  offline: it never contacts GitHub or the network, and `govern verify-issue` is a pure
+  local validator. See *Network Access* below.
 - NPM provenance — signed builds via GitHub Actions OIDC.
 
 ### Network Access & Revocation Checking

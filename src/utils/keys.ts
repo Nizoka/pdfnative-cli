@@ -6,6 +6,7 @@
 //   - Env-var precedence over file paths (avoids accidental disk persistence).
 
 import { readFile } from 'node:fs/promises';
+import { createPrivateKey, createSign } from 'node:crypto';
 import {
     parseRsaPrivateKey,
     parseCertificate,
@@ -16,9 +17,10 @@ import type {
     EcPrivateKey,
     X509Certificate,
     Asn1Node,
+    CryptoProvider,
 } from '../core-bridge/index.js';
 import { validatePath } from './io.js';
-import { CliError } from './error.js';
+import { CliError, ErrorCode } from './error.js';
 
 
 /**
@@ -98,6 +100,42 @@ export async function loadPemChain(
         }
     }
     return blocks;
+}
+
+/**
+ * Build a native, constant-time CMS crypto provider from a PEM private key,
+ * backed by Node's OpenSSL bindings (`node:crypto`). Passed to pdfnative as
+ * `PdfSignOptions.provider` so signing uses side-channel-resistant OpenSSL
+ * math instead of the pure-JS bignum path.
+ *
+ * The provider signs the DER-encoded CMS `SignedAttributes`: `createSign`
+ * hashes them with SHA-256 internally and returns the correct encoding for the
+ * key type (RSASSA-PKCS1-v1_5 for RSA, DER-encoded ECDSA for EC keys).
+ *
+ * Security: the `KeyObject` is created once and captured in the closure; the
+ * PEM string is never referenced again and never appears in error messages.
+ */
+export function createNativeCryptoProvider(pem: string): CryptoProvider {
+    let keyObject: ReturnType<typeof createPrivateKey>;
+    try {
+        keyObject = createPrivateKey(pem);
+    } catch {
+        throw new CliError(
+            'Failed to load private key for native signing. Verify it is a valid PEM key, '
+            + 'or pass --pure-crypto to use the pure-JS signer.',
+            1,
+        );
+    }
+    return {
+        sign(tbs: Uint8Array): Uint8Array {
+            try {
+                return new Uint8Array(createSign('sha256').update(tbs).sign(keyObject));
+            } catch {
+                // Never surface the underlying message — it may reference key bytes.
+                throw new CliError('Failed to sign PDF.', 1, ErrorCode.SIGN);
+            }
+        },
+    };
 }
 
 /**

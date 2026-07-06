@@ -51,6 +51,10 @@ const CATEGORY_FLAGS = {
 // they require multi-file orchestration or interactive input (e.g. --watch).
 const SKIP_CATEGORIES = new Set(['watch', 'template']);
 
+// Individual JSON files that are *not* renderable documents (e.g. an
+// OutlineItem[] tree consumed by --outline) and must be skipped by discovery.
+const SKIP_FILES = new Set(['02-outline-tree.json']);
+
 /** Per-file overrides (within a category). */
 // Note: --lang <code> for non-Latin scripts requires the matching bundled font
 // to be registered first via --font (see samples/render/font/ and
@@ -67,6 +71,10 @@ const FILE_FLAGS = {
     '--lang', 'te,si,km,my,bo,am,color-emoji',
   ],
   '03-emoji.json': ['--font', 'emoji', '--lang', 'emoji'],
+  // outline/ — 01 derives bookmarks from headings via --outline auto.
+  '01-headings.json': ['--outline', 'auto'],
+  // math/ — register the bundled math font so symbols render as real glyphs.
+  '01-math.json': ['--font', 'latin', '--font', 'math'],
   // encryption/ — algorithm differs per file (passwords come from CATEGORY_ENV).
   '01-aes128-protected.json': ['--encrypt-algorithm', 'aes128', '--encrypt-permissions', 'print'],
   '02-aes256-protected.json': ['--encrypt-algorithm', 'aes256', '--encrypt-permissions', 'print'],
@@ -122,6 +130,7 @@ for (const category of readdirSync(RENDER_DIR, { withFileTypes: true })
 
   for (const entry of readdirSync(categoryDir, { withFileTypes: true })) {
     if (!entry.isFile() || extname(entry.name) !== '.json') continue;
+    if (SKIP_FILES.has(entry.name)) continue;
     const stem = basename(entry.name, '.json');
     jobs.push({
       category,
