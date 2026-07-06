@@ -1,0 +1,19 @@
+{
+    "title": "Outline Demo — Quarterly Review",
+    "blocks": [
+        { "type": "heading", "level": 1, "text": "1. Executive Summary" },
+        { "type": "paragraph", "text": "A concise overview of the quarter." },
+        { "type": "heading", "level": 2, "text": "1.1 Highlights" },
+        { "type": "paragraph", "text": "Revenue up, churn down." },
+        { "type": "pageBreak" },
+        { "type": "heading", "level": 1, "text": "2. Financials" },
+        { "type": "paragraph", "text": "Detailed numbers follow." },
+        { "type": "heading", "level": 2, "text": "2.1 Revenue" },
+        { "type": "paragraph", "text": "Revenue by region." },
+        { "type": "heading", "level": 2, "text": "2.2 Costs" },
+        { "type": "paragraph", "text": "Cost breakdown." },
+        { "type": "pageBreak" },
+        { "type": "heading", "level": 1, "text": "3. Outlook" },
+        { "type": "paragraph", "text": "What comes next." }
+    ]
+}

@@ -1,0 +1,30 @@
+{
+    "annotations": [
+        {
+            "page": 1,
+            "type": "highlight",
+            "rect": [72, 700, 320, 715],
+            "color": "#FFD400",
+            "contents": "Key figure — double-check before publishing.",
+            "title": "Reviewer"
+        },
+        {
+            "page": 1,
+            "type": "text",
+            "rect": [330, 700, 350, 720],
+            "icon": "Comment",
+            "color": "#FF3B30",
+            "open": false,
+            "contents": "Sticky note: needs a citation.",
+            "title": "Reviewer"
+        },
+        {
+            "page": 1,
+            "type": "square",
+            "rect": [60, 660, 400, 690],
+            "color": "#007AFF",
+            "borderWidth": 1.5,
+            "contents": "Section flagged for legal review."
+        }
+    ]
+}

@@ -18,7 +18,12 @@ Commands:
   sign      Apply a digital signature to a PDF
   verify    Verify embedded PDF signatures
   inspect   Analyse a PDF and output metadata / conformance info
+  merge     Concatenate multiple PDFs into one
+  split     Split a PDF into multiple PDFs (per page or range)
+  extract   Extract selected pages into a new PDF
+  annotate  Attach markup annotations to a PDF
   batch     Render every JSON file in a directory to PDF (parallel)
+  govern    AI-governance / HITL contract (rules, policy, verify-issue)
   schema    Print a JSON Schema for a CLI input/output shape
   completion  Emit a shell completion script (bash|zsh|fish)
 
@@ -34,7 +39,7 @@ Global options (any command):
   --json            Agent mode: emit a JSON status/error envelope on stderr
                     (data stays on stdout). Errors carry a stable code.
   --dry-run         Validate inputs and exit without writing output
-                    (render, sign, batch).
+                    (render, sign, batch, merge, split, extract, annotate).
 
 For autonomous/agent usage see AGENTS.md.
 Run \`pdfnative <command> --help\` for per-command options.
@@ -136,6 +141,11 @@ Credentials (env wins over file flags):
 Algorithm:
   --algorithm     rsa-sha256 (default) or ecdsa-sha256 (P-256 SEC1 keys).
 
+Signing engine:
+  --pure-crypto   Force pdfnative's pure-JS RSA/ECDSA signer. By default the CLI
+                  signs via a native, constant-time (side-channel-resistant)
+                  node:crypto/OpenSSL provider.
+
 Signature metadata (optional):
   --reason        Reason text shown in signature panel
   --name          Signer name override
@@ -208,6 +218,7 @@ Options:
   --verbose,  -v  Include trailerKeys, catalogKeys, objectCount,
                   XMP metadata length
   --pages         Per-page width/height/rotation/annotation/formField counts
+  --annotations   List markup / link annotations (page, subtype, contents/url)
   --pdfua         Include a PDF/UA (ISO 14289-1) structural validation report
                   (valid + errors + warnings)
   --check         Assert a property; repeatable; AND semantics; exits 1 on
@@ -240,6 +251,126 @@ smart-table flags, …) are forwarded to each render. Per-file --input/--output
 are managed automatically. Exit code 1 if any file fails.
 `;
 
+const MERGE_USAGE = `\
+pdfnative merge — Concatenate multiple PDFs into one
+
+Usage:
+  pdfnative merge <in1.pdf> <in2.pdf> [...] [--output <out.pdf>] [options]
+  pdfnative merge --input a.pdf --input b.pdf --output out.pdf
+
+Inputs are given as positional paths and/or repeated --input flags (2–50
+sources, applied in order). Output defaults to stdout.
+
+Options:
+  --output,  -o         Output PDF path (default: stdout)
+  --drop-annotations    Drop ALL annotations (default keeps self-contained URI
+                        links; cross-page GoTo links and widgets are always
+                        dropped)
+  --max-output-size     Max assembled size in bytes (default 256 MiB; 0/none to
+                        disable the OOM guard — not recommended for untrusted
+                        input)
+  --dry-run             Validate + read all sources without writing output
+  --help,    -h         Show this help message
+
+Note: the page-tree rebuild drops signatures and form fields (any page-tree
+edit invalidates a signature's /ByteRange). Encrypted sources are rejected.
+`;
+
+const SPLIT_USAGE = `\
+pdfnative split — Split one PDF into multiple PDFs
+
+Usage:
+  pdfnative split --input in.pdf --output-dir out/ [--pages "1-3,4-6,7"]
+
+With --pages, each comma-separated segment becomes one output document; without
+it, every page becomes its own single-page PDF.
+
+Options:
+  --input,   -i         Input PDF path (default: stdin)
+  --output-dir          Directory for the output PDFs (created if absent, required)
+  --pages               1-based selector, one output per segment (e.g. "1-3,4-6,7")
+  --prefix              Output filename prefix (default: input basename or "part")
+  --drop-annotations    Drop ALL annotations (see merge)
+  --max-output-size     Max size per emitted PDF in bytes (default 256 MiB)
+  --dry-run             Validate without writing output
+  --help,    -h         Show this help message
+
+Output files are named <prefix>-<n>.pdf (zero-padded). Signatures/forms are
+dropped; encrypted sources are rejected.
+`;
+
+const EXTRACT_USAGE = `\
+pdfnative extract — Extract selected pages into a new PDF
+
+Usage:
+  pdfnative extract --input in.pdf --pages "1,3,5-7" [--output out.pdf]
+
+Options:
+  --input,   -i         Input PDF path (default: stdin)
+  --output,  -o         Output PDF path (default: stdout)
+  --pages               1-based selector (required). Order is preserved and
+                        pages may repeat, e.g. "3,1,1,5-7"
+  --drop-annotations    Drop ALL annotations (see merge)
+  --max-output-size     Max assembled size in bytes (default 256 MiB)
+  --dry-run             Validate without writing output
+  --help,    -h         Show this help message
+
+Signatures/forms are dropped; encrypted sources are rejected.
+`;
+
+const ANNOTATE_USAGE = `\
+pdfnative annotate — Attach markup annotations to a PDF
+
+Usage:
+  pdfnative annotate --input in.pdf --annotations notes.json [--output out.pdf]
+
+The annotations file is a JSON array (or { "annotations": [...] }). Each entry
+is a markup annotation plus a 1-based "page":
+
+  [
+    { "page": 1, "type": "highlight", "rect": [72,700,520,716],
+      "color": "#ffd400", "contents": "Review this" },
+    { "page": 1, "type": "text", "rect": [540,700,560,720],
+      "icon": "Comment", "contents": "A sticky note" }
+  ]
+
+Types: text, highlight, underline, strikeout, squiggly, square, circle, line,
+freetext. All need "rect": [x1,y1,x2,y2]; "line" also needs "start"/"end".
+
+Options:
+  --input,   -i         Input PDF path (default: stdin)
+  --output,  -o         Output PDF path (default: stdout)
+  --annotations         Path to the annotations JSON (required)
+  --dry-run             Validate inputs without writing output
+  --help,    -h         Show this help message
+
+The document is updated with an incremental save, so the original bytes — and
+any existing signature — are preserved.
+`;
+
+const GOVERN_USAGE = `\
+pdfnative govern — AI-governance / Human-in-the-Loop (HITL) contract
+
+Usage:
+  pdfnative govern rules                 Print the human/agent protocol
+  pdfnative govern policy                Print the machine-readable policy (JSON)
+  pdfnative govern verify-issue <draft>  Validate an issue/PR draft
+
+pdfnative's governance model makes AI agents DRAFTSMEN, never autonomous
+submitters: no runtime dependencies, a local reproduction for every bug, and a
+mandatory human review before anything is submitted under a human identity.
+
+verify-issue exits 1 when the draft proposes an external dependency or omits a
+reproduction code block. A passing check is necessary but NOT sufficient — the
+human review gate always applies.
+
+Options (verify-issue):
+  --input,   -i   Draft path (alternative to the positional argument; stdin if -)
+  --format,  -f   json (report on stdout) or text (default)
+  --pretty        Force indented JSON even under --json
+  --help,    -h   Show this help message
+`;
+
 const SCHEMA_USAGE = `\
 pdfnative schema — Print a JSON Schema for a CLI input/output shape
 
@@ -251,9 +382,11 @@ Subjects:
   inspect         Output of \`inspect --format json\`
   verify          Output of \`verify --format json\`
   batch           Output of \`batch --format json\`
+  annotate        Input for \`annotate\` (--annotations JSON)
   inspect-summary Output of \`inspect --summary\`
   verify-summary  Output of \`verify --summary\`
   batch-summary   Output of \`batch --summary\`
+  govern-verify   Output of \`govern verify-issue --format json\`
   list            Print the available subjects as JSON
 
 With no subject, the \`render\` input schema is printed. Schemas are JSON Schema
@@ -296,6 +429,26 @@ async function loadCommand(name: string): Promise<CommandFn> {
         case 'inspect': {
             const m = await import('./commands/inspect.js');
             return m.inspect;
+        }
+        case 'merge': {
+            const m = await import('./commands/merge.js');
+            return m.merge;
+        }
+        case 'split': {
+            const m = await import('./commands/split.js');
+            return m.split;
+        }
+        case 'extract': {
+            const m = await import('./commands/extract.js');
+            return m.extract;
+        }
+        case 'annotate': {
+            const m = await import('./commands/annotate.js');
+            return m.annotate;
+        }
+        case 'govern': {
+            const m = await import('./commands/govern.js');
+            return m.govern;
         }
         case 'batch': {
             const m = await import('./commands/batch.js');
@@ -367,6 +520,11 @@ async function main(): Promise<void> {
             case 'sign':   process.stdout.write(SIGN_USAGE);   break;
             case 'verify': process.stdout.write(VERIFY_USAGE); break;
             case 'inspect': process.stdout.write(INSPECT_USAGE); break;
+            case 'merge': process.stdout.write(MERGE_USAGE); break;
+            case 'split': process.stdout.write(SPLIT_USAGE); break;
+            case 'extract': process.stdout.write(EXTRACT_USAGE); break;
+            case 'annotate': process.stdout.write(ANNOTATE_USAGE); break;
+            case 'govern': process.stdout.write(GOVERN_USAGE); break;
             case 'batch': process.stdout.write(BATCH_USAGE); break;
             case 'schema': process.stdout.write(SCHEMA_USAGE); break;
             case 'completion': process.stdout.write(COMPLETION_USAGE); break;

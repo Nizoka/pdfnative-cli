@@ -15,6 +15,7 @@ import type {
     EncryptionOptions,
     PdfAttachment,
     PdfAttachmentRelationship,
+    LayoutDebugOptions,
 } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from './args.js';
 import { validatePath, readBinaryFile } from './io.js';
@@ -84,6 +85,31 @@ export async function loadLayoutFile(
         });
     }
     return obj as Partial<PdfLayoutOptions>;
+}
+
+/** Parse the `--debug-layout` flag into `PdfLayoutOptions.debug`, or undefined.
+ *  Bare `--debug-layout` → `true` (full overlay). A value is a comma list of
+ *  `margins` / `content` / `cells` mapping to the LayoutDebugOptions boxes. */
+function parseDebugLayout(args: ParsedArgs): boolean | LayoutDebugOptions | undefined {
+    const raw = args.flags['debug-layout'];
+    if (raw === undefined) return undefined;
+    if (typeof raw === 'boolean') return raw ? true : undefined;
+    const value = (typeof raw === 'string' ? raw : (raw[0] ?? '')).trim();
+    if (value === '' || value.toLowerCase() === 'true') return true;
+    if (value.toLowerCase() === 'false') return undefined;
+    const opts: { -readonly [K in keyof LayoutDebugOptions]: LayoutDebugOptions[K] } = {};
+    for (const token of value.split(',').map((s) => s.trim().toLowerCase()).filter((s) => s.length > 0)) {
+        if (token === 'margins') opts.showMargins = true;
+        else if (token === 'content' || token === 'bounds') opts.showContentBounds = true;
+        else if (token === 'cells') opts.showCells = true;
+        else {
+            throw new CliError(
+                `Invalid --debug-layout token "${token}". Valid: margins, content, cells.`,
+                2,
+            );
+        }
+    }
+    return opts;
 }
 
 /** Parse `WxH` (e.g. `595.28x841.89`) into `[w, h]` or return null. */
@@ -388,6 +414,13 @@ export async function buildLayoutOptions(
     // --compress
     if (hasFlag(args.flags, 'compress')) {
         out.compress = true;
+    }
+
+    // --debug-layout (pdfnative 1.5.0 layout.debug overlay). A bare flag turns
+    // on the full overlay; a comma list selects boxes: margins, content, cells.
+    const debug = parseDebugLayout(args);
+    if (debug !== undefined) {
+        out.debug = debug;
     }
 
     // --max-blocks (pdfnative 1.3.0 layout.maxBlocks; default DEFAULT_MAX_BLOCKS = 100000)

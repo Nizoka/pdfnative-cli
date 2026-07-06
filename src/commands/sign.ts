@@ -8,8 +8,10 @@ import {
     loadRsaPrivateKey,
     loadEcPrivateKey,
     loadCertificate,
+    loadPem,
     loadPemChain,
     parseCertificateChain,
+    createNativeCryptoProvider,
 } from '../utils/keys.js';
 
 const VALID_ALGORITHMS = new Set<SignatureAlgorithm>(['rsa-sha256', 'ecdsa-sha256']);
@@ -48,6 +50,7 @@ export async function sign(args: ParsedArgs): Promise<void> {
     const signingTimeRaw = getStringFlag(args.flags, 'signing-time');
     const chainPaths = getStringFlagAll(args.flags, 'cert-chain');
     const timestampUrl = getStringFlag(args.flags, 'timestamp');
+    const pureCrypto = hasFlag(args.flags, 'pure-crypto');
     const dryRun = hasFlag(args.flags, 'dry-run') || isDryRun();
 
     if (!VALID_ALGORITHMS.has(algorithm)) {
@@ -107,10 +110,19 @@ export async function sign(args: ParsedArgs): Promise<void> {
         signerCert,
         algorithm,
     };
-    if (algorithm === 'ecdsa-sha256') {
-        options.ecKey = await loadEcPrivateKey('PDFNATIVE_SIGN_KEY', keyPath, 'key');
+    // Signing engine. By default the CLI routes CMS signing through a native,
+    // constant-time (side-channel-resistant) OpenSSL signer via node:crypto.
+    // `--pure-crypto` forces pdfnative's pure-JS RSA/ECDSA math (useful for
+    // reproducibility or environments without node:crypto).
+    if (pureCrypto) {
+        if (algorithm === 'ecdsa-sha256') {
+            options.ecKey = await loadEcPrivateKey('PDFNATIVE_SIGN_KEY', keyPath, 'key');
+        } else {
+            options.rsaKey = await loadRsaPrivateKey('PDFNATIVE_SIGN_KEY', keyPath, 'key');
+        }
     } else {
-        options.rsaKey = await loadRsaPrivateKey('PDFNATIVE_SIGN_KEY', keyPath, 'key');
+        const keyPem = await loadPem('PDFNATIVE_SIGN_KEY', keyPath, 'private key', 'key');
+        options.provider = createNativeCryptoProvider(keyPem);
     }
     if (certChain !== undefined) options.certChain = certChain;
     if (reason !== undefined) options.reason = reason;

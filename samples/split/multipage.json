@@ -1,0 +1,16 @@
+{
+    "title": "Multi-Page Source",
+    "blocks": [
+        { "type": "heading", "level": 1, "text": "Chapter 1" },
+        { "type": "paragraph", "text": "First page content." },
+        { "type": "pageBreak" },
+        { "type": "heading", "level": 1, "text": "Chapter 2" },
+        { "type": "paragraph", "text": "Second page content." },
+        { "type": "pageBreak" },
+        { "type": "heading", "level": 1, "text": "Chapter 3" },
+        { "type": "paragraph", "text": "Third page content." },
+        { "type": "pageBreak" },
+        { "type": "heading", "level": 1, "text": "Chapter 4" },
+        { "type": "paragraph", "text": "Fourth page content." }
+    ]
+}

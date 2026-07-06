@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] – 2026-07-06
+
+Built on **pdfnative 1.5.0**. Lands the engine's page-tree and annotation APIs on the CLI
+as five new commands (`merge`, `split`, `extract`, `annotate`, `govern`), adds PDF
+bookmarks, a math font, layout introspection, native constant-time signing, and surfaces
+pdfnative's AI-governance / Human-in-the-Loop contract to agents. 100% backward-compatible.
+
+### Added
+
+#### New commands
+
+- **`merge`** — concatenate several PDFs into one via pdfnative 1.5.0 `mergePdfs`. Sources
+  as positional paths and/or repeatable `--input`; `--output`, `--drop-annotations`,
+  `--max-output-size`, `--dry-run`.
+- **`split`** — split one PDF into many via `splitPdf`. `--output-dir` (required), `--pages`
+  (per-range) or one-per-page by default, `--prefix`, `--drop-annotations`,
+  `--max-output-size`, `--dry-run`.
+- **`extract`** — pull selected pages into a new PDF via `extractPages`. `--pages` (required,
+  1-based; order preserved, repeats allowed), `--drop-annotations`, `--max-output-size`,
+  `--dry-run`.
+- **`annotate`** — attach markup annotations (highlight, text, underline, strikeout,
+  squiggly, square, circle, line, freetext) via pdfnative 1.5.0 `createModifier` +
+  `buildAnnotationBody`, using an **incremental save** so the original bytes and any
+  existing signature stay intact. `--annotations <spec.json>` (JSON array or
+  `{ annotations: [...] }`); only known fields are forwarded (no dictionary injection).
+- **`govern`** — expose pdfnative's **AI-governance / Human-in-the-Loop (HITL)** contract:
+  `govern rules` (protocol), `govern policy` (machine-readable JSON), and
+  `govern verify-issue <draft.md>` to gate a draft before a human reviews and submits it
+  (exit 1 / new `E_POLICY` code on violation). Pure, zero-dependency validator.
+
+#### `render`
+
+- **PDF bookmarks** — `--outline auto` derives a bookmark tree from the document's headings;
+  `--outline <tree.json>` loads an explicit `OutlineItem[]` tree. The flag wins over any
+  JSON-embedded outline.
+- **Math / technical symbols** — `--font math` registers the bundled Noto Sans Math font;
+  pdfnative auto-routes math-operator / geometric-shape code points to it.
+- **Layout introspection** — `--inspect-layout` emits a `LayoutInspection` JSON report
+  (per-page blocks, positions, sizes) instead of a PDF; `--debug-layout [margins,content,cells]`
+  renders a normal PDF with layout guides overlaid.
+
+#### `sign`
+
+- **Native constant-time crypto by default** — CMS signing now routes through Node's
+  `node:crypto` (`createNativeCryptoProvider`) for side-channel-resistant RSA/ECDSA. Pass
+  **`--pure-crypto`** to force pdfnative's portable pure-JS bignum path.
+
+#### `inspect`
+
+- **`--annotations`** — list markup and link annotations per page.
+- **Page labels** — the `/PageLabels` number tree is reported automatically when present.
+
+#### Agent / governance
+
+- **`E_POLICY`** stable error code for governance-gate failures.
+- **`schema`** gains `annotate` (annotation-spec input) and `govern-verify`
+  (`{ ok, errors, warnings }`) subjects.
+- **`.github/ai-governance.json`**, **`.github/AGENT_RULES.md`**, and
+  **`.github/drafts/README.md`** governance files, mirrored by the `govern` command.
+
+#### Samples & docs
+
+- New samples: `merge/`, `split/`, `extract/`, `annotate/`, `govern/`, `render/outline/`,
+  `render/math/`, `render/inspect-layout/`, `sign/07-native-crypto.*`,
+  `inspect/07-annotations.*` (Bash + PowerShell).
+- README, AGENTS.md, KNOWLEDGE_BASE.md, SECURITY.md, and ROADMAP.md updated.
+
+### Changed
+
+- **`pdfnative` dependency** bumped to `^1.5.0`.
+- **`package.json` keywords** enriched (AI governance, HITL, page-tree merge/split/extract,
+  annotations, bookmarks, page labels, layout inspection, math symbols).
+
+### Security
+
+- **npm audit clean.** Added `js-yaml ^4.3.0` and `vite ^8.0.16` `overrides` to resolve two
+  transitive dev-only advisories (0 vulnerabilities).
+- `merge` / `split` / `extract` / `annotate` validate paths against traversal and cap output
+  size; `annotate` re-keys only known annotation fields; `govern verify-issue` runs fully
+  offline.
+
 ## [1.1.0] – 2026-06-30
 
 Built on **pdfnative 1.3.0**. Surfaces the new engine capabilities through the CLI:

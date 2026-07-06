@@ -25,8 +25,8 @@ authors:
 repository-code: "https://github.com/Nizoka/pdfnative-cli"
 url: "https://pdfnative.dev"
 license: MIT
-version: 1.1.0
-date-released: "2026-06-30"
+version: 1.2.0
+date-released: "2026-07-06"
 keywords:
   - pdf
   - cli
@@ -43,6 +43,11 @@ keywords:
   - pdf-a
   - ai-agent
   - automation
+  - ai-governance
+  - human-in-the-loop
+  - pdf-merge
+  - pdf-split
+  - markup-annotations
   - shell
   - pipeline
 references:

@@ -85,19 +85,22 @@ describe('sign → verify round-trip', () => {
 
     async function signWith(
         algorithm: 'rsa-sha256' | 'ecdsa-sha256',
+        pureCrypto = false,
     ): Promise<string> {
         const src = await renderUnsigned();
         const out = path.join(os.tmpdir(), `rt-signed-${Date.now()}-${Math.random()}.pdf`);
         tmpFiles.push(out);
         const key = algorithm === 'rsa-sha256' ? RSA_KEY : EC_KEY;
         const cert = algorithm === 'rsa-sha256' ? RSA_CERT : EC_CERT;
-        await sign(parseArgs([
+        const argv = [
             '--input', src,
             '--output', out,
             '--key', key,
             '--cert', cert,
             '--algorithm', algorithm,
-        ]));
+        ];
+        if (pureCrypto) argv.push('--pure-crypto');
+        await sign(parseArgs(argv));
         return out;
     }
 
@@ -134,6 +137,22 @@ describe('sign → verify round-trip', () => {
         expect(sig.signatureValid).toBe(true);
         expect(sig.signatureAlgorithm).toBe('ecdsa-sha256');
         expect(result.allValid).toBe(true);
+    });
+
+    it('native crypto (default) and --pure-crypto both verify as valid (RSA)', async () => {
+        const native = await verifyJson(await signWith('rsa-sha256', false));
+        expect(native.allValid).toBe(true);
+        expect(native.signatures[0]!.signatureValid).toBe(true);
+
+        const pure = await verifyJson(await signWith('rsa-sha256', true));
+        expect(pure.allValid).toBe(true);
+        expect(pure.signatures[0]!.signatureValid).toBe(true);
+    });
+
+    it('--pure-crypto verifies as valid (ECDSA)', async () => {
+        const pure = await verifyJson(await signWith('ecdsa-sha256', true));
+        expect(pure.allValid).toBe(true);
+        expect(pure.signatures[0]!.signatureValid).toBe(true);
     });
 
     it('detects tampering (RSA): integrity FAIL after byte mutation', async () => {

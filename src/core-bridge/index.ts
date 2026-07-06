@@ -22,6 +22,12 @@ export { initNodeCompression } from 'pdfnative';
 export { signPdfBytes, buildSigDict, addSignaturePlaceholder } from 'pdfnative';
 export { parseRsaPrivateKey, parseCertificate } from 'pdfnative';
 
+// ── Sign — native constant-time crypto provider (v1.4.0) ─────────────
+// Lets the CLI route CMS signing through node:crypto instead of the pure-JS
+// RSA/ECDSA math, for constant-time (side-channel-resistant) signatures.
+export { setCryptoProvider, getCryptoProvider } from 'pdfnative';
+export type { CryptoProvider } from 'pdfnative';
+
 // ── One-time async crypto bootstrap (initCrypto must run before any
 // RSA / ECDSA key parsing or CMS verification). pdfnative throws
 // "ASN.1 module must be imported before RSA key parsing" otherwise.
@@ -45,6 +51,35 @@ export {
 // ── Inspect / Verify — PDF parser helpers ────────────────────────────
 export { openPdf, isRef, isName, isDict, isArray, isStream, nameValue } from 'pdfnative';
 
+// ── Page-tree manipulation — merge / split / extract (v1.4.0) ─────────
+export { mergePdfs, splitPdf, extractPages } from 'pdfnative';
+export type { PageRange, MergeOptions } from 'pdfnative';
+
+// ── Incremental modifier + markup annotations (v1.5.0) ───────────────
+export { createModifier } from 'pdfnative';
+export { buildAnnotation, buildAnnotationBody } from 'pdfnative';
+export type { PdfModifier } from 'pdfnative';
+export type {
+    AnnotationRect,
+    AnnotationBase,
+    TextAnnotation,
+    TextMarkupAnnotation,
+    ShapeAnnotation,
+    LineAnnotation,
+    FreeTextAnnotation,
+    MarkupAnnotation,
+    ParsedAnnotation,
+} from 'pdfnative';
+
+// ── Layout inspection + debug overlay (v1.5.0) ───────────────────────
+export { inspectDocumentLayout } from 'pdfnative';
+export type {
+    LayoutInspection,
+    InspectedPage,
+    InspectedBlock,
+    LayoutDebugOptions,
+} from 'pdfnative';
+
 // ── Inspect — PDF/UA structural validator (ISO 14289-1, v1.3.0) ──────
 export { validatePdfUA } from 'pdfnative';
 
@@ -65,6 +100,9 @@ export type {
     PdfAttachmentRelationship,
     StreamOptions,
     FontEntry,
+    OutlineItem,
+    PageLabelRange,
+    PageLabelStyle,
 } from 'pdfnative';
 
 export type {

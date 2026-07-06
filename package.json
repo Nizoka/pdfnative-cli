@@ -1,7 +1,7 @@
 {
   "name": "pdfnative-cli",
-  "version": "1.1.0",
-  "description": "Official CLI for pdfnative — render JSON to PDF (22 Unicode scripts, COLRv1 colour emoji, true constant-memory streaming), sign (RSA + ECDSA), inspect, validate PDF/UA, and verify CMS signatures with LTV (RFC 3161 timestamps, OCSP, CRL). Zero extra runtime dependencies.",
+  "version": "1.2.0",
+  "description": "Official CLI for pdfnative — render JSON to PDF (22 Unicode scripts, math symbols, COLRv1 colour emoji, bookmarks/outline, true constant-memory streaming), merge/split/extract pages, annotate (markup annotations), sign (RSA + ECDSA, native constant-time crypto), inspect, validate PDF/UA, verify CMS signatures with LTV (RFC 3161, OCSP, CRL), and drive it all from AI agents under a human-in-the-loop governance contract. Zero extra runtime dependencies.",
   "type": "module",
   "bin": {
     "pdfnative": "./dist/cli.cjs"
@@ -69,11 +69,27 @@
     "amharic",
     "ai-agent",
     "agentic",
+    "ai-governance",
+    "hitl",
+    "human-in-the-loop",
     "automation",
     "json-output",
     "json-schema",
     "sbom",
-    "supply-chain"
+    "supply-chain",
+    "pdf-merge",
+    "pdf-split",
+    "pdf-extract",
+    "merge",
+    "split",
+    "annotate",
+    "annotations",
+    "markup-annotations",
+    "bookmarks",
+    "outline",
+    "page-labels",
+    "layout-inspection",
+    "math-symbols"
   ],
   "author": "Nizoka <hello@pdfnative.dev> (https://pdfnative.dev)",
   "license": "MIT",
@@ -97,7 +113,7 @@
     "provenance": true
   },
   "dependencies": {
-    "pdfnative": "^1.3.0"
+    "pdfnative": "^1.5.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -109,6 +125,8 @@
     "vitest": "^4.1.7"
   },
   "overrides": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "js-yaml": "^4.3.0",
+    "vite": "^8.0.16"
   }
 }

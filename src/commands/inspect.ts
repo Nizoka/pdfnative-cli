@@ -1,5 +1,5 @@
 import { openPdf, validatePdfUA, isStream } from '../core-bridge/index.js';
-import type { PdfReader, PdfUAValidationResult } from '../core-bridge/index.js';
+import type { PdfReader, PdfUAValidationResult, PageLabelRange, ParsedAnnotation } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../utils/args.js';
 import { readFileOrStdin } from '../utils/io.js';
 import { CliError, ErrorCode } from '../utils/error.js';
@@ -17,6 +17,21 @@ interface PageInfo {
     readonly formFields: number;
 }
 
+interface AnnotationInfo {
+    readonly page: number;
+    readonly subtype: string;
+    readonly contents: string | null;
+    readonly title: string | null;
+    readonly url: string | null;
+}
+
+interface PageLabelInfo {
+    readonly startPage: number;
+    readonly style: string | null;
+    readonly prefix: string | null;
+    readonly start: number | null;
+}
+
 interface InspectResult {
     readonly version: string;
     readonly pageCount: number;
@@ -30,7 +45,9 @@ interface InspectResult {
         readonly subject: string | null;
         readonly producer: string | null;
     };
+    readonly pageLabels?: readonly PageLabelInfo[];
     readonly pages?: readonly PageInfo[];
+    readonly annotations?: readonly AnnotationInfo[];
     readonly pdfua?: {
         readonly valid: boolean;
         readonly errors: readonly string[];
@@ -166,6 +183,46 @@ function runPdfUaCheck(bytes: Uint8Array): NonNullable<InspectResult['pdfua']> {
     return { valid: res.valid, errors: res.errors, warnings: res.warnings };
 }
 
+/** Read the document's /PageLabels number tree (pdfnative 1.5.0), or undefined. */
+function inspectPageLabels(reader: PdfReader): readonly PageLabelInfo[] | undefined {
+    let ranges: PageLabelRange[] | null;
+    try {
+        ranges = reader.getPageLabels();
+    } catch {
+        return undefined;
+    }
+    if (ranges === null || ranges.length === 0) return undefined;
+    return ranges.map((r) => ({
+        startPage: r.startPage,
+        style: r.style ?? null,
+        prefix: r.prefix ?? null,
+        start: r.start ?? null,
+    }));
+}
+
+/** Read markup / link annotations across all pages (pdfnative 1.5.0). */
+function inspectAnnotations(reader: PdfReader): readonly AnnotationInfo[] {
+    const out: AnnotationInfo[] = [];
+    for (let i = 0; i < reader.pageCount; i++) {
+        let annots: ParsedAnnotation[];
+        try {
+            annots = reader.getAnnotations(i);
+        } catch {
+            continue;
+        }
+        for (const a of annots) {
+            out.push({
+                page: i + 1,
+                subtype: a.subtype,
+                contents: a.contents ?? null,
+                title: a.title ?? null,
+                url: a.url ?? null,
+            });
+        }
+    }
+    return out;
+}
+
 function buildVerbose(reader: PdfReader): InspectResult['verbose'] {
     const trailerKeys: string[] = [];
     for (const k of reader.trailer.keys()) trailerKeys.push(k);
@@ -220,6 +277,7 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     const format = getStringFlag(args.flags, 'format', 'f') ?? 'json';
     const verbose = hasFlag(args.flags, 'verbose');
     const includePages = hasFlag(args.flags, 'pages');
+    const includeAnnotations = hasFlag(args.flags, 'annotations');
     const checks = getStringFlagAll(args.flags, 'check');
     const includePdfua = hasFlag(args.flags, 'pdfua') || checks.includes('pdfua');
 
@@ -254,9 +312,12 @@ export async function inspect(args: ParsedArgs): Promise<void> {
         },
     };
 
+    const pageLabels = inspectPageLabels(reader);
     const result: InspectResult = {
         ...baseResult,
+        ...(pageLabels !== undefined ? { pageLabels } : {}),
         ...(includePages ? { pages: inspectPages(reader) } : {}),
+        ...(includeAnnotations ? { annotations: inspectAnnotations(reader) } : {}),
         ...(includePdfua ? { pdfua: runPdfUaCheck(pdfBytes) } : {}),
         ...(verbose ? { verbose: buildVerbose(reader) } : {}),
     };
@@ -290,6 +351,21 @@ export async function inspect(args: ParsedArgs): Promise<void> {
                 lines.push(
                     `  #${p.index + 1}: ${p.width ?? '?'}x${p.height ?? '?'}pt rot=${p.rotation}° annots=${p.annotations} fields=${p.formFields}`,
                 );
+            }
+        }
+        if (result.pageLabels !== undefined) {
+            lines.push('Page labels:');
+            for (const l of result.pageLabels) {
+                lines.push(
+                    `  from #${l.startPage + 1}: style=${l.style ?? 'none'}${l.prefix !== null ? ` prefix="${l.prefix}"` : ''}${l.start !== null ? ` start=${l.start}` : ''}`,
+                );
+            }
+        }
+        if (result.annotations !== undefined) {
+            lines.push(`Annotations:    ${result.annotations.length}`);
+            for (const a of result.annotations) {
+                const detail = a.url ?? a.contents ?? a.title ?? '';
+                lines.push(`  page ${a.page} ${a.subtype}${detail !== '' ? `: ${detail}` : ''}`);
             }
         }
         if (result.pdfua !== undefined) {

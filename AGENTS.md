@@ -16,7 +16,7 @@ a process, pass flags, read stdout/stderr, branch on the exit code).
 
 | Channel | Carries |
 |---------|---------|
-| **stdout** | The primary artifact: a PDF (`render`, `sign`), a JSON report (`inspect`, `verify`, `batch --format json`), a JSON Schema (`schema`), or a completion script (`completion`). |
+| **stdout** | The primary artifact: a PDF (`render`, `sign`, `merge`, `extract`, `annotate`), a JSON report (`inspect`, `verify`, `batch --format json`, `govern verify-issue --json`), a JSON Schema (`schema`), the governance protocol/policy (`govern rules`/`policy`), or a completion script (`completion`). `split` writes its parts to `--output-dir`. |
 | **stderr** | All diagnostics: progress, warnings, and the agent JSON envelopes below. |
 | **exit code** | `0` success · `1` runtime error · `2` usage error. Unchanged in every mode. |
 
@@ -37,7 +37,8 @@ default to JSON on stdout).
 { "ok": false, "command": "inspect", "error": { "code": "E_PARSE", "message": "Failed to read PDF: …" } }
 ```
 
-**On success**, `render` / `sign` / `batch` write a status line to stderr:
+**On success**, `render` / `sign` / `merge` / `split` / `extract` / `annotate` / `batch`
+write a status line to stderr:
 
 ```json
 { "ok": true, "command": "render", "variant": "document", "dryRun": false, "output": "out.pdf", "bytes": 12345 }
@@ -60,6 +61,7 @@ Branch on `error.code`, never on the human message:
 | `E_SIGN` | Signing failed (message is always generic — no key material) | 1 |
 | `E_VERIFY_FAILED` | `verify --strict` found an invalid signature | 1 |
 | `E_CHECK_FAILED` | `inspect --check` assertion failed | 1 |
+| `E_POLICY` | `govern verify-issue` found a governance violation | 1 |
 | `E_UNSUPPORTED` | Reserved / not-yet-available capability | 2 |
 | `E_RUNTIME` | Catch-all runtime error | 1 |
 
@@ -105,10 +107,11 @@ The compact shapes are schema-pinned — validate them with
 
 ## 4. Validate first — `--dry-run`
 
-`render`, `sign`, and `batch` accept `--dry-run`: inputs are fully validated
-(JSON parsed, document/table shape checked, layout assembled, signing credentials
-loaded and the PDF prepared) but **no output is produced or written**. Combine
-with `--json` for a `{ "ok": true, "dryRun": true, … }` envelope.
+`render`, `sign`, `batch`, `merge`, `split`, `extract`, and `annotate` accept `--dry-run`:
+inputs are fully validated (JSON parsed, document/table shape checked, layout assembled,
+signing credentials loaded and the PDF prepared, page ranges and annotation specs
+bounds-checked) but **no output is produced or written**. Combine with `--json` for a
+`{ "ok": true, "dryRun": true, … }` envelope.
 
 ```bash
 pdfnative render --input doc.json --dry-run --json
@@ -123,15 +126,47 @@ tooling before invoking a command. Each schema carries a `$id` embedding the CLI
 version so you can detect drift.
 
 ```bash
-pdfnative schema list             # → { "subjects": ["render","inspect","verify","batch","inspect-summary","verify-summary","batch-summary"] }
+pdfnative schema list             # → { "subjects": ["render","inspect","verify","batch","annotate","govern-verify","inspect-summary","verify-summary","batch-summary"] }
 pdfnative schema render           # input accepted by `render`
 pdfnative schema inspect          # output of `inspect --format json`
 pdfnative schema verify-summary   # output of `verify --summary`
+pdfnative schema annotate         # annotation-spec accepted by `annotate --annotations`
+pdfnative schema govern-verify    # output of `govern verify-issue --json`
 ```
 
 ---
 
-## 6. Recommended agent loop
+## 6. Governance & Human-in-the-Loop — `govern`
+
+pdfnative's monorepo governance model treats AI agents as **draftsmen**, never
+autonomous submitters. The `govern` command makes that contract actionable from any
+agent pipeline — entirely offline, no GitHub or network access:
+
+```bash
+pdfnative govern rules                  # the human/agent protocol (AGENT_RULES) on stdout
+pdfnative govern policy --json          # machine-readable policy JSON on stdout
+pdfnative govern verify-issue draft.md  # gate a draft: exit 1 / E_POLICY on a violation
+```
+
+Rules an agent MUST honour:
+
+- **No autonomous GitHub writes.** Never open, edit, label, close, comment on, or submit
+  issues / PRs / releases. Produce a **local draft** plus a compliance report and hand it
+  to the human.
+- **Zero runtime dependencies.** Never propose adding an npm runtime package — this is a
+  hard block that `verify-issue` enforces.
+- **Local reproduction required.** A bug draft must include a minimal, executed repro
+  inside a fenced code block; `verify-issue` fails the draft otherwise.
+- **Identity integrity.** Anything submitted is published under the **human's** GitHub
+  identity; remind them of their shared responsibility.
+
+`govern verify-issue` returns `{ ok, errors, warnings }` under `--json`. A passing check is
+**necessary but not sufficient** — the human review gate always applies. Recommended flow:
+draft locally → `govern verify-issue` → present to the human → the **human** submits.
+
+---
+
+## 7. Recommended agent loop
 
 1. `pdfnative --version --json` → confirm the CLI is present and pin the version.
 2. `pdfnative schema render` → validate the document you intend to render.
@@ -146,15 +181,21 @@ For `verify`/`inspect`, read the JSON result on stdout and use `--strict` /
 
 ---
 
-## 7. Safety notes for unattended use
+## 8. Safety notes for unattended use
 
 - **Offline by default.** Only `verify --revocation online` makes network requests,
-  and only through an SSRF guard. Nothing else touches the network.
+  and only through an SSRF guard. Nothing else touches the network — including `govern`.
 - **No secrets in output.** `sign` never emits key material — errors are the fixed
   `E_SIGN` / "Failed to sign PDF." Pass keys via `PDFNATIVE_SIGN_KEY` /
-  `PDFNATIVE_SIGN_CERT` (env wins over `--key` / `--cert`).
+  `PDFNATIVE_SIGN_CERT` (env wins over `--key` / `--cert`). Native `node:crypto` signing is
+  the default; `--pure-crypto` selects the portable pure-JS path.
 - **Bounded input.** JSON input is capped at 50 MB; paths are checked against
-  traversal. Prefer `--output <file>` over shell redirection for large PDFs.
+  traversal. `merge` / `split` / `extract` also honour `--max-output-size`. Prefer
+  `--output <file>` over shell redirection for large PDFs.
+- **Incremental, signature-safe edits.** `annotate` uses an incremental save, so existing
+  signatures on the input stay valid.
+- **Human-in-the-loop for governance.** `govern` never submits anything; it only drafts and
+  verifies. A human must review and submit under their own identity (see §6).
 - **One process per task.** The CLI is stateless; run it per unit of work and let
   the exit code drive your orchestration.
 

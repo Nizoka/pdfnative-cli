@@ -8,7 +8,7 @@
 ## 1. Context
 
 **What is pdfnative-cli?**
-The official command-line interface for [`pdfnative`](https://github.com/Nizoka/pdfnative) — a zero-dependency, ISO 32000-1 compliant PDF generation library. The CLI exposes six commands: `render`, `sign`, `inspect`, `verify`, `batch`, `completion`.
+The official command-line interface for [`pdfnative`](https://github.com/Nizoka/pdfnative) — a zero-dependency, ISO 32000-1 compliant PDF generation library. The CLI exposes eleven commands: `render`, `sign`, `inspect`, `verify`, `merge`, `split`, `extract`, `annotate`, `govern`, `batch`, `completion` — plus a `schema` command for agent self-validation.
 
 **Philosophy:**
 - Zero extra runtime dependencies — `pdfnative` is the *only* dependency.
@@ -29,10 +29,16 @@ The official command-line interface for [`pdfnative`](https://github.com/Nizoka/
 src/
 ├── index.ts              # Entry: parse argv → config merge → dispatch → process.exit
 ├── commands/
-│   ├── render.ts         # JSON → PDF (buildDocumentPDF*, smart tables, page streaming)
-│   ├── sign.ts           # PDF + key/cert → addSignaturePlaceholder → signPdfBytes
-│   ├── inspect.ts        # PDF → PdfReader → metadata JSON/text
+│   ├── render.ts         # JSON → PDF (buildDocumentPDF*, smart tables, page streaming, outline, layout inspect)
+│   ├── sign.ts           # PDF + key/cert → addSignaturePlaceholder → signPdfBytes (native node:crypto default)
+│   ├── inspect.ts        # PDF → PdfReader → metadata JSON/text (+ annotations, page labels)
 │   ├── verify.ts         # PDF → CMS + timestamp (PAdES-T) + OCSP/CRL revocation
+│   ├── merge.ts          # Several PDFs → mergePdfs → combined PDF
+│   ├── split.ts          # One PDF → splitPdf → many PDFs (per-page or per-range)
+│   ├── extract.ts        # One PDF + --pages → extractPages → new PDF
+│   ├── annotate.ts       # PDF + --annotations → createModifier + buildAnnotationBody → incremental save
+│   ├── govern.ts         # AI-governance / HITL: rules | policy | verify-issue
+│   ├── schema.ts         # Versioned JSON Schemas (Draft 2020-12)
 │   ├── batch.ts          # Directory of JSON → parallel render → per-file summary
 │   └── completion.ts     # bash/zsh/fish completion scripts
 ├── utils/
@@ -40,15 +46,18 @@ src/
 │   ├── io.ts             # stdin/stdout/file I/O helpers
 │   ├── config.ts         # `.pdfnativerc.json` discovery + flag-default merge
 │   ├── colors.ts         # NO_COLOR/TTY-aware ANSI helper
-│   ├── layout.ts         # Layout option composer (CLI flags + --layout file merge)
-│   ├── keys.ts           # PEM / PEM-chain loader (key-material redaction on error)
+│   ├── pages.ts          # 1-based page-list / page-range parsing (zero-dep)
+│   ├── pdfops.ts         # --max-output-size parsing + source-path collection (traversal guard)
+│   ├── governance.ts     # AI-governance policy + AGENT_RULES text + pure draft validator
+│   ├── layout.ts         # Layout option composer (CLI flags + --layout / --debug-layout merge)
+│   ├── keys.ts           # PEM / PEM-chain loader + native node:crypto provider (key redaction on error)
 │   ├── asn1-walk.ts      # ASN.1/DER walker with absolute byte offsets (50 MiB cap)
 │   ├── cms-verify.ts     # RSA/ECDSA CMS + verifySignedStructure (CRL/OCSP)
 │   ├── cert-chain.ts     # X.509 chain construction + trust evaluation
 │   ├── timestamp-verify.ts # RFC 3161 timestamp validation (PAdES-T)
 │   ├── revocation.ts     # OCSP (RFC 6960) + CRL (RFC 5280), DSS + online
 │   ├── fetch-guard.ts    # SSRF-guarded HTTP(S) client (opt-in online revocation)
-│   └── error.ts          # CliError class + die() + deprecate() helpers
+│   └── error.ts          # CliError class + die() + deprecate() helpers (incl. E_POLICY)
 └── core-bridge/
     └── index.ts          # Selective re-exports from pdfnative
 ```
@@ -188,8 +197,11 @@ pdfnative render [--input <file.json>] [--output <out.pdf>] [--stream|--stream-p
 | `--stream-page-by-page` | boolean | false | Object-boundary streaming; TOC- and `{pages}`-compatible |
 | `--stream-true` | boolean | false | True constant-memory streaming (`buildDocumentPDFStreamTrue`); parts freed as emitted; byte-identical |
 | `--max-blocks` | integer | 100000 | Maximum document blocks (`layout.maxBlocks`) before pdfnative aborts |
-| `--font` | string (repeatable) | — | Register a bundled font shortcut (see Multilingual rendering below) |
+| `--font` | string (repeatable) | — | Register a bundled font shortcut (`latin`, `emoji`, `color-emoji`, `math`, 22 script codes) |
 | `--lang` | string (comma list) | — | Preferred font code per script (`th`, `ja`, `ar`, …) |
+| `--outline` | `auto`\|`<file.json>` | — | PDF bookmarks: `auto` from headings, or an explicit `OutlineItem[]` tree |
+| `--inspect-layout` | boolean | false | Emit a `LayoutInspection` JSON report instead of a PDF (document variant only) |
+| `--debug-layout` | `[margins,content,cells]` | — | Overlay layout debug guides on the PDF (bare flag = all) |
 | `--conformance` | `1b`\|`2b`\|`3b` | — | **Deprecated** — use `--tagged pdfa<level>` |
 
 **JSON schema:** Full [`DocumentParams`](https://github.com/Nizoka/pdfnative) — same object passed to `buildDocumentPDFBytes()`.
@@ -386,6 +398,7 @@ pdfnative inspect [--input <file.pdf>] [--format json|text]
 | `--format` | `json`\|`text` | `json` | Output format |
 | `--verbose` | boolean | false | Add trailer keys, catalog keys, object count, XMP |
 | `--pages` | boolean | false | Add per-page metadata array |
+| `--annotations` | boolean | false | List markup + link annotations per page (page labels reported automatically) |
 | `--pdfua` | boolean | false | Add a PDF/UA (ISO 14289-1) structural validation report |
 | `--check` | `pdfa`\|`signed`\|`encrypted`\|`pdfua` (repeatable) | — | CI assertion; sets exit code (0 = pass, 1 = fail) |
 
@@ -426,6 +439,93 @@ interface PdfReader {
 `PdfDict` is a `Map<string, PdfValue>` — use `.get('Key')` to access entries (no bracket notation).
 
 pdfnative also exports typed accessors: `dictGet`, `dictGetName`, `dictGetNum`, `dictGetDict`, `dictGetArray`.
+
+---
+
+### `merge`
+
+**Purpose:** Concatenate several PDFs into one (pdfnative 1.5.0 page-tree API).
+
+```bash
+pdfnative merge <a.pdf> <b.pdf> [...] --output <combined.pdf>
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| _positionals_ | string[] | — | Source PDFs in order (2–50); may combine with `--input` |
+| `--input` | string (repeatable) | — | Additional source PDF |
+| `--output` | string | stdout | Output combined PDF |
+| `--drop-annotations` | boolean | false | Strip annotations from the merged output |
+| `--max-output-size` | bytes | none | Fail if the output would exceed this size |
+
+**pdfnative API:** `mergePdfs(sources: Uint8Array[], options?: MergeOptions): Uint8Array`.
+
+### `split`
+
+**Purpose:** Split one PDF into several (pdfnative 1.5.0 page-tree API).
+
+```bash
+pdfnative split --input <in.pdf> --output-dir <dir> [--pages 1-2,3-4] [--prefix part]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--input` | string | stdin | Source PDF |
+| `--output-dir` | string | — **(required)** | Output directory (created if absent) |
+| `--pages` | ranges | one per page | Each comma-separated range becomes one output |
+| `--prefix` | string | input stem / `part` | Filename prefix → `<prefix>-<n>.pdf` (zero-padded) |
+| `--drop-annotations` | boolean | false | Strip annotations from each part |
+| `--max-output-size` | bytes | none | Per-part size cap |
+
+**pdfnative API:** `splitPdf(source: Uint8Array, ranges?: PageRange[], options?): Uint8Array[]`.
+
+### `extract`
+
+**Purpose:** Pull selected pages into a new PDF (pdfnative 1.5.0 page-tree API).
+
+```bash
+pdfnative extract --input <in.pdf> --output <out.pdf> --pages 4,1-2
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--input` | string | stdin | Source PDF |
+| `--output` | string | stdout | Output PDF |
+| `--pages` | list/range | — **(required)** | 1-based; order preserved, repeats allowed |
+| `--drop-annotations` | boolean | false | Strip annotations from the output |
+| `--max-output-size` | bytes | none | Output size cap |
+
+**pdfnative API:** `extractPages(source: Uint8Array, pages: PageRange[], options?): Uint8Array`.
+
+### `annotate`
+
+**Purpose:** Attach markup annotations to an existing PDF via an incremental save (original bytes — and any existing signature — preserved).
+
+```bash
+pdfnative annotate --input <in.pdf> --output <out.pdf> --annotations <spec.json>
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--input` | string | stdin | Source PDF |
+| `--output` | string | stdout | Annotated PDF |
+| `--annotations` | string | — **(required)** | JSON array (or `{ annotations: [...] }`); each entry a markup annotation + 1-based `page` |
+
+Types: `text`, `highlight`, `underline`, `strikeout`, `squiggly`, `square`, `circle`, `line`, `freetext`. Each needs `page` + `rect` `[x1,y1,x2,y2]`; `line` also needs `start`/`end`. Only known fields are forwarded (no dictionary injection).
+
+**pdfnative API:** `createModifier(reader): PdfModifier`, `buildAnnotationBody(annotation: MarkupAnnotation)`, `modifier.addAnnotation(pageIndex, body)`, `modifier.save(): Uint8Array` (incremental).
+
+### `govern`
+
+**Purpose:** Expose pdfnative's AI-governance / Human-in-the-Loop (HITL) contract. Agents are **draftsmen** — a human always reviews and submits.
+
+```bash
+pdfnative govern rules                  # human/agent protocol (AGENT_RULES) on stdout
+pdfnative govern policy [--json]        # machine-readable policy JSON on stdout
+pdfnative govern verify-issue <draft.md> [--json]   # gate a draft
+```
+
+`verify-issue` returns `{ ok, errors, warnings }` and exits 1 (`E_POLICY`) on a violation — proposing an external runtime dependency, or omitting a reproduction code block. Missing recommended fields (environment, expected behaviour) are warnings. Fully offline; no GitHub / network access. Implemented by the pure `validateGovernanceDraft` in `utils/governance.ts` (a zero-dependency port of pdfnative's `verify-issue.mjs`).
 
 ---
 
@@ -474,6 +574,7 @@ carried on every `CliError.code`:
 | `E_SIGN` | Signing failed (generic message — never leaks key material) |
 | `E_VERIFY_FAILED` | `verify --strict` found an invalid signature |
 | `E_CHECK_FAILED` | `inspect --check` assertion failed |
+| `E_POLICY` | `govern verify-issue` found a governance violation |
 | `E_UNSUPPORTED` | Reserved / not-yet-available capability |
 | `E_RUNTIME` | Catch-all runtime error |
 
@@ -483,11 +584,12 @@ code for free.
 
 ### `--dry-run`
 
-`render`, `sign`, and `batch` accept `--dry-run` (sets `PDFNATIVE_DRY_RUN=1`).
-Inputs are fully validated — and for `sign`, credentials are parsed and the PDF
-is placeholder-prepared — but **no output is produced or written**. Commands
-read `hasFlag(args.flags, 'dry-run') || isDryRun()` so a direct command call and
-the global flag both work.
+`render`, `sign`, `batch`, `merge`, `split`, `extract`, and `annotate` accept
+`--dry-run` (sets `PDFNATIVE_DRY_RUN=1`). Inputs are fully validated — and for
+`sign`, credentials are parsed and the PDF is placeholder-prepared — but **no
+output is produced or written**. Commands read
+`hasFlag(args.flags, 'dry-run') || isDryRun()` so a direct command call and the
+global flag both work.
 
 ### Token economy — output projection
 
@@ -527,9 +629,9 @@ Human invocations (no `--json`) are unchanged.
 ### `schema` command
 
 [`src/commands/schema.ts`](../src/commands/schema.ts) prints a hand-authored,
-versioned JSON Schema (Draft 2020-12) for `render` input, `inspect` / `verify`
-/ `batch` output, or the `inspect-summary` / `verify-summary` / `batch-summary`
-compact shapes. The `$id` embeds the CLI version
+versioned JSON Schema (Draft 2020-12) for `render` / `annotate` input, `inspect`
+/ `verify` / `batch` / `govern-verify` output, or the `inspect-summary` /
+`verify-summary` / `batch-summary` compact shapes. The `$id` embeds the CLI version
 (`https://pdfnative.dev/schema/cli/<version>/<subject>.schema.json`) so callers
 can detect drift. `schema list` enumerates the subjects.
 

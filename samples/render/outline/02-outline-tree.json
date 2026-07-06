@@ -1,0 +1,26 @@
+[
+    {
+        "title": "Executive Summary",
+        "pageIndex": 0,
+        "bold": true,
+        "children": [
+            { "title": "Highlights", "pageIndex": 0 }
+        ]
+    },
+    {
+        "title": "Financials",
+        "pageIndex": 1,
+        "bold": true,
+        "open": false,
+        "children": [
+            { "title": "Revenue", "pageIndex": 1 },
+            { "title": "Costs", "pageIndex": 1 }
+        ]
+    },
+    {
+        "title": "Outlook",
+        "pageIndex": 2,
+        "bold": true,
+        "color": "#007AFF"
+    }
+]

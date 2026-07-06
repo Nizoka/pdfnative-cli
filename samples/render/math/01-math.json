@@ -1,0 +1,11 @@
+{
+    "title": "Mathematical Symbols Demo",
+    "blocks": [
+        { "type": "heading", "level": 1, "text": "Notable Identities" },
+        { "type": "paragraph", "text": "Euler's identity: e^{iπ} + 1 = 0" },
+        { "type": "paragraph", "text": "Summation: ∑_{n=1}^{∞} 1/n² = π²/6" },
+        { "type": "paragraph", "text": "Integral: ∫₀^∞ e^{−x²} dx = √π / 2" },
+        { "type": "paragraph", "text": "Set relations: ∀x ∈ ℝ, ∃y such that x ≤ y ∧ y ∈ ℤ" },
+        { "type": "paragraph", "text": "Operators: ∇ · ∇ = ∆,  α ⊗ β,  A ∪ B ⊆ C ∩ D" }
+    ]
+}
