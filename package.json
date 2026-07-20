@@ -113,15 +113,15 @@
     "provenance": true
   },
   "dependencies": {
-    "pdfnative": "^1.5.0"
+    "pdfnative": "^1.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@vitest/coverage-v8": "^4.1.7",
-    "eslint": "^9.0.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^9.39.5",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
-    "typescript-eslint": "^8.59.2",
+    "typescript-eslint": "^8.64.0",
     "vitest": "^4.1.7"
   },
   "overrides": {
