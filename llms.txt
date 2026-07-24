@@ -1,0 +1,71 @@
+# pdfnative-cli
+
+> Official command-line interface for **pdfnative** — an agent-native PDF toolkit.
+> Render JSON to PDF, extract text, fill/flatten AcroForms, merge/split/extract
+> pages, encrypt/decrypt, sign and verify (CMS, LTV), and inspect — with a
+> deterministic process contract designed to be driven by autonomous AI agents.
+> Zero extra runtime dependencies; all PDF logic lives in `pdfnative`.
+
+This file is an LLM-facing capability manifest (see https://llmstxt.org). For a
+machine-readable JSON manifest run `pdfnative schema manifest`.
+
+## Process contract (how to call it)
+
+- **stdout** carries the primary artifact: a PDF, a JSON report, extracted text,
+  a JSON Schema, or a completion script.
+- **stderr** carries diagnostics and, under `--json`, a status/error envelope.
+- **Exit codes**: `0` success, `1` runtime/check failure, `2` usage error.
+- **`--json`** (agent mode): success emits `{ "ok": true, "command", … }` on
+  stderr; failure emits `{ "ok": false, "command", "error": { "code", "message" } }`.
+  Place `--json` AFTER the sub-command name.
+- **Stable error codes** (branch on these, not on the message):
+  `E_USAGE, E_INPUT, E_PARSE, E_IO, E_SIGN, E_VERIFY_FAILED, E_CHECK_FAILED,`
+  `E_POLICY, E_UNSUPPORTED, E_PASSWORD, E_RUNTIME`.
+- **Token economy**: `--summary` (minimal verdict), `--fields a,b.c` (dot-path
+  projection), compact JSON by default under `--json` (`--pretty` opts out).
+- **`--dry-run`** validates inputs without writing output.
+- **Self-description**: `pdfnative schema <subject>` (Draft 2020-12) and
+  `pdfnative schema manifest` (capability list) — validate before you invoke.
+
+## Commands
+
+- `render` — JSON document/table → PDF (22 Unicode scripts, math, colour emoji,
+  bookmarks, native charts, watermarks, PDF/A, encryption, streaming).
+- `extract-text` — reading-order Unicode text as `text | json | ndjson`
+  (`--runs` for positioned runs, `--password` for encrypted PDFs). No OCR.
+- `fill` — fill, flatten, and/or **export** an AcroForm (`--data values.json`,
+  `--flatten`, `--export`); incremental save keeps existing signatures valid.
+  `fill --export` emits current values as a `--data` map (read → edit → fill).
+- `encrypt` / `decrypt` — re-secure with AES-128/256, or remove encryption
+  (`--password`, `--stream` for constant memory). Rebuilds the page tree (drops
+  signatures/forms, like `merge`).
+- `merge` / `split` / `extract` — page-tree ops; support encrypted sources
+  (`--password`), output re-encryption (`--encrypt`), and constant-memory
+  streaming (`--stream`).
+- `annotate` — attach markup annotations via incremental save.
+- `sign` / `verify` — CMS/PKCS#7 RSA & ECDSA signing (native constant-time
+  crypto) and verification with LTV (RFC 3161 timestamps, OCSP, CRL).
+- `inspect` — metadata, conformance, signatures, annotations, form fields
+  (`--form-fields`), encryption scheme (`--encryption`), PDF/UA validation.
+- `batch` — render a directory of JSON inputs in parallel.
+- `govern` — AI-governance / Human-in-the-Loop contract (`rules`, `policy`,
+  `verify-issue`).
+- `schema` / `completion` — self-description and shell completions
+  (bash|zsh|fish|powershell).
+- `doctor` — offline environment/capability preflight (`--format json`): CLI /
+  Node / pdfnative versions, Web Crypto CSPRNG (required by `encrypt`), command
+  count. Exit 0/1 — run it as an agent pre-flight before `encrypt`.
+
+## Governance (read before autonomous use)
+
+Agents are **draftsmen, never autonomous submitters**: no runtime dependencies,
+a local reproduction for every bug, and a mandatory human review before anything
+is submitted under a human identity. `pdfnative govern verify-issue <draft>`
+gates drafts (exit `1` / `E_POLICY` on violation). See AGENTS.md.
+
+## Docs
+
+- README.md — features, examples, command reference.
+- AGENTS.md — the full agent-automation contract.
+- docs/KNOWLEDGE_BASE.md — deep reference.
+- Requires Node ≥ 20 (also runs on Bun and Deno). MIT licensed.

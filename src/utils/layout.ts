@@ -20,6 +20,12 @@ import type {
 import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from './args.js';
 import { validatePath, readBinaryFile } from './io.js';
 import { CliError, deprecate } from './error.js';
+import {
+    normalizeEncryptAlgo,
+    readEncryptTrigger,
+    parsePermissions,
+    firstNonEmpty,
+} from './pdfops.js';
 
 /**
  * Tagged-mode values accepted by the `--tagged` flag.
@@ -40,9 +46,6 @@ const NAMED_PAGE_SIZES: Readonly<Record<string, readonly [number, number]>> = {
     tabloid: [792.00, 1224.00],
     a5:      [419.53, 595.28],
 };
-
-const VALID_ENCRYPTION_ALGOS = new Set(['aes128', 'aes256']);
-const VALID_PERMISSIONS = new Set(['print', 'copy', 'modify', 'extractText', 'extracttext']);
 
 /**
  * Load a `Partial<PdfLayoutOptions>` JSON file from disk.
@@ -204,61 +207,56 @@ function buildPageTemplate(parts: HeaderFooterFlags): PageTemplate | undefined {
     return tpl;
 }
 
-/** Build encryption options from CLI flags (or env vars for passwords). */
+/**
+ * Build encryption options from CLI flags (or env vars for passwords).
+ *
+ * Two flag vocabularies are accepted, so `render` matches merge/split/extract:
+ *   - Unified (preferred): `--encrypt [aes-128|aes-256]`, `--owner-password`,
+ *     `--user-password`, `--permissions`.
+ *   - Legacy (still supported): `--encrypt-algorithm`, `--encrypt-owner-pass`,
+ *     `--encrypt-user-pass`, `--encrypt-permissions`.
+ * Env vars ($PDFNATIVE_ENCRYPT_OWNER_PASS / _USER_PASS) win over both; an empty
+ * value is treated as absent. The unified value wins over the legacy alias.
+ */
 function buildEncryptionFromFlags(args: ParsedArgs): EncryptionOptions | undefined {
-    const ownerFlag = getStringFlag(args.flags, 'encrypt-owner-pass');
-    const userFlag = getStringFlag(args.flags, 'encrypt-user-pass');
-    const algoFlag = getStringFlag(args.flags, 'encrypt-algorithm');
-    const permsFlag = getStringFlag(args.flags, 'encrypt-permissions');
+    const { enabled: encryptTriggered, algoRaw: unifiedAlgo } = readEncryptTrigger(args.flags);
+    const legacyAlgo = getStringFlag(args.flags, 'encrypt-algorithm');
+    const permsRaw = firstNonEmpty(
+        getStringFlag(args.flags, 'permissions'),
+        getStringFlag(args.flags, 'encrypt-permissions'),
+    );
+    const owner = firstNonEmpty(
+        process.env.PDFNATIVE_ENCRYPT_OWNER_PASS,
+        getStringFlag(args.flags, 'owner-password'),
+        getStringFlag(args.flags, 'encrypt-owner-pass'),
+    );
+    const user = firstNonEmpty(
+        process.env.PDFNATIVE_ENCRYPT_USER_PASS,
+        getStringFlag(args.flags, 'user-password'),
+        getStringFlag(args.flags, 'encrypt-user-pass'),
+    );
 
-    const owner = process.env.PDFNATIVE_ENCRYPT_OWNER_PASS ?? ownerFlag;
-    const user = process.env.PDFNATIVE_ENCRYPT_USER_PASS ?? userFlag;
+    const requested =
+        encryptTriggered ||
+        legacyAlgo !== undefined ||
+        owner !== undefined ||
+        user !== undefined ||
+        permsRaw !== undefined;
+    if (!requested) return undefined;
 
-    if (
-        owner === undefined &&
-        user === undefined &&
-        algoFlag === undefined &&
-        permsFlag === undefined
-    ) {
-        return undefined;
-    }
-    if (owner === undefined || owner.length === 0) {
+    if (owner === undefined) {
         throw new CliError(
-            'Encryption requires an owner password. Provide --encrypt-owner-pass <pass> or $PDFNATIVE_ENCRYPT_OWNER_PASS.',
-            2,
-        );
-    }
-    const algo = algoFlag ?? 'aes128';
-    if (!VALID_ENCRYPTION_ALGOS.has(algo)) {
-        throw new CliError(
-            `Invalid --encrypt-algorithm "${algo}". Valid: aes128, aes256.`,
+            'Encryption requires an owner password. Provide --owner-password <pass> or $PDFNATIVE_ENCRYPT_OWNER_PASS.',
             2,
         );
     }
     const opts: { -readonly [K in keyof EncryptionOptions]: EncryptionOptions[K] } = {
         ownerPassword: owner,
-        algorithm: algo as 'aes128' | 'aes256',
+        algorithm: normalizeEncryptAlgo(unifiedAlgo ?? legacyAlgo),
     };
     if (user !== undefined) opts.userPassword = user;
-
-    if (permsFlag !== undefined) {
-        const perms: Record<string, boolean> = {};
-        for (const raw of permsFlag.split(',')) {
-            const p = raw.trim();
-            if (p.length === 0) continue;
-            const lower = p.toLowerCase();
-            if (!VALID_PERMISSIONS.has(p) && !VALID_PERMISSIONS.has(lower)) {
-                throw new CliError(
-                    `Invalid permission "${p}" in --encrypt-permissions. Valid: print, copy, modify, extractText.`,
-                    2,
-                );
-            }
-            const key =
-                lower === 'extracttext' || p === 'extractText' ? 'extractText' : lower;
-            perms[key] = true;
-        }
-        opts.permissions = perms;
-    }
+    const perms = parsePermissions(permsRaw);
+    if (perms !== undefined) opts.permissions = perms;
     return opts;
 }
 

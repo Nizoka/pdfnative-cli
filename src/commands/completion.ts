@@ -1,4 +1,5 @@
-// `pdfnative completion <bash|zsh|fish>` — emit a shell completion script.
+// `pdfnative completion <bash|zsh|fish|powershell>` — emit a shell completion
+// script.
 //
 // The generated scripts are self-contained and driven by the static command /
 // flag metadata below. Install by sourcing the output, e.g.:
@@ -6,19 +7,27 @@
 //     pdfnative completion bash > /etc/bash_completion.d/pdfnative
 //     pdfnative completion zsh  > "${fpath[1]}/_pdfnative"
 //     pdfnative completion fish > ~/.config/fish/completions/pdfnative.fish
+//     pdfnative completion powershell >> $PROFILE
 
 import type { ParsedArgs } from '../utils/args.js';
 import { CliError } from '../utils/error.js';
 
-interface CommandSpec {
+export interface CommandSpec {
     readonly name: string;
     readonly summary: string;
     readonly flags: readonly string[];
 }
 
-const GLOBAL_FLAGS = ['--help', '--version', '--no-color', '--quiet', '--json', '--dry-run', '--config', '--no-config'];
+export const GLOBAL_FLAGS = ['--help', '--version', '--no-color', '--quiet', '--json', '--dry-run', '--config', '--no-config'];
 
-const COMMANDS: readonly CommandSpec[] = [
+// Shared password / re-encryption / streaming flags for the page-tree commands
+// (merge, split, extract) — pdfnative 1.6.0.
+const PAGETREE_CRYPTO_FLAGS = [
+    '--password', '--encrypt', '--owner-password', '--user-password',
+    '--permissions', '--stream', '--chunk-size',
+];
+
+export const COMMANDS: readonly CommandSpec[] = [
     {
         name: 'render',
         summary: 'Render a JSON document definition to PDF',
@@ -33,6 +42,7 @@ const COMMANDS: readonly CommandSpec[] = [
             '--watermark-text', '--watermark-image', '--watermark-opacity',
             '--watermark-angle', '--watermark-color', '--watermark-font-size',
             '--watermark-position',
+            '--encrypt', '--owner-password', '--user-password', '--permissions',
             '--encrypt-algorithm', '--encrypt-owner-pass', '--encrypt-user-pass',
             '--encrypt-permissions', '--attachment',
         ],
@@ -54,22 +64,42 @@ const COMMANDS: readonly CommandSpec[] = [
     {
         name: 'inspect',
         summary: 'Analyse a PDF and output metadata',
-        flags: ['--input', '--format', '--verbose', '--pages', '--pdfua', '--annotations', '--check', '--summary', '--fields', '--pretty'],
+        flags: ['--input', '--format', '--verbose', '--pages', '--pdfua', '--annotations', '--form-fields', '--encryption', '--password', '--check', '--summary', '--fields', '--pretty'],
     },
     {
         name: 'merge',
         summary: 'Concatenate multiple PDFs into one',
-        flags: ['--input', '--output', '--drop-annotations', '--max-output-size'],
+        flags: ['--input', '--output', '--drop-annotations', '--max-output-size', ...PAGETREE_CRYPTO_FLAGS],
     },
     {
         name: 'split',
         summary: 'Split a PDF into multiple PDFs',
-        flags: ['--input', '--output-dir', '--pages', '--prefix', '--drop-annotations', '--max-output-size'],
+        flags: ['--input', '--output-dir', '--pages', '--prefix', '--drop-annotations', '--max-output-size', ...PAGETREE_CRYPTO_FLAGS],
     },
     {
         name: 'extract',
         summary: 'Extract selected pages into a new PDF',
-        flags: ['--input', '--output', '--pages', '--drop-annotations', '--max-output-size'],
+        flags: ['--input', '--output', '--pages', '--drop-annotations', '--max-output-size', ...PAGETREE_CRYPTO_FLAGS],
+    },
+    {
+        name: 'extract-text',
+        summary: 'Extract reading-order text (text|json|ndjson)',
+        flags: ['--input', '--format', '--pages', '--runs', '--password', '--max-length', '--summary', '--fields', '--pretty'],
+    },
+    {
+        name: 'fill',
+        summary: 'Fill and/or flatten an AcroForm PDF',
+        flags: ['--input', '--output', '--data', '--flatten', '--export', '--force', '--on-unknown', '--need-appearances', '--password'],
+    },
+    {
+        name: 'encrypt',
+        summary: 'Re-secure a PDF with AES-128/256 encryption',
+        flags: ['--input', '--output', '--owner-password', '--user-password', '--algorithm', '--permissions', '--password', '--drop-annotations', '--max-output-size', '--stream', '--chunk-size'],
+    },
+    {
+        name: 'decrypt',
+        summary: 'Remove encryption from a PDF',
+        flags: ['--input', '--output', '--password', '--drop-annotations', '--max-output-size', '--stream', '--chunk-size'],
     },
     {
         name: 'annotate',
@@ -95,6 +125,11 @@ const COMMANDS: readonly CommandSpec[] = [
         name: 'completion',
         summary: 'Emit a shell completion script',
         flags: [],
+    },
+    {
+        name: 'doctor',
+        summary: 'Environment / capability preflight',
+        flags: ['--format', '--json', '--pretty'],
     },
 ];
 
@@ -172,10 +207,41 @@ function fishScript(): string {
     return lines.join('\n') + '\n';
 }
 
+function powershellScript(): string {
+    // A Register-ArgumentCompleter script block. First positional → command
+    // names; after a command → that command's flags plus the global flags.
+    const cmdList = COMMAND_NAMES.map((n) => `'${n}'`).join(', ');
+    const cases = COMMANDS.map(
+        (c) => `            '${c.name}' { @(${[...c.flags, ...GLOBAL_FLAGS].map((f) => `'${f}'`).join(', ')}) }`,
+    ).join('\n');
+    return `\
+# PowerShell completion for pdfnative
+# Add to your profile:  pdfnative completion powershell >> $PROFILE
+Register-ArgumentCompleter -Native -CommandName pdfnative -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+    $commands = @(${cmdList})
+    $tokens = $commandAst.CommandElements | ForEach-Object { $_.ToString() }
+    # tokens[0] is 'pdfnative'; tokens[1] is the sub-command when present.
+    if ($tokens.Count -le 2 -and -not $wordToComplete.StartsWith('-')) {
+        $commands | Where-Object { $_ -like "$wordToComplete*" } |
+            ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+        return
+    }
+    $cmd = if ($tokens.Count -ge 2) { $tokens[1] } else { '' }
+    $flags = switch ($cmd) {
+${cases}
+            default { @(${GLOBAL_FLAGS.map((f) => `'${f}'`).join(', ')}) }
+    }
+    $flags | Where-Object { $_ -like "$wordToComplete*" } |
+        ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterName', $_) }
+}
+`;
+}
+
 export async function completion(args: ParsedArgs): Promise<void> {
     const shell = args.positionals[0];
     if (shell === undefined) {
-        throw new CliError('Usage: pdfnative completion <bash|zsh|fish>', 2);
+        throw new CliError('Usage: pdfnative completion <bash|zsh|fish|powershell>', 2);
     }
     switch (shell) {
         case 'bash':
@@ -187,7 +253,11 @@ export async function completion(args: ParsedArgs): Promise<void> {
         case 'fish':
             process.stdout.write(fishScript());
             break;
+        case 'powershell':
+        case 'pwsh':
+            process.stdout.write(powershellScript());
+            break;
         default:
-            throw new CliError(`Unsupported shell "${shell}". Valid: bash, zsh, fish.`, 2);
+            throw new CliError(`Unsupported shell "${shell}". Valid: bash, zsh, fish, powershell.`, 2);
     }
 }

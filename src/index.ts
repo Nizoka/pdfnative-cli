@@ -1,8 +1,8 @@
-import { createRequire } from 'node:module';
 import { parseArgs, hasFlag, getStringFlag } from './utils/args.js';
 import { CliError } from './utils/error.js';
 import { isJsonMode, emitJsonError } from './utils/agent.js';
 import { loadConfig, applyConfigDefaults } from './utils/config.js';
+import { cliVersion } from './utils/version.js';
 
 // Lazy-import commands to keep startup fast for --help / --version
 type CommandFn = (args: ReturnType<typeof parseArgs>) => Promise<void>;
@@ -13,19 +13,34 @@ pdfnative-cli — Official CLI for pdfnative
 Usage:
   pdfnative <command> [options]
 
-Commands:
-  render    Render a JSON document definition to PDF
-  sign      Apply a digital signature to a PDF
-  verify    Verify embedded PDF signatures
-  inspect   Analyse a PDF and output metadata / conformance info
-  merge     Concatenate multiple PDFs into one
-  split     Split a PDF into multiple PDFs (per page or range)
-  extract   Extract selected pages into a new PDF
-  annotate  Attach markup annotations to a PDF
-  batch     Render every JSON file in a directory to PDF (parallel)
-  govern    AI-governance / HITL contract (rules, policy, verify-issue)
-  schema    Print a JSON Schema for a CLI input/output shape
-  completion  Emit a shell completion script (bash|zsh|fish)
+Commands (17):
+
+ Create & edit
+  render      Render a JSON document definition to PDF
+  fill        Fill / flatten / export an AcroForm PDF
+  annotate    Attach markup annotations to a PDF
+
+ Page tree
+  merge       Concatenate multiple PDFs into one
+  split       Split a PDF into multiple PDFs (per page or range)
+  extract     Extract selected pages into a new PDF
+
+ Security
+  sign        Apply a digital signature to a PDF
+  verify      Verify embedded PDF signatures
+  encrypt     Re-secure a PDF with AES-128/256 encryption
+  decrypt     Remove encryption from a PDF (with --password)
+
+ Read & extract
+  inspect     Analyse a PDF (metadata, conformance, form fields, encryption)
+  extract-text  Extract reading-order text (text | json | ndjson)
+
+ Automation & meta
+  batch       Render every JSON file in a directory to PDF (parallel)
+  doctor      Environment / capability preflight (text or --json)
+  schema      Print a JSON Schema / capability manifest for agents
+  completion  Emit a shell completion script (bash|zsh|fish|powershell)
+  govern      AI-governance / HITL contract (rules, policy, verify-issue)
 
 Options:
   --help,    -h   Show this help message
@@ -38,8 +53,9 @@ Global options (any command):
   --no-color        Disable ANSI colour (also respects NO_COLOR)
   --json            Agent mode: emit a JSON status/error envelope on stderr
                     (data stays on stdout). Errors carry a stable code.
-  --dry-run         Validate inputs and exit without writing output
-                    (render, sign, batch, merge, split, extract, annotate).
+  --dry-run         Validate inputs and exit without writing output (render,
+                    sign, batch, merge, split, extract, annotate, fill,
+                    encrypt, decrypt).
 
 For autonomous/agent usage see AGENTS.md.
 Run \`pdfnative <command> --help\` for per-command options.
@@ -106,15 +122,21 @@ Header / Footer:
 Watermark:
   --watermark-text       Text watermark
   --watermark-image      Image path (PNG/JPEG)
-  --watermark-opacity    0.0–1.0 (default 0.2)
-  --watermark-rotation   degrees (default 45)
+  --watermark-opacity    0.0–1.0
+  --watermark-angle      degrees (text watermark)
+  --watermark-color      PdfColor (hex "#rrggbb", "r g b", …)
+  --watermark-font-size  points (text watermark)
+  --watermark-position   background | foreground
 
 Encryption (mutually exclusive with --tagged pdfa*):
-  --encrypt              aes-128 | aes-256
+  --encrypt [aes-128|aes-256]
+                         Enable encryption (bare = aes-128)
   --owner-password       (or env $PDFNATIVE_ENCRYPT_OWNER_PASS — env wins)
   --user-password        (or env $PDFNATIVE_ENCRYPT_USER_PASS — env wins)
-  --permissions          Comma-separated: print,copy,modify,annotate,form,
-                         accessibility,assemble,print-hi-res
+  --permissions          Comma-separated: print,copy,modify,extract
+                         (Legacy aliases still accepted: --encrypt-algorithm,
+                          --encrypt-owner-pass, --encrypt-user-pass,
+                          --encrypt-permissions.)
 
 Attachments (PDF/A-3, repeatable):
   --attachment <path>[:mime[:rel[:desc]]]
@@ -219,6 +241,9 @@ Options:
                   XMP metadata length
   --pages         Per-page width/height/rotation/annotation/formField counts
   --annotations   List markup / link annotations (page, subtype, contents/url)
+  --form-fields   List AcroForm fields (name, type, value, required/read-only)
+  --encryption    Report the encryption scheme (algorithm, revision, opened-as)
+  --password      Password for an encrypted PDF (env: PDFNATIVE_PASSWORD)
   --pdfua         Include a PDF/UA (ISO 14289-1) structural validation report
                   (valid + errors + warnings)
   --check         Assert a property; repeatable; AND semantics; exits 1 on
@@ -269,11 +294,23 @@ Options:
   --max-output-size     Max assembled size in bytes (default 256 MiB; 0/none to
                         disable the OOM guard — not recommended for untrusted
                         input)
+  --password            Password for encrypted source PDFs (env: PDFNATIVE_PASSWORD).
+                        A SINGLE password is applied to EVERY source; merging
+                        encrypted sources that use different passwords fails
+                        (E_PASSWORD).
+  --encrypt [aes-128|aes-256]
+                        Re-encrypt the output (bare = aes-128). Needs
+                        --owner-password
+  --owner-password      Owner password for --encrypt (env: PDFNATIVE_ENCRYPT_OWNER_PASS)
+  --user-password       User password for --encrypt (env: PDFNATIVE_ENCRYPT_USER_PASS)
+  --permissions         Comma-separated: print, copy, modify, extract
+  --stream              Constant-memory streaming output (--chunk-size N bytes)
   --dry-run             Validate + read all sources without writing output
   --help,    -h         Show this help message
 
 Note: the page-tree rebuild drops signatures and form fields (any page-tree
-edit invalidates a signature's /ByteRange). Encrypted sources are rejected.
+edit invalidates a signature's /ByteRange). Encrypted sources are supported
+via --password (pdfnative 1.6.0).
 `;
 
 const SPLIT_USAGE = `\
@@ -292,11 +329,18 @@ Options:
   --prefix              Output filename prefix (default: input basename or "part")
   --drop-annotations    Drop ALL annotations (see merge)
   --max-output-size     Max size per emitted PDF in bytes (default 256 MiB)
+  --password            Password for an encrypted source (env: PDFNATIVE_PASSWORD)
+  --encrypt [aes-128|aes-256]
+                        Re-encrypt each output (needs --owner-password)
+  --owner-password      Owner password for --encrypt (env: PDFNATIVE_ENCRYPT_OWNER_PASS)
+  --user-password       User password for --encrypt (env: PDFNATIVE_ENCRYPT_USER_PASS)
+  --permissions         Comma-separated: print, copy, modify, extract
+  --stream              Constant-memory streaming output (--chunk-size N bytes)
   --dry-run             Validate without writing output
   --help,    -h         Show this help message
 
 Output files are named <prefix>-<n>.pdf (zero-padded). Signatures/forms are
-dropped; encrypted sources are rejected.
+dropped; encrypted sources are supported via --password.
 `;
 
 const EXTRACT_USAGE = `\
@@ -312,10 +356,137 @@ Options:
                         pages may repeat, e.g. "3,1,1,5-7"
   --drop-annotations    Drop ALL annotations (see merge)
   --max-output-size     Max assembled size in bytes (default 256 MiB)
+  --password            Password for an encrypted source (env: PDFNATIVE_PASSWORD)
+  --encrypt [aes-128|aes-256]
+                        Re-encrypt the output (needs --owner-password)
+  --owner-password      Owner password for --encrypt (env: PDFNATIVE_ENCRYPT_OWNER_PASS)
+  --user-password       User password for --encrypt (env: PDFNATIVE_ENCRYPT_USER_PASS)
+  --permissions         Comma-separated: print, copy, modify, extract
+  --stream              Constant-memory streaming output (--chunk-size N bytes)
   --dry-run             Validate without writing output
   --help,    -h         Show this help message
 
-Signatures/forms are dropped; encrypted sources are rejected.
+Signatures/forms are dropped; encrypted sources are supported via --password.
+`;
+
+const EXTRACT_TEXT_USAGE = `\
+pdfnative extract-text — Extract reading-order Unicode text from a PDF
+
+Usage:
+  pdfnative extract-text --input in.pdf [--format text|json|ndjson] [options]
+
+Built for agents / RAG: emits per-page text in reading order. No OCR —
+image-only pages yield empty text.
+
+Options:
+  --input,   -i   Input PDF path (default: stdin)
+  --format,  -f   text (default) | json | ndjson (one JSON object per page)
+  --pages         1-based selector to limit pages (e.g. "1,3,5-7")
+  --runs          Include positioned text runs { text, x, y, fontSize, fontName }
+  --password      Password for an encrypted PDF (env: PDFNATIVE_PASSWORD)
+  --max-length    Hard cap on total characters (default 16000000; 0/none off)
+  --summary       (json) Emit only { pages, characters }
+  --fields        (json) Comma-separated dot-paths to keep
+  --pretty        Force indented JSON even under --json
+  --help,    -h   Show this help message
+
+In text mode, pages are separated by a form-feed (\\f) character.
+`;
+
+const FILL_USAGE = `\
+pdfnative fill — Fill and/or flatten an AcroForm PDF
+
+Usage:
+  pdfnative fill --input form.pdf --data values.json [--output out.pdf] [--flatten]
+  pdfnative fill --input form.pdf --flatten --output flat.pdf
+  pdfnative fill --input form.pdf --export [--output values.json]
+
+--data is a JSON object mapping fully-qualified field name → value (string,
+boolean, or string[] for multi-select listboxes), or { "values": { … } }.
+Discover field names with \`pdfnative inspect --form-fields\`, or dump the current
+values as a ready-to-edit --data map with --export (read → edit → fill).
+
+Options:
+  --input,   -i        Input PDF path (default: stdin)
+  --output,  -o        Output PDF / values path (default: stdout)
+  --data               Path to the values JSON (required unless --flatten/--export)
+  --flatten            Also flatten after filling (or flatten existing values
+                       when --data is omitted)
+  --export             Read-only: emit current field values as a --data-shaped
+                       JSON map (ignores --data/--flatten)
+  --force              Flatten even if a signed signature field is present
+  --on-unknown         Behaviour for unknown field names: throw (default)|ignore
+  --need-appearances   Allow non-WinAnsi values by setting /NeedAppearances
+  --password           Password for an encrypted PDF (env: PDFNATIVE_PASSWORD)
+  --dry-run            Validate + enumerate fields without writing output
+  --help,    -h        Show this help message
+
+The update is incremental, so an existing signature stays valid for its
+revision. Signature fields cannot be filled.
+`;
+
+const ENCRYPT_USAGE = `\
+pdfnative encrypt — Re-secure a PDF with AES-128/256 encryption
+
+Usage:
+  pdfnative encrypt --input in.pdf --owner-password <pass> [--output out.pdf]
+
+Rebuilds the document from its page tree (like merge), so signatures and form
+fields are dropped. Requires a Web Crypto CSPRNG; RC4 is never emitted.
+
+Options:
+  --input,   -i        Input PDF path (default: stdin)
+  --output,  -o        Output PDF path (default: stdout)
+  --owner-password     Owner password — REQUIRED (env: PDFNATIVE_ENCRYPT_OWNER_PASS)
+  --user-password      User (open) password (env: PDFNATIVE_ENCRYPT_USER_PASS)
+  --algorithm          aes-128 (default) | aes-256
+  --permissions        Comma-separated: print, copy, modify, extract
+  --password           Open an already-encrypted source (password rotation;
+                       env: PDFNATIVE_PASSWORD)
+  --drop-annotations   Drop ALL annotations (default keeps URI links)
+  --max-output-size    Max assembled size in bytes (default 256 MiB)
+  --stream             Constant-memory streaming output (--chunk-size N bytes)
+  --dry-run            Validate without writing output
+  --help,    -h        Show this help message
+
+Passwords are read from env (winning over flags) and never logged.
+`;
+
+const DECRYPT_USAGE = `\
+pdfnative decrypt — Remove encryption from a PDF
+
+Usage:
+  pdfnative decrypt --input enc.pdf --password <pass> [--output out.pdf]
+
+Emits a plaintext copy. Rebuilds the page tree (like merge), so signatures and
+form fields are dropped.
+
+Options:
+  --input,   -i        Input PDF path (default: stdin)
+  --output,  -o        Output PDF path (default: stdout)
+  --password           Document password (env: PDFNATIVE_PASSWORD)
+  --drop-annotations   Drop ALL annotations (default keeps URI links)
+  --max-output-size    Max assembled size in bytes (default 256 MiB)
+  --stream             Constant-memory streaming output (--chunk-size N bytes)
+  --dry-run            Validate without writing output
+  --help,    -h        Show this help message
+`;
+
+const DOCTOR_USAGE = `\
+pdfnative doctor — Environment / capability preflight
+
+Usage:
+  pdfnative doctor [--format json|text] [--json]
+
+Reports the CLI version, Node version, Web Crypto (CSPRNG) availability — which
+\`encrypt\` requires — the resolved pdfnative version, and the registered command
+count. Fully offline. Exit code 0 when all checks pass, 1 otherwise.
+
+Options:
+  --format,  -f   text (default) or json
+  --json          Global agent mode also selects JSON output
+  --pretty        Force indented JSON even under --json
+  --help,    -h   Show this help message
 `;
 
 const ANNOTATE_USAGE = `\
@@ -383,10 +554,16 @@ Subjects:
   verify          Output of \`verify --format json\`
   batch           Output of \`batch --format json\`
   annotate        Input for \`annotate\` (--annotations JSON)
+  extract-text    Output of \`extract-text --format json\`
+  fill            Input for \`fill\` (--data JSON)
+  form-export     Output of \`fill --export\`
   inspect-summary Output of \`inspect --summary\`
   verify-summary  Output of \`verify --summary\`
   batch-summary   Output of \`batch --summary\`
   govern-verify   Output of \`govern verify-issue --format json\`
+  status          Agent success envelope (write commands, --json)
+  manifest        Machine-readable capability manifest (commands, flags, codes)
+  doctor          Output of \`doctor --format json\`
   list            Print the available subjects as JSON
 
 With no subject, the \`render\` input schema is printed. Schemas are JSON Schema
@@ -398,19 +575,14 @@ const COMPLETION_USAGE = `\
 pdfnative completion — Emit a shell completion script
 
 Usage:
-  pdfnative completion <bash|zsh|fish>
+  pdfnative completion <bash|zsh|fish|powershell>
 
 Install (examples):
   pdfnative completion bash > /etc/bash_completion.d/pdfnative
   pdfnative completion zsh  > "\${fpath[1]}/_pdfnative"
   pdfnative completion fish > ~/.config/fish/completions/pdfnative.fish
+  pdfnative completion powershell >> $PROFILE
 `;
-
-function getVersion(): string {
-    const require = createRequire(import.meta.url);
-    const pkg = require('../package.json') as { version: string };
-    return pkg.version;
-}
 
 async function loadCommand(name: string): Promise<CommandFn> {
     switch (name) {
@@ -442,6 +614,22 @@ async function loadCommand(name: string): Promise<CommandFn> {
             const m = await import('./commands/extract.js');
             return m.extract;
         }
+        case 'extract-text': {
+            const m = await import('./commands/extract-text.js');
+            return m.extractTextCmd;
+        }
+        case 'fill': {
+            const m = await import('./commands/fill.js');
+            return m.fill;
+        }
+        case 'encrypt': {
+            const m = await import('./commands/encrypt.js');
+            return m.encrypt;
+        }
+        case 'decrypt': {
+            const m = await import('./commands/decrypt.js');
+            return m.decrypt;
+        }
         case 'annotate': {
             const m = await import('./commands/annotate.js');
             return m.annotate;
@@ -461,6 +649,10 @@ async function loadCommand(name: string): Promise<CommandFn> {
         case 'schema': {
             const m = await import('./commands/schema.js');
             return m.schema;
+        }
+        case 'doctor': {
+            const m = await import('./commands/doctor.js');
+            return m.doctor;
         }
         default:
             return Promise.reject(
@@ -496,7 +688,7 @@ async function main(): Promise<void> {
     }
 
     if (hasFlag(args.flags, 'version', 'V')) {
-        const version = getVersion();
+        const version = cliVersion();
         if (hasFlag(args.flags, 'json')) {
             process.stdout.write(JSON.stringify({ name: 'pdfnative-cli', version }) + '\n');
         } else {
@@ -523,11 +715,16 @@ async function main(): Promise<void> {
             case 'merge': process.stdout.write(MERGE_USAGE); break;
             case 'split': process.stdout.write(SPLIT_USAGE); break;
             case 'extract': process.stdout.write(EXTRACT_USAGE); break;
+            case 'extract-text': process.stdout.write(EXTRACT_TEXT_USAGE); break;
+            case 'fill': process.stdout.write(FILL_USAGE); break;
+            case 'encrypt': process.stdout.write(ENCRYPT_USAGE); break;
+            case 'decrypt': process.stdout.write(DECRYPT_USAGE); break;
             case 'annotate': process.stdout.write(ANNOTATE_USAGE); break;
             case 'govern': process.stdout.write(GOVERN_USAGE); break;
             case 'batch': process.stdout.write(BATCH_USAGE); break;
             case 'schema': process.stdout.write(SCHEMA_USAGE); break;
             case 'completion': process.stdout.write(COMPLETION_USAGE); break;
+            case 'doctor': process.stdout.write(DOCTOR_USAGE); break;
             default:
                 process.stderr.write(`Unknown command: ${commandName}. Run pdfnative --help for usage.\n`);
                 process.exit(1);

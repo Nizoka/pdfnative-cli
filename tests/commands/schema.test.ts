@@ -25,7 +25,11 @@ describe('schema', () => {
         expect(Array.isArray(doc.oneOf)).toBe(true);
     });
 
-    it.each(['render', 'inspect', 'verify', 'batch', 'inspect-summary', 'verify-summary', 'batch-summary'])(
+    it.each([
+        'render', 'inspect', 'verify', 'batch', 'annotate', 'extract-text', 'fill',
+        'form-export', 'inspect-summary', 'verify-summary', 'batch-summary',
+        'govern-verify', 'status', 'doctor',
+    ])(
         'prints a valid Draft 2020-12 schema for "%s"',
         async (subject) => {
             const out = captureStdout();
@@ -36,6 +40,22 @@ describe('schema', () => {
             expect(typeof doc.title).toBe('string');
         },
     );
+
+    it('emits a capability manifest for "manifest"', async () => {
+        const out = captureStdout();
+        await schema(parseArgs(['manifest']));
+        out.restore();
+        const doc = JSON.parse(out.calls.join(''));
+        expect(doc.kind).toBe('capability-manifest');
+        expect(doc.name).toBe('pdfnative-cli');
+        expect(Array.isArray(doc.commands)).toBe(true);
+        // Every new 1.3.0 command must be discoverable.
+        const names = (doc.commands as { name: string }[]).map((c) => c.name);
+        expect(names).toEqual(
+            expect.arrayContaining(['extract-text', 'fill', 'encrypt', 'decrypt']),
+        );
+        expect(doc.errorCodes).toContain('E_PASSWORD');
+    });
 
     it('embeds the CLI version in the schema $id', async () => {
         const out = captureStdout();
@@ -58,10 +78,16 @@ describe('schema', () => {
             'verify',
             'batch',
             'annotate',
+            'extract-text',
+            'fill',
+            'form-export',
             'inspect-summary',
             'verify-summary',
             'batch-summary',
             'govern-verify',
+            'status',
+            'manifest',
+            'doctor',
         ]);
     });
 

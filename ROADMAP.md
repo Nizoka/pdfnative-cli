@@ -68,7 +68,7 @@ This document outlines the planned development direction for pdfnative-cli. Prio
 - [x] **Shell completions** — `completion bash|zsh|fish`.
 - [x] **Global flags** — `--quiet`, `--no-color` (+`NO_COLOR`), `--version --json`.
 
-## In Progress
+## Recent releases
 
 ### v1.1.0 — pdfnative 1.3.0 coverage _(released 2026-06-30)_
 
@@ -112,6 +112,40 @@ This document outlines the planned development direction for pdfnative-cli. Prio
   `/PageLabels`.
 - [x] **`schema annotate` / `schema govern-verify`** — new agent-validation subjects.
 
+### v1.3.0 — pdfnative 1.6.0: text, forms, encryption & charts _(released 2026-07-24)_
+
+- [x] **`pdfnative` bumped** to `^1.6.0` (was `^1.5.0`).
+- [x] **`extract-text` command** — reading-order Unicode text via `extractText`
+  (`--format text|json|ndjson`, `--pages`, `--runs`, `--password`, `--max-length`). NDJSON
+  and `--summary`/`--fields` make it agent/RAG-native. No OCR.
+- [x] **`fill` command** — fill and/or flatten existing AcroForms via `fillForm` /
+  `flattenForm` with an incremental save (existing signatures stay valid).
+- [x] **`encrypt` / `decrypt` commands** — AES-128/256 re-encryption and transparent
+  decryption via pdfnative 1.6.0 page-tree re-encryption (Future Consideration, now shipped).
+- [x] **`render` native charts** — the `chart` document block (bar/barH/line/pie/donut) as
+  pure PDF path operators, tagged `/Figure`.
+- [x] **`merge`/`split`/`extract` — `--password` / `--encrypt` / `--stream`** — encrypted
+  sources, output re-encryption, and constant-memory streaming (`stream*` variants).
+- [x] **`inspect --form-fields` / `--encryption` / `--password`** — list form fields, report
+  the encryption scheme, and open encrypted documents.
+- [x] **Agent capability manifest** — `schema manifest` + repo `llms.txt`; new schema subjects
+  `extract-text` / `fill` / `status`; new stable `E_PASSWORD` error code.
+- [x] **PowerShell completion** — `completion powershell`.
+- [x] **`CLAUDE.md`** — Claude Code contributor guide.
+- [x] **`fill --export`** — dump an AcroForm's current values as a `--data`-shaped JSON map
+  (read → edit → fill round-trip).
+- [x] **`doctor` command** — offline environment/capability preflight (CLI/Node/pdfnative
+  versions, Web Crypto CSPRNG, command count); text or `--json`, exit 0/1.
+- [x] **`encrypt` / `decrypt --stream`** — constant-memory streaming parity with the
+  page-tree commands.
+- [x] **Unified `render` encryption flags** — `render` now accepts `--encrypt [aes-128|aes-256]`
+  / `--owner-password` / `--user-password` / `--permissions` (same vocabulary as
+  merge/split/extract); the `--encrypt-*` flags remain as aliases.
+- [x] **fix** — `render --encrypt` was a silent no-op (help documented flags the code didn't
+  read); it now encrypts. And `schema` / `--version` were broken in the published binary
+  (bundle-relative `package.json` path); version resolution is now bundle-safe. An empty
+  env password no longer overrides an explicit `--password`.
+
 ### Next — Sign-side LTV (PAdES-T / LT / LTA), upstream-coordinated
 
 Sign-side LTV is **PDF-writing logic that belongs in pdfnative**; the CLI exposes the
@@ -128,6 +162,26 @@ surface and will light it up once the upstream primitives ship.
 
 ## Future Considerations
 
-- **`merge`** — ✅ shipped in v1.2.0 (page-tree). **`encrypt` / `modify` standalone
-  commands** — once pdfnative exposes the matching primitives.
-- **Additional shell integrations** — PowerShell completion, man pages.
+Feasibility is called out honestly: some ideas need pdfnative to expose a primitive first
+(the CLI stays a thin dispatch layer and never re-implements engine logic).
+
+- **`batch --manifest tasks.json`** — turn `batch` into a file-driven task orchestrator: a JSON
+  manifest of steps (e.g. `render → sign → encrypt`), each an existing command, run in order
+  with a JSON summary and stable exit codes. **Feasible today** (composes existing commands, no
+  new pdfnative primitive) — a strong agent-automation candidate.
+- **`compare a.pdf b.pdf`** — diff two PDFs for CI / regression testing, with `--format json`,
+  a stable `E_CHECK_FAILED` exit, and `--tolerance`. **Text / structural** diff is feasible now
+  (`extractText` + object / metadata comparison). A **visual** (pixel) diff is **blocked**:
+  pdfnative is a generator/parser with **no rasteriser**, so rendering pages to images is out of
+  scope until an upstream raster primitive exists.
+- **`optimize`** — shrink PDFs for web/archival: image re-compression/resampling, unused-object
+  GC, and linearisation ("Fast Web View"). **Blocked** — pdfnative does not yet expose the
+  low-level optimisation/linearisation primitives this would wrap.
+- **`modify` standalone command** — in-place object edits that preserve signatures/forms —
+  awaits the matching pdfnative primitives.
+- **Category help commands** (`pdfnative page --help`, `pdfnative security --help`) — the global
+  `--help` already **groups** commands by category (Create & edit / Page tree / Security /
+  Read & extract / Automation & meta); dedicated category dispatch commands are deferred (extra
+  surface + category-vs-command ambiguity).
+- **Additional shell integrations** — PowerShell completion ✅ shipped in v1.3.0. **man pages**
+  remain (deferred: ongoing maintenance cost vs. `--help`/completions already covering usage).

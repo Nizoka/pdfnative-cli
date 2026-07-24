@@ -1,68 +1,61 @@
-// `pdfnative extract` — extract a subset of pages from a PDF into a new PDF
-// (pdfnative page-tree API). Page order follows the `--pages` selector and
-// pages may repeat. Signatures/forms are dropped. Encrypted sources are
-// supported with --password (v1.6.0); the output can be re-encrypted with
-// --encrypt and streamed at constant memory with --stream (see `merge`).
+// `pdfnative encrypt` — re-secure a PDF with AES-128/256 encryption (pdfnative
+// 1.6.0 page-tree re-encryption). The document is rebuilt from its page tree,
+// so — like `merge` — signatures and form fields are dropped (any page-tree
+// edit invalidates a signature's /ByteRange). An already-encrypted source can
+// be opened with --password for password rotation. Requires a Web Crypto
+// CSPRNG; RC4 is never emitted.
 
 import { extractPages, streamExtractPages, openPdf } from '../core-bridge/index.js';
 import type { StreamMergeOptions } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, hasFlag } from '../utils/args.js';
 import { readFileOrStdin, writeOutput, writeStreamingOutput } from '../utils/io.js';
-import { CliError } from '../utils/error.js';
 import { emitStatus, isDryRun } from '../utils/agent.js';
 import {
     parseMaxOutputSize,
-    resolveSourcePassword,
-    readEncryptTrigger,
-    buildEncryptOptions,
     parseChunkSize,
+    resolveSourcePassword,
+    buildEncryptOptions,
     mapPdfError,
 } from '../utils/pdfops.js';
-import { parsePageList } from '../utils/pages.js';
 
-export async function extract(args: ParsedArgs): Promise<void> {
+export async function encrypt(args: ParsedArgs): Promise<void> {
     const inputPath = getStringFlag(args.flags, 'input', 'i');
     const outputPath = getStringFlag(args.flags, 'output', 'o');
-    const pagesSpec = getStringFlag(args.flags, 'pages');
     const dropAnnotations = hasFlag(args.flags, 'drop-annotations');
     const maxOutputSize = parseMaxOutputSize(getStringFlag(args.flags, 'max-output-size'));
-    const password = resolveSourcePassword(args.flags);
-    const { enabled: doEncrypt, algoRaw } = readEncryptTrigger(args.flags);
-    const encrypt = doEncrypt ? buildEncryptOptions(args, algoRaw) : undefined;
+    const sourcePassword = resolveSourcePassword(args.flags);
     const stream = hasFlag(args.flags, 'stream');
     const chunkSize = parseChunkSize(getStringFlag(args.flags, 'chunk-size'));
     const dryRun = hasFlag(args.flags, 'dry-run') || isDryRun();
 
-    if (pagesSpec === undefined) {
-        throw new CliError('extract requires --pages <selector> (e.g. "1,3,5-7").', 2);
-    }
+    // Owner password is required — buildEncryptOptions throws (exit 2) if absent.
+    const encryptOptions = buildEncryptOptions(args, getStringFlag(args.flags, 'algorithm'));
 
     const inputBuf = await readFileOrStdin(inputPath);
     const pdfBytes = new Uint8Array(inputBuf);
 
     let pageCount: number;
     try {
-        pageCount = openPdf(pdfBytes, password !== undefined ? { password } : undefined).pageCount;
+        pageCount = openPdf(pdfBytes, sourcePassword !== undefined ? { password: sourcePassword } : undefined).pageCount;
     } catch (e) {
         throw mapPdfError(e, 'Failed to read PDF');
     }
-
-    const indices = parsePageList(pagesSpec, pageCount);
+    const indices = Array.from({ length: pageCount }, (_, i) => i);
 
     const opts: { -readonly [K in keyof StreamMergeOptions]: StreamMergeOptions[K] } = {
         dropAnnotations,
+        encrypt: encryptOptions,
     };
+    if (sourcePassword !== undefined) opts.password = sourcePassword;
     if (maxOutputSize !== undefined) opts.maxOutputSize = maxOutputSize;
-    if (password !== undefined) opts.password = password;
-    if (encrypt !== undefined) opts.encrypt = encrypt;
     if (chunkSize !== undefined) opts.chunkSize = chunkSize;
 
     if (dryRun) {
         emitStatus({
-            command: 'extract',
+            command: 'encrypt',
             dryRun: true,
-            pages: indices.length,
-            encrypted: encrypt !== undefined,
+            pages: pageCount,
+            algorithm: encryptOptions.algorithm ?? 'aes128',
             output: outputPath ?? '-',
         });
         return;
@@ -72,33 +65,33 @@ export async function extract(args: ParsedArgs): Promise<void> {
         try {
             await writeStreamingOutput(streamExtractPages(pdfBytes, indices, opts), outputPath);
         } catch (e) {
-            throw mapPdfError(e, 'Failed to extract pages');
+            throw mapPdfError(e, 'Failed to encrypt PDF');
         }
         emitStatus({
-            command: 'extract',
+            command: 'encrypt',
             dryRun: false,
-            pages: indices.length,
+            pages: pageCount,
+            algorithm: encryptOptions.algorithm ?? 'aes128',
             streamed: true,
-            encrypted: encrypt !== undefined,
             output: outputPath ?? '-',
         });
         return;
     }
 
-    let extracted: Uint8Array;
+    let out: Uint8Array;
     try {
-        extracted = extractPages(pdfBytes, indices, opts);
+        out = extractPages(pdfBytes, indices, opts);
     } catch (e) {
-        throw mapPdfError(e, 'Failed to extract pages');
+        throw mapPdfError(e, 'Failed to encrypt PDF');
     }
 
-    await writeOutput(extracted, outputPath);
+    await writeOutput(out, outputPath);
     emitStatus({
-        command: 'extract',
+        command: 'encrypt',
         dryRun: false,
-        pages: indices.length,
-        encrypted: encrypt !== undefined,
+        pages: pageCount,
+        algorithm: encryptOptions.algorithm ?? 'aes128',
         output: outputPath ?? '-',
-        bytes: extracted.length,
+        bytes: out.length,
     });
 }

@@ -1,17 +1,26 @@
-// `pdfnative split` — split one PDF into multiple PDFs (pdfnative 1.4.0
-// page-tree API). With `--pages` each comma-separated segment becomes one
-// output document; without it, every page becomes its own single-page PDF.
-// Signatures/forms are dropped and encrypted sources rejected (see `merge`).
+// `pdfnative split` — split one PDF into multiple PDFs (pdfnative page-tree
+// API). With `--pages` each comma-separated segment becomes one output
+// document; without it, every page becomes its own single-page PDF.
+// Signatures/forms are dropped. Encrypted sources are supported with
+// --password (v1.6.0); each output can be re-encrypted with --encrypt and
+// written at constant memory with --stream (see `merge`).
 
 import { mkdir } from 'node:fs/promises';
 import { join, basename, extname } from 'node:path';
-import { splitPdf, openPdf } from '../core-bridge/index.js';
-import type { MergeOptions, PageRange } from '../core-bridge/index.js';
+import { splitPdf, streamSplitPdf, openPdf } from '../core-bridge/index.js';
+import type { StreamMergeOptions, PageRange } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, hasFlag } from '../utils/args.js';
-import { readFileOrStdin, writeOutput, validatePath } from '../utils/io.js';
-import { CliError, ErrorCode } from '../utils/error.js';
+import { readFileOrStdin, writeOutput, writeStreamingOutput, validatePath } from '../utils/io.js';
+import { CliError } from '../utils/error.js';
 import { emitStatus, isDryRun } from '../utils/agent.js';
-import { parseMaxOutputSize } from '../utils/pdfops.js';
+import {
+    parseMaxOutputSize,
+    resolveSourcePassword,
+    readEncryptTrigger,
+    buildEncryptOptions,
+    parseChunkSize,
+    mapPdfError,
+} from '../utils/pdfops.js';
 import { parsePageRanges } from '../utils/pages.js';
 
 /** Sanitise a user-supplied filename prefix (strip path separators / dots). */
@@ -27,6 +36,11 @@ export async function split(args: ParsedArgs): Promise<void> {
     const prefixRaw = getStringFlag(args.flags, 'prefix');
     const dropAnnotations = hasFlag(args.flags, 'drop-annotations');
     const maxOutputSize = parseMaxOutputSize(getStringFlag(args.flags, 'max-output-size'));
+    const password = resolveSourcePassword(args.flags);
+    const { enabled: doEncrypt, algoRaw } = readEncryptTrigger(args.flags);
+    const encrypt = doEncrypt ? buildEncryptOptions(args, algoRaw) : undefined;
+    const stream = hasFlag(args.flags, 'stream');
+    const chunkSize = parseChunkSize(getStringFlag(args.flags, 'chunk-size'));
     const dryRun = hasFlag(args.flags, 'dry-run') || isDryRun();
 
     if (outputDir === undefined) {
@@ -39,10 +53,9 @@ export async function split(args: ParsedArgs): Promise<void> {
 
     let pageCount: number;
     try {
-        pageCount = openPdf(pdfBytes).pageCount;
+        pageCount = openPdf(pdfBytes, password !== undefined ? { password } : undefined).pageCount;
     } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new CliError(`Failed to read PDF: ${message}`, 1, ErrorCode.PARSE);
+        throw mapPdfError(e, 'Failed to read PDF');
     }
 
     const ranges: PageRange[] = pagesSpec !== undefined
@@ -53,13 +66,48 @@ export async function split(args: ParsedArgs): Promise<void> {
         prefixRaw ?? (inputPath !== undefined ? basename(inputPath, extname(inputPath)) : 'part'),
     );
 
-    const opts: MergeOptions = {
+    const opts: { -readonly [K in keyof StreamMergeOptions]: StreamMergeOptions[K] } = {
         dropAnnotations,
-        ...(maxOutputSize !== undefined ? { maxOutputSize } : {}),
     };
+    if (maxOutputSize !== undefined) opts.maxOutputSize = maxOutputSize;
+    if (password !== undefined) opts.password = password;
+    if (encrypt !== undefined) opts.encrypt = encrypt;
+    if (chunkSize !== undefined) opts.chunkSize = chunkSize;
 
     if (dryRun) {
-        emitStatus({ command: 'split', dryRun: true, parts: ranges.length, outputDir });
+        emitStatus({
+            command: 'split',
+            dryRun: true,
+            parts: ranges.length,
+            encrypted: encrypt !== undefined,
+            outputDir,
+        });
+        return;
+    }
+
+    await mkdir(outputDir, { recursive: true });
+    // Zero-pad the index so lexical sort matches page order.
+    const width = String(ranges.length).length;
+    const outName = (i: number): string => `${prefix}-${String(i + 1).padStart(width, '0')}.pdf`;
+
+    if (stream) {
+        try {
+            for await (const part of streamSplitPdf(pdfBytes, ranges, opts)) {
+                // writeStreamingOutput fully drains part.pdf before we advance,
+                // which streamSplitPdf requires.
+                await writeStreamingOutput(part.pdf, join(outputDir, outName(part.index)));
+            }
+        } catch (e) {
+            throw mapPdfError(e, 'Failed to split PDF');
+        }
+        emitStatus({
+            command: 'split',
+            dryRun: false,
+            parts: ranges.length,
+            streamed: true,
+            encrypted: encrypt !== undefined,
+            outputDir,
+        });
         return;
     }
 
@@ -67,21 +115,18 @@ export async function split(args: ParsedArgs): Promise<void> {
     try {
         parts = splitPdf(pdfBytes, ranges, opts);
     } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new CliError(`Failed to split PDF: ${message}`, 1, ErrorCode.PARSE);
+        throw mapPdfError(e, 'Failed to split PDF');
     }
 
-    await mkdir(outputDir, { recursive: true });
-
-    // Zero-pad the index so lexical sort matches page order.
-    const width = String(parts.length).length;
-    const outputs: string[] = [];
     for (let i = 0; i < parts.length; i++) {
-        const name = `${prefix}-${String(i + 1).padStart(width, '0')}.pdf`;
-        const outPath = join(outputDir, name);
-        await writeOutput(parts[i] as Uint8Array, outPath);
-        outputs.push(outPath);
+        await writeOutput(parts[i] as Uint8Array, join(outputDir, outName(i)));
     }
 
-    emitStatus({ command: 'split', dryRun: false, parts: parts.length, outputDir });
+    emitStatus({
+        command: 'split',
+        dryRun: false,
+        parts: parts.length,
+        encrypted: encrypt !== undefined,
+        outputDir,
+    });
 }
