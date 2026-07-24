@@ -10,9 +10,10 @@
 // Philosophy: zero runtime deps, pure data. No validation engine is bundled —
 // the CLI only PRODUCES schemas; callers validate with their own tooling.
 
-import { createRequire } from 'node:module';
 import type { ParsedArgs } from '../utils/args.js';
 import { CliError, ErrorCode } from '../utils/error.js';
+import { cliVersion } from '../utils/version.js';
+import { COMMANDS, GLOBAL_FLAGS } from './completion.js';
 
 type JsonSchema = Readonly<Record<string, unknown>>;
 
@@ -22,18 +23,18 @@ const SUBJECTS = [
     'verify',
     'batch',
     'annotate',
+    'extract-text',
+    'fill',
+    'form-export',
     'inspect-summary',
     'verify-summary',
     'batch-summary',
     'govern-verify',
+    'status',
+    'manifest',
+    'doctor',
 ] as const;
 type Subject = (typeof SUBJECTS)[number];
-
-function cliVersion(): string {
-    const require = createRequire(import.meta.url);
-    const pkg = require('../../package.json') as { version: string };
-    return pkg.version;
-}
 
 const DRAFT = 'https://json-schema.org/draft/2020-12/schema';
 const ID_BASE = 'https://pdfnative.dev/schema/cli';
@@ -133,6 +134,33 @@ function inspectSchema(): JsonSchema {
                         style: { type: ['string', 'null'] },
                         prefix: { type: ['string', 'null'] },
                         start: { type: ['integer', 'null'] },
+                    },
+                },
+            },
+            encryption: {
+                type: ['object', 'null'],
+                description: 'Present with `inspect --encryption` (pdfnative 1.6.0).',
+                properties: {
+                    algorithm: { type: 'string', enum: ['rc4-40', 'rc4-128', 'aes128', 'aes256'] },
+                    revision: { type: 'integer' },
+                    authenticatedAs: { type: 'string', enum: ['user', 'owner'] },
+                },
+            },
+            formFields: {
+                type: 'array',
+                description: 'Present with `inspect --form-fields` (pdfnative 1.6.0).',
+                items: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string' },
+                        type: {
+                            type: 'string',
+                            enum: ['text', 'checkbox', 'radio', 'dropdown', 'listbox', 'button', 'signature', 'unknown'],
+                        },
+                        value: { type: ['string', 'array', 'boolean', 'null'] },
+                        readOnly: { type: 'boolean' },
+                        required: { type: 'boolean' },
+                        options: { type: 'array', items: { type: 'string' } },
                     },
                 },
             },
@@ -369,16 +397,166 @@ function batchSummarySchema(): JsonSchema {
     };
 }
 
+function extractTextSchema(): JsonSchema {
+    return {
+        $schema: DRAFT,
+        $id: id('extract-text'),
+        title: 'pdfnative-cli extract-text output',
+        description: 'JSON emitted by `pdfnative extract-text --format json`: one entry '
+            + 'per page. NDJSON mode emits each entry on its own line.',
+        type: 'array',
+        items: {
+            type: 'object',
+            required: ['pageIndex', 'text'],
+            properties: {
+                pageIndex: { type: 'integer', minimum: 0 },
+                text: { type: 'string' },
+                runs: {
+                    type: 'array',
+                    description: 'Present with --runs.',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            text: { type: 'string' },
+                            x: { type: 'number' },
+                            y: { type: 'number' },
+                            fontSize: { type: 'number' },
+                            fontName: { type: 'string' },
+                        },
+                    },
+                },
+            },
+        },
+    };
+}
+
+function fillSchema(): JsonSchema {
+    return {
+        $schema: DRAFT,
+        $id: id('fill'),
+        title: 'pdfnative-cli fill input',
+        description: 'JSON accepted via --data by `pdfnative fill`: a map of '
+            + 'fully-qualified field name → value (string, boolean, or string[]), '
+            + 'optionally wrapped in { "values": { … } }.',
+        oneOf: [
+            {
+                type: 'object',
+                additionalProperties: { type: ['string', 'boolean', 'array'], items: { type: 'string' } },
+            },
+            {
+                type: 'object',
+                required: ['values'],
+                properties: {
+                    values: {
+                        type: 'object',
+                        additionalProperties: { type: ['string', 'boolean', 'array'], items: { type: 'string' } },
+                    },
+                },
+            },
+        ],
+    };
+}
+
+function formExportSchema(): JsonSchema {
+    return {
+        $schema: DRAFT,
+        $id: id('form-export'),
+        title: 'pdfnative-cli fill --export output',
+        description: 'JSON emitted by `pdfnative fill --export`: a map of field name → '
+            + 'current value (string, boolean, or string[]). Re-usable directly as `fill --data`.',
+        type: 'object',
+        additionalProperties: { type: ['string', 'boolean', 'array'], items: { type: 'string' } },
+    };
+}
+
+function doctorSchema(): JsonSchema {
+    return {
+        $schema: DRAFT,
+        $id: id('doctor'),
+        title: 'pdfnative-cli doctor output',
+        description: 'JSON emitted by `pdfnative doctor --format json`: environment / '
+            + 'capability preflight. `ok` is false when any check has status "error".',
+        type: 'object',
+        required: ['ok', 'checks'],
+        additionalProperties: false,
+        properties: {
+            ok: { type: 'boolean' },
+            checks: {
+                type: 'array',
+                items: {
+                    type: 'object',
+                    required: ['name', 'status', 'value', 'detail'],
+                    properties: {
+                        name: { type: 'string' },
+                        status: { type: 'string', enum: ['ok', 'warn', 'error'] },
+                        value: { type: 'string' },
+                        detail: { type: 'string' },
+                    },
+                },
+            },
+        },
+    };
+}
+
+function statusSchema(): JsonSchema {
+    return {
+        $schema: DRAFT,
+        $id: id('status'),
+        title: 'pdfnative-cli agent status envelope',
+        description: 'The success envelope written to stderr under --json by the write '
+            + 'commands (render, sign, merge, split, extract, annotate, fill, encrypt, '
+            + 'decrypt, batch). Additional command-specific fields may be present.',
+        type: 'object',
+        required: ['ok', 'command'],
+        properties: {
+            ok: { type: 'boolean', const: true },
+            command: { type: 'string' },
+            dryRun: { type: 'boolean' },
+            output: { type: 'string' },
+            bytes: { type: 'integer', minimum: 0 },
+        },
+    };
+}
+
+/**
+ * The CLI capability manifest — DATA (not a JSON Schema) describing every
+ * command, its flags, the global flags, and the stable error codes. Emitted by
+ * `schema manifest` so an AI agent can discover the CLI's tools at runtime.
+ * Kept in sync with the completion metadata (single source of truth).
+ */
+function manifestDocument(): JsonSchema {
+    return {
+        $id: `${ID_BASE}/${cliVersion()}/manifest.json`,
+        kind: 'capability-manifest',
+        name: 'pdfnative-cli',
+        version: cliVersion(),
+        contract: {
+            stdout: 'primary artifact (PDF, JSON report, text, schema, script)',
+            stderr: 'diagnostics and, under --json, the status/error envelope',
+            exitCodes: { '0': 'success', '1': 'runtime/check failure', '2': 'usage error' },
+        },
+        globalFlags: GLOBAL_FLAGS,
+        errorCodes: Object.values(ErrorCode),
+        commands: COMMANDS.map((c) => ({ name: c.name, summary: c.summary, flags: c.flags })),
+    };
+}
+
 const BUILDERS: Readonly<Record<Subject, () => JsonSchema>> = {
     render: renderSchema,
     inspect: inspectSchema,
     verify: verifySchema,
     batch: batchSchema,
     annotate: annotateSchema,
+    'extract-text': extractTextSchema,
+    fill: fillSchema,
+    'form-export': formExportSchema,
     'inspect-summary': inspectSummarySchema,
     'verify-summary': verifySummarySchema,
     'batch-summary': batchSummarySchema,
     'govern-verify': governVerifySchema,
+    status: statusSchema,
+    manifest: manifestDocument,
+    doctor: doctorSchema,
 };
 
 function isSubject(value: string): value is Subject {

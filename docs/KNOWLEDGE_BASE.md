@@ -8,7 +8,17 @@
 ## 1. Context
 
 **What is pdfnative-cli?**
-The official command-line interface for [`pdfnative`](https://github.com/Nizoka/pdfnative) — a zero-dependency, ISO 32000-1 compliant PDF generation library. The CLI exposes eleven commands: `render`, `sign`, `inspect`, `verify`, `merge`, `split`, `extract`, `annotate`, `govern`, `batch`, `completion` — plus a `schema` command for agent self-validation.
+The official command-line interface for [`pdfnative`](https://github.com/Nizoka/pdfnative) — a zero-dependency, ISO 32000-1 compliant PDF generation library. The CLI exposes 17 commands, grouped by purpose (the global `--help` shows the same grouping):
+
+| Group | Commands |
+|-------|----------|
+| Create & edit | `render`, `fill`, `annotate` |
+| Page tree | `merge`, `split`, `extract` |
+| Security | `sign`, `verify`, `encrypt`, `decrypt` |
+| Read & extract | `inspect`, `extract-text` |
+| Automation & meta | `batch`, `doctor`, `schema`, `completion`, `govern` |
+
+`schema` (self-validation + capability manifest) and `doctor` (capability pre-flight) support agent automation.
 
 **Philosophy:**
 - Zero extra runtime dependencies — `pdfnative` is the *only* dependency.
@@ -33,21 +43,28 @@ src/
 │   ├── sign.ts           # PDF + key/cert → addSignaturePlaceholder → signPdfBytes (native node:crypto default)
 │   ├── inspect.ts        # PDF → PdfReader → metadata JSON/text (+ annotations, page labels)
 │   ├── verify.ts         # PDF → CMS + timestamp (PAdES-T) + OCSP/CRL revocation
-│   ├── merge.ts          # Several PDFs → mergePdfs → combined PDF
+│   ├── merge.ts          # Several PDFs → mergePdfs → combined PDF (+ password/encrypt/stream)
 │   ├── split.ts          # One PDF → splitPdf → many PDFs (per-page or per-range)
 │   ├── extract.ts        # One PDF + --pages → extractPages → new PDF
+│   ├── extract-text.ts   # PDF → extractText → reading-order text (text|json|ndjson)
+│   ├── fill.ts           # AcroForm → fillForm/flattenForm/readFormFields (fill|flatten|export)
+│   ├── encrypt.ts        # PDF → page-tree re-encryption (AES-128/256)
+│   ├── decrypt.ts        # Encrypted PDF + --password → plaintext copy
 │   ├── annotate.ts       # PDF + --annotations → createModifier + buildAnnotationBody → incremental save
 │   ├── govern.ts         # AI-governance / HITL: rules | policy | verify-issue
-│   ├── schema.ts         # Versioned JSON Schemas (Draft 2020-12)
+│   ├── schema.ts         # Versioned JSON Schemas (Draft 2020-12) + capability manifest
 │   ├── batch.ts          # Directory of JSON → parallel render → per-file summary
-│   └── completion.ts     # bash/zsh/fish completion scripts
+│   ├── completion.ts     # bash/zsh/fish/powershell completion scripts
+│   └── doctor.ts         # Environment / capability preflight (text | --json)
 ├── utils/
 │   ├── args.ts           # Zero-dep argument parser
 │   ├── io.ts             # stdin/stdout/file I/O helpers
 │   ├── config.ts         # `.pdfnativerc.json` discovery + flag-default merge
 │   ├── colors.ts         # NO_COLOR/TTY-aware ANSI helper
 │   ├── pages.ts          # 1-based page-list / page-range parsing (zero-dep)
-│   ├── pdfops.ts         # --max-output-size parsing + source-path collection (traversal guard)
+│   ├── pdfops.ts         # page-tree helpers: max-output-size/chunk-size parsing, source-path
+│   │                     #   collection (traversal guard), password/encrypt resolution, mapPdfError
+│   ├── version.ts        # bundle-safe CLI version resolution (name-guarded package.json probe)
 │   ├── governance.ts     # AI-governance policy + AGENT_RULES text + pure draft validator
 │   ├── layout.ts         # Layout option composer (CLI flags + --layout / --debug-layout merge)
 │   ├── keys.ts           # PEM / PEM-chain loader + native node:crypto provider (key redaction on error)
@@ -243,6 +260,7 @@ pdfnative render [--input <file.json>] [--output <out.pdf>] [--stream|--stream-p
 | `link` | `text`, `url` | `fontSize`, `color` | [01-resource-directory.json](../samples/render/link/01-resource-directory.json) |
 | `toc` | — | `title`, `maxLevel` | [01-document-with-toc.json](../samples/render/toc/01-document-with-toc.json) |
 | `formField` | `fieldType` (`text`\|`textarea`\|`checkbox`\|`radio`\|`select`), `name` | `label`, `value`, `placeholder`, `options`, `readOnly`, `required`, `maxLength`, `width` | [01-contact-form.json](../samples/render/form/01-contact-form.json) |
+| `chart` | `chartType` (`bar`\|`barH`\|`line`\|`pie`\|`donut`), `series` (`{ label, values[] }[]`) | `title`, `categories`, `legend`, `width`, `height`, `axis` | [01-bar-chart.json](../samples/render/chart/01-bar-chart.json) |
 | `spacer` | `height` (points) | — | any sample |
 | `pageBreak` | — | — | [03-all-blocks.json](../samples/render/document/03-all-blocks.json) |
 
@@ -456,7 +474,7 @@ pdfnative merge <a.pdf> <b.pdf> [...] --output <combined.pdf>
 | `--input` | string (repeatable) | — | Additional source PDF |
 | `--output` | string | stdout | Output combined PDF |
 | `--drop-annotations` | boolean | false | Strip annotations from the merged output |
-| `--max-output-size` | bytes | none | Fail if the output would exceed this size |
+| `--max-output-size` | bytes | 256 MiB | Fail if the output would exceed this size (`0`/`none` = unlimited) |
 
 **pdfnative API:** `mergePdfs(sources: Uint8Array[], options?: MergeOptions): Uint8Array`.
 
@@ -475,7 +493,7 @@ pdfnative split --input <in.pdf> --output-dir <dir> [--pages 1-2,3-4] [--prefix 
 | `--pages` | ranges | one per page | Each comma-separated range becomes one output |
 | `--prefix` | string | input stem / `part` | Filename prefix → `<prefix>-<n>.pdf` (zero-padded) |
 | `--drop-annotations` | boolean | false | Strip annotations from each part |
-| `--max-output-size` | bytes | none | Per-part size cap |
+| `--max-output-size` | bytes | 256 MiB | Per-part size cap (`0`/`none` = unlimited) |
 
 **pdfnative API:** `splitPdf(source: Uint8Array, ranges?: PageRange[], options?): Uint8Array[]`.
 
@@ -493,9 +511,93 @@ pdfnative extract --input <in.pdf> --output <out.pdf> --pages 4,1-2
 | `--output` | string | stdout | Output PDF |
 | `--pages` | list/range | — **(required)** | 1-based; order preserved, repeats allowed |
 | `--drop-annotations` | boolean | false | Strip annotations from the output |
-| `--max-output-size` | bytes | none | Output size cap |
+| `--max-output-size` | bytes | 256 MiB | Output size cap (`0`/`none` = unlimited) |
 
 **pdfnative API:** `extractPages(source: Uint8Array, pages: PageRange[], options?): Uint8Array`.
+
+> **Encryption & streaming (pdfnative 1.6.0):** `merge`, `split`, and `extract` also accept
+> `--password` (decrypt an encrypted source), `--encrypt [aes-128|aes-256]` with
+> `--owner-password` / `--user-password` / `--permissions` (re-encrypt the rebuilt output via
+> `MergeOptions.encrypt`), and `--stream` + `--chunk-size` (constant-memory output via the
+> `streamMergedPdfs` / `streamSplitPdf` / `streamExtractPages` generators). A wrong/missing
+> password surfaces the stable `E_PASSWORD` code.
+>
+> **`merge` multiple encrypted sources:** the single `--password` is applied to *every* source
+> (`MergeOptions.password`), so merging sources with **different** passwords fails with
+> `E_PASSWORD`. Decrypt the outliers first, then merge. (`split` / `extract` take a single input,
+> so their `--password` is unambiguous.)
+
+### `extract-text`
+
+**Purpose:** Extract reading-order Unicode text (pdfnative 1.6.0 `extractText`). No OCR —
+image-only pages yield empty text.
+
+```bash
+pdfnative extract-text --input <in.pdf> --format text|json|ndjson [--runs] [--pages 1,3] [--password <s>]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--format` | `text`\|`json`\|`ndjson` | `text` | Plain text (form-feed between pages), JSON array, or NDJSON (one object per page) |
+| `--pages` | list/range | all | 1-based selector |
+| `--runs` | boolean | false | Include positioned runs `{ text, x, y, fontSize, fontName }` |
+| `--password` | string | — | Password for an encrypted PDF (env `PDFNATIVE_PASSWORD`) |
+| `--max-length` | integer | 16000000 | Total-character cap (`0`/`none` disables) |
+| `--summary` / `--fields` / `--pretty` | — | — | Token-economy controls (json) |
+
+**pdfnative API:** `extractText(bytes, { password?, pages?, includeRuns?, maxTextLength? }): ExtractedPageText[]`.
+
+### `fill`
+
+**Purpose:** Fill and/or flatten an existing AcroForm (pdfnative 1.6.0), incremental save.
+
+```bash
+pdfnative fill --input <form.pdf> --data <values.json> [--flatten] [--output <out.pdf>]
+pdfnative fill --input <form.pdf> --flatten --output <flat.pdf>
+pdfnative fill --input <form.pdf> --export [--output <values.json>]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--data` | string | — | JSON object `name → string\|boolean\|string[]` (or `{ "values": {…} }`) |
+| `--flatten` | boolean | false | Flatten after filling, or flatten in place when `--data` omitted |
+| `--export` | boolean | false | Read-only: emit current values as a `--data`-shaped JSON map (ignores `--data`/`--flatten`) |
+| `--force` | boolean | false | Flatten even with a signed signature field present |
+| `--on-unknown` | `throw`\|`ignore` | `throw` | Unknown field-name behaviour |
+| `--need-appearances` | boolean | false | Set `/NeedAppearances` for non-WinAnsi values |
+| `--password` | string | — | Password for an encrypted PDF |
+
+`--export` enables a read → edit → fill round-trip: it emits current field values
+(unset choice fields omitted, so the map re-fills cleanly). Errors on malformed
+`--data` content are `E_INPUT` (exit 1).
+
+**pdfnative API:** `readFormFields(bytes, opts?)`, `fillForm(bytes, values, opts?)`,
+`flattenForm(bytes, opts?)`. Form errors map to `E_INPUT` (field/value) or `E_UNSUPPORTED`
+(signature fields).
+
+### `encrypt` / `decrypt`
+
+**Purpose:** Re-secure with AES-128/256, or remove encryption (pdfnative 1.6.0 page-tree
+re-encryption). Both rebuild the page tree like `merge`, so signatures/forms are dropped.
+`encrypt` requires a Web Crypto CSPRNG; RC4 is never emitted.
+
+```bash
+pdfnative encrypt --input in.pdf --owner-password <s> [--user-password <s>] [--algorithm aes-256] [--permissions print,copy]
+pdfnative decrypt --input enc.pdf --password <s> --output plain.pdf
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--owner-password` | string | — **(required for encrypt)** | env `PDFNATIVE_ENCRYPT_OWNER_PASS` |
+| `--user-password` | string | — | env `PDFNATIVE_ENCRYPT_USER_PASS` |
+| `--algorithm` | `aes-128`\|`aes-256` | `aes-128` | encrypt only |
+| `--permissions` | list | — | `print,copy,modify,extract` |
+| `--password` | string | — | Open an encrypted source (rotation, or decrypt); env `PDFNATIVE_PASSWORD` |
+| `--stream` | boolean | false | Constant-memory streaming output (`--chunk-size <bytes>`) |
+
+**pdfnative API:** `extractPages(source, allPages, { password?, encrypt? })` (buffered) or
+`streamExtractPages(...)` (with `--stream`) — `encrypt` maps to `MergeOptions.encrypt`.
+Passwords come from env (a non-empty value wins over flags) and are never logged.
 
 ### `annotate`
 
@@ -526,6 +628,16 @@ pdfnative govern verify-issue <draft.md> [--json]   # gate a draft
 ```
 
 `verify-issue` returns `{ ok, errors, warnings }` and exits 1 (`E_POLICY`) on a violation — proposing an external runtime dependency, or omitting a reproduction code block. Missing recommended fields (environment, expected behaviour) are warnings. Fully offline; no GitHub / network access. Implemented by the pure `validateGovernanceDraft` in `utils/governance.ts` (a zero-dependency port of pdfnative's `verify-issue.mjs`).
+
+### `doctor`
+
+**Purpose:** Environment / capability preflight for onboarding (humans) and pre-flight (agents). Fully offline.
+
+```bash
+pdfnative doctor [--format json|text]
+```
+
+Reports the CLI version, Node version (≥ 20), Web Crypto (CSPRNG) availability — required by `encrypt` — the resolved `pdfnative` version, and the registered command count. `--format json` (or global `--json`) emits `{ ok, checks: [{ name, status, value, detail }] }`. Exit code **0** when all checks pass, **1** otherwise — so an agent can gate `encrypt` on `doctor` first.
 
 ---
 
@@ -576,6 +688,7 @@ carried on every `CliError.code`:
 | `E_CHECK_FAILED` | `inspect --check` assertion failed |
 | `E_POLICY` | `govern verify-issue` found a governance violation |
 | `E_UNSUPPORTED` | Reserved / not-yet-available capability |
+| `E_PASSWORD` | Encrypted PDF: password missing or incorrect |
 | `E_RUNTIME` | Catch-all runtime error |
 
 When no code is passed, `CliError` derives one from the exit code
@@ -584,7 +697,8 @@ code for free.
 
 ### `--dry-run`
 
-`render`, `sign`, `batch`, `merge`, `split`, `extract`, and `annotate` accept
+`render`, `sign`, `batch`, `merge`, `split`, `extract`, `annotate`, `fill`,
+`encrypt`, and `decrypt` accept
 `--dry-run` (sets `PDFNATIVE_DRY_RUN=1`). Inputs are fully validated — and for
 `sign`, credentials are parsed and the PDF is placeholder-prepared — but **no
 output is produced or written**. Commands read

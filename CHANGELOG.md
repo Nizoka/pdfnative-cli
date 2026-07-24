@@ -7,6 +7,118 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] – 2026-07-24
+
+Built on **pdfnative 1.6.0**. Surfaces the engine's 1.6.0 additions on the CLI as five new
+commands (`extract-text`, `fill`, `encrypt`, `decrypt`, `doctor`), native vector charts in
+`render`, and password / re-encryption / constant-memory streaming on the page-tree commands.
+Adds `fill --export`, a unified `render` encryption vocabulary, an agent capability manifest
+(`schema manifest` + `llms.txt`), PowerShell completion, and a `CLAUDE.md`. Fixes a silent
+`render --encrypt` no-op. 100% backward-compatible.
+
+### Added
+
+#### New commands
+
+- **`extract-text`** — extract reading-order Unicode text via pdfnative 1.6.0 `extractText`.
+  `--format text|json|ndjson` (NDJSON = one object per page, ideal for RAG/agents), `--pages`
+  (1-based selector), `--runs` (positioned runs), `--password` (encrypted PDFs), `--max-length`
+  (memory cap), plus `--summary`/`--fields`. No OCR — image-only pages yield empty text.
+- **`fill`** — fill, flatten, and/or **export** an existing AcroForm via `fillForm` /
+  `flattenForm` / `readFormFields`, using an **incremental save** so an existing signature
+  stays valid for its revision. `--data <values.json>` (name → string|boolean|string[]),
+  `--flatten`, `--export` (emit current values as a `--data`-shaped map — read → edit → fill),
+  `--force`, `--on-unknown throw|ignore`, `--need-appearances`, `--password`, `--dry-run`.
+- **`doctor`** — offline environment / capability preflight: CLI / Node (≥ 20) / `pdfnative`
+  versions, Web Crypto (CSPRNG) availability (required by `encrypt`), and the registered
+  command count. `--format json|text`; exit 0 when all checks pass, 1 otherwise.
+- **`encrypt`** — re-secure a PDF with AES-128/256 via page-tree re-encryption.
+  `--owner-password` (required), `--user-password`, `--algorithm aes-128|aes-256`,
+  `--permissions print,copy,modify,extract`, `--password` (open an encrypted source for
+  password rotation). Requires a Web Crypto CSPRNG; RC4 is never emitted.
+- **`decrypt`** — remove encryption, emitting a plaintext copy. `--password` (or
+  `$PDFNATIVE_PASSWORD`). Both rebuild the page tree (like `merge`), so signatures and form
+  fields are dropped.
+
+#### `render`
+
+- **Native vector charts** — the pdfnative 1.6.0 `chart` document block (bar, barH, line, pie,
+  donut) renders as pure PDF path operators (zero dependencies, no rasterisation, tagged
+  `/Figure` with alt text). Flows through `render` via document JSON / `--layout`.
+
+#### `render`
+
+- **Unified encryption flags** — `render` now accepts `--encrypt [aes-128|aes-256]` /
+  `--owner-password` / `--user-password` / `--permissions` (the same vocabulary as
+  merge/split/extract). The legacy `--encrypt-algorithm` / `--encrypt-owner-pass` /
+  `--encrypt-user-pass` / `--encrypt-permissions` flags remain as aliases.
+
+#### `merge` / `split` / `extract`
+
+- **`--password`** — read encrypted source PDFs (pdfnative 1.6.0).
+- **`--encrypt [aes-128|aes-256]`** with `--owner-password` / `--user-password` /
+  `--permissions` — re-encrypt the rebuilt output.
+- **`--stream`** (+ `--chunk-size`) — constant-memory streaming output via
+  `streamMergedPdfs` / `streamSplitPdf` / `streamExtractPages`. `encrypt` and `decrypt`
+  also gain `--stream` (via `streamExtractPages`).
+
+#### `inspect`
+
+- **`--form-fields`** — list AcroForm fields (name, type, value, required/read-only, options).
+- **`--encryption`** — report the encryption scheme (algorithm, revision, opened-as).
+- **`--password`** — open an encrypted PDF for inspection.
+
+#### Agent surface
+
+- **`schema manifest`** — a machine-readable capability manifest (commands, flags, global
+  flags, stable error codes) for AI-agent tool discovery, plus new schema subjects
+  `extract-text`, `fill`, and `status` (the success envelope).
+- **`llms.txt`** — an LLM-facing capability manifest at the repo root (shipped in the package).
+- **`E_PASSWORD`** — new stable error code for a missing/incorrect PDF password.
+
+#### Tooling & docs
+
+- **PowerShell completion** — `completion powershell` (Register-ArgumentCompleter).
+- **`CLAUDE.md`** — Claude Code contributor guide.
+
+### Changed
+
+- **`pdfnative` bumped** to `^1.6.0` (was `^1.5.0`).
+- Package `keywords` expanded (text extraction, forms, encryption, charts, RAG/LLM/MCP) and
+  the `description` updated to reflect the new surface.
+- **Grouped `--help`** — the global `pdfnative --help` now lists the 17 commands by category
+  (Create & edit / Page tree / Security / Read & extract / Automation & meta) for
+  discoverability. Display-only; dispatch is unchanged.
+
+### Documentation
+
+- Documented that **`merge` applies a single `--password` to every source** — merging encrypted
+  sources with different passwords fails with `E_PASSWORD` (decrypt the outliers first). Added to
+  `merge --help`, README, `docs/KNOWLEDGE_BASE.md`, and `AGENTS.md`.
+- Full factual-coherence pass (command count = 17 with grouping, `E_PASSWORD` in every error-code
+  list, `--max-output-size` default = 256 MiB, updated architecture map). Future ideas
+  (`optimize`, `compare`, `batch --manifest`) recorded in ROADMAP with feasibility notes.
+
+### Fixed
+
+- **`render --encrypt` was a silent no-op** — `render`'s `--help` advertised
+  `--encrypt aes-256 / --owner-password / --user-password / --permissions`, but the code only
+  read `--encrypt-*` flags, so `render --encrypt aes-256 --owner-password X` produced an
+  **unencrypted** PDF with no error. `render` now reads the unified flags (with `--encrypt-*`
+  kept as aliases) and the help text matches the implementation (including the watermark flags:
+  `--watermark-angle` / `-color` / `-font-size` / `-position`).
+- **`schema` / `--version` in the published binary** — the version was resolved with a path
+  (`../../package.json`) that does not exist relative to the flattened `dist/cli.cjs`, so
+  every `schema <subject>` invocation on an installed CLI failed with
+  `Cannot find module '../../package.json'`. Version resolution now goes through a robust,
+  name-guarded `src/utils/version.ts` that works in both source and bundle.
+- **Empty environment password overrode an explicit flag** — an exported but empty
+  `PDFNATIVE_PASSWORD` / `PDFNATIVE_ENCRYPT_OWNER_PASS` / `_USER_PASS` used to win over
+  `--password` / `--owner-password` / `--user-password` (via `??`). An empty env value is now
+  treated as absent, so the flag is used.
+- **`fill` error classification** — malformed `--data` content (wrong shape or wrong value
+  type) now consistently raises `E_INPUT` at exit 1 (was a mix of exit 2 / `E_USAGE`).
+
 ## [1.2.0] – 2026-07-06
 
 Built on **pdfnative 1.5.0**. Lands the engine's page-tree and annotation APIs on the CLI

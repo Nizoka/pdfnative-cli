@@ -1,21 +1,36 @@
-// `pdfnative merge` — concatenate multiple PDFs into one (pdfnative 1.4.0
-// page-tree API). Rebuilds a fresh, self-contained document: signatures and
-// form fields are dropped (any page-tree edit invalidates a signature's
-// /ByteRange), and only self-contained URI links are kept. Encrypted sources
-// are rejected. See `pdfnative verify` / `sign` for signature workflows.
+// `pdfnative merge` — concatenate multiple PDFs into one (pdfnative page-tree
+// API). Rebuilds a fresh, self-contained document: signatures and form fields
+// are dropped (any page-tree edit invalidates a signature's /ByteRange), and
+// only self-contained URI links are kept. Encrypted sources are supported with
+// --password (v1.6.0); the output can be re-encrypted with --encrypt and
+// streamed at constant memory with --stream. See `verify` / `sign` for
+// signature workflows.
 
-import { mergePdfs } from '../core-bridge/index.js';
-import type { MergeOptions } from '../core-bridge/index.js';
+import { mergePdfs, streamMergedPdfs } from '../core-bridge/index.js';
+import type { StreamMergeOptions } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../utils/args.js';
-import { readBinaryFile, writeOutput } from '../utils/io.js';
-import { CliError, ErrorCode } from '../utils/error.js';
+import { readBinaryFile, writeOutput, writeStreamingOutput } from '../utils/io.js';
+import { CliError } from '../utils/error.js';
 import { emitStatus, isDryRun } from '../utils/agent.js';
-import { parseMaxOutputSize, collectSourcePaths } from '../utils/pdfops.js';
+import {
+    parseMaxOutputSize,
+    collectSourcePaths,
+    resolveSourcePassword,
+    readEncryptTrigger,
+    buildEncryptOptions,
+    parseChunkSize,
+    mapPdfError,
+} from '../utils/pdfops.js';
 
 export async function merge(args: ParsedArgs): Promise<void> {
     const outputPath = getStringFlag(args.flags, 'output', 'o');
     const dropAnnotations = hasFlag(args.flags, 'drop-annotations');
     const maxOutputSize = parseMaxOutputSize(getStringFlag(args.flags, 'max-output-size'));
+    const password = resolveSourcePassword(args.flags);
+    const { enabled: doEncrypt, algoRaw } = readEncryptTrigger(args.flags);
+    const encrypt = doEncrypt ? buildEncryptOptions(args, algoRaw) : undefined;
+    const stream = hasFlag(args.flags, 'stream');
+    const chunkSize = parseChunkSize(getStringFlag(args.flags, 'chunk-size'));
     const dryRun = hasFlag(args.flags, 'dry-run') || isDryRun();
 
     const sources = collectSourcePaths(args.positionals, getStringFlagAll(args.flags, 'input'));
@@ -34,22 +49,47 @@ export async function merge(args: ParsedArgs): Promise<void> {
         buffers.push(await readBinaryFile(path));
     }
 
-    const opts: MergeOptions = {
+    const opts: { -readonly [K in keyof StreamMergeOptions]: StreamMergeOptions[K] } = {
         dropAnnotations,
-        ...(maxOutputSize !== undefined ? { maxOutputSize } : {}),
     };
+    if (maxOutputSize !== undefined) opts.maxOutputSize = maxOutputSize;
+    if (password !== undefined) opts.password = password;
+    if (encrypt !== undefined) opts.encrypt = encrypt;
+    if (chunkSize !== undefined) opts.chunkSize = chunkSize;
+
+    if (dryRun) {
+        emitStatus({
+            command: 'merge',
+            dryRun: true,
+            sources: sources.length,
+            encrypted: encrypt !== undefined,
+            output: outputPath ?? '-',
+        });
+        return;
+    }
+
+    if (stream) {
+        try {
+            await writeStreamingOutput(streamMergedPdfs(buffers, opts), outputPath);
+        } catch (e) {
+            throw mapPdfError(e, 'Failed to merge PDFs');
+        }
+        emitStatus({
+            command: 'merge',
+            dryRun: false,
+            sources: sources.length,
+            streamed: true,
+            encrypted: encrypt !== undefined,
+            output: outputPath ?? '-',
+        });
+        return;
+    }
 
     let merged: Uint8Array;
     try {
         merged = mergePdfs(buffers, opts);
     } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new CliError(`Failed to merge PDFs: ${message}`, 1, ErrorCode.PARSE);
-    }
-
-    if (dryRun) {
-        emitStatus({ command: 'merge', dryRun: true, sources: sources.length, output: outputPath ?? '-' });
-        return;
+        throw mapPdfError(e, 'Failed to merge PDFs');
     }
 
     await writeOutput(merged, outputPath);
@@ -57,6 +97,7 @@ export async function merge(args: ParsedArgs): Promise<void> {
         command: 'merge',
         dryRun: false,
         sources: sources.length,
+        encrypted: encrypt !== undefined,
         output: outputPath ?? '-',
         bytes: merged.length,
     });

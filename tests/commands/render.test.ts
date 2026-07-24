@@ -5,6 +5,7 @@ import * as fs from 'node:fs/promises';
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { CliError } from '../../src/utils/error.js';
+import { openPdf } from '../../src/core-bridge/index.js';
 
 const minimalParams = JSON.stringify({
     title: 'Test Document',
@@ -517,6 +518,69 @@ describe('render', () => {
 
         const stat = await fs.stat(outPath);
         expect(stat.size).toBeGreaterThan(1000);
+    });
+
+    it('renders native chart blocks (pdfnative 1.6.0)', async () => {
+        const params = JSON.stringify({
+            blocks: [
+                { type: 'heading', text: 'Revenue', level: 1 },
+                {
+                    type: 'chart', chartType: 'bar', title: 'By region',
+                    categories: ['NA', 'EU', 'APAC'],
+                    series: [{ label: '2026', values: [55, 40, 33] }],
+                },
+                { type: 'chart', chartType: 'pie', categories: ['A', 'B'], series: [{ label: 'Share', values: [60, 40] }] },
+            ],
+        });
+        const outPath = path.join(os.tmpdir(), `render-chart-${Date.now()}.pdf`);
+        tmpFiles.push(outPath);
+        await withTempFile('.json', params, async (inputPath) => {
+            await render(parseArgs(['--input', inputPath, '--output', outPath]));
+        });
+        const bytes = await fs.readFile(outPath);
+        expect(bytes.slice(0, 4).toString('ascii')).toBe('%PDF');
+        expect(bytes.length).toBeGreaterThan(1000);
+    });
+
+    // Regression: `render --encrypt aes-256 --owner-password X` used to be a
+    // SILENT no-op (layout.ts read --encrypt-* only). It must now encrypt, and
+    // the legacy --encrypt-* aliases must keep working.
+    describe('encryption flag unification', () => {
+        it('encrypts via the unified --encrypt / --owner-password flags', async () => {
+            const outPath = path.join(os.tmpdir(), `render-uni-enc-${Date.now()}.pdf`);
+            tmpFiles.push(outPath);
+            await withTempFile('.json', minimalParams, async (inputPath) => {
+                await render(parseArgs([
+                    '--input', inputPath, '--output', outPath,
+                    '--encrypt', 'aes-256', '--owner-password', 'OWN', '--user-password', 'USR',
+                ]));
+            });
+            const reader = openPdf(new Uint8Array(await fs.readFile(outPath)), { password: 'USR' });
+            expect(reader.encryption?.algorithm).toBe('aes256');
+        });
+
+        it('still honours the legacy --encrypt-algorithm / --encrypt-owner-pass aliases', async () => {
+            const outPath = path.join(os.tmpdir(), `render-legacy-enc-${Date.now()}.pdf`);
+            tmpFiles.push(outPath);
+            await withTempFile('.json', minimalParams, async (inputPath) => {
+                await render(parseArgs([
+                    '--input', inputPath, '--output', outPath,
+                    '--encrypt-algorithm', 'aes256', '--encrypt-owner-pass', 'OWN',
+                ]));
+            });
+            const reader = openPdf(new Uint8Array(await fs.readFile(outPath)));
+            expect(reader.encryption?.algorithm).toBe('aes256');
+        });
+
+        it('produces an unencrypted PDF when no encryption flags are given', async () => {
+            const outPath = path.join(os.tmpdir(), `render-noenc-${Date.now()}.pdf`);
+            tmpFiles.push(outPath);
+            await withTempFile('.json', minimalParams, async (inputPath) => {
+                await render(parseArgs(['--input', inputPath, '--output', outPath]));
+            });
+            const reader = openPdf(new Uint8Array(await fs.readFile(outPath)));
+            expect(reader.encryption).toBeNull();
+        });
     });
 
     describe('agent mode', () => {

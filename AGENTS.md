@@ -16,7 +16,7 @@ a process, pass flags, read stdout/stderr, branch on the exit code).
 
 | Channel | Carries |
 |---------|---------|
-| **stdout** | The primary artifact: a PDF (`render`, `sign`, `merge`, `extract`, `annotate`), a JSON report (`inspect`, `verify`, `batch --format json`, `govern verify-issue --json`), a JSON Schema (`schema`), the governance protocol/policy (`govern rules`/`policy`), or a completion script (`completion`). `split` writes its parts to `--output-dir`. |
+| **stdout** | The primary artifact: a PDF (`render`, `sign`, `merge`, `extract`, `annotate`, `fill`, `encrypt`, `decrypt`), extracted text (`extract-text`), a JSON report (`inspect`, `verify`, `batch --format json`, `govern verify-issue --json`, `doctor --format json`, `fill --export`), a JSON Schema (`schema`), the governance protocol/policy (`govern rules`/`policy`), or a completion script (`completion`). `split` writes its parts to `--output-dir`. |
 | **stderr** | All diagnostics: progress, warnings, and the agent JSON envelopes below. |
 | **exit code** | `0` success · `1` runtime error · `2` usage error. Unchanged in every mode. |
 
@@ -37,8 +37,9 @@ default to JSON on stdout).
 { "ok": false, "command": "inspect", "error": { "code": "E_PARSE", "message": "Failed to read PDF: …" } }
 ```
 
-**On success**, `render` / `sign` / `merge` / `split` / `extract` / `annotate` / `batch`
-write a status line to stderr:
+**On success**, the write commands — `render` / `sign` / `merge` / `split` / `extract` /
+`annotate` / `fill` / `encrypt` / `decrypt` / `batch` — write a status line to stderr
+(schema: `pdfnative schema status`):
 
 ```json
 { "ok": true, "command": "render", "variant": "document", "dryRun": false, "output": "out.pdf", "bytes": 12345 }
@@ -63,6 +64,7 @@ Branch on `error.code`, never on the human message:
 | `E_CHECK_FAILED` | `inspect --check` assertion failed | 1 |
 | `E_POLICY` | `govern verify-issue` found a governance violation | 1 |
 | `E_UNSUPPORTED` | Reserved / not-yet-available capability | 2 |
+| `E_PASSWORD` | Encrypted PDF: password missing or incorrect (`extract-text` / `fill` / `encrypt` / `decrypt` / `inspect` / page-tree) | 1 |
 | `E_RUNTIME` | Catch-all runtime error | 1 |
 
 ---
@@ -107,7 +109,7 @@ The compact shapes are schema-pinned — validate them with
 
 ## 4. Validate first — `--dry-run`
 
-`render`, `sign`, `batch`, `merge`, `split`, `extract`, and `annotate` accept `--dry-run`:
+`render`, `sign`, `batch`, `merge`, `split`, `extract`, `annotate`, `fill`, `encrypt`, and `decrypt` accept `--dry-run`:
 inputs are fully validated (JSON parsed, document/table shape checked, layout assembled,
 signing credentials loaded and the PDF prepared, page ranges and annotation specs
 bounds-checked) but **no output is produced or written**. Combine with `--json` for a
@@ -126,13 +128,27 @@ tooling before invoking a command. Each schema carries a `$id` embedding the CLI
 version so you can detect drift.
 
 ```bash
-pdfnative schema list             # → { "subjects": ["render","inspect","verify","batch","annotate","govern-verify","inspect-summary","verify-summary","batch-summary"] }
+pdfnative schema list             # → { "subjects": [ …all subjects… ] }
 pdfnative schema render           # input accepted by `render`
 pdfnative schema inspect          # output of `inspect --format json`
 pdfnative schema verify-summary   # output of `verify --summary`
 pdfnative schema annotate         # annotation-spec accepted by `annotate --annotations`
+pdfnative schema extract-text     # output of `extract-text --format json`
+pdfnative schema fill             # values map accepted by `fill --data`
+pdfnative schema form-export      # output of `fill --export`
+pdfnative schema doctor           # output of `doctor --format json`
 pdfnative schema govern-verify    # output of `govern verify-issue --json`
+pdfnative schema status           # the --json success envelope (write commands)
+pdfnative schema manifest         # capability manifest: commands, flags, error codes (DATA, not a schema)
 ```
+
+**Tool discovery.** `pdfnative schema manifest` emits a single JSON document listing every
+command, its flags, the global flags, and the stable error codes — enough to register the CLI
+as a tool set at runtime. A prose/LLM-facing version lives in `llms.txt` at the repo root.
+
+**Text extraction for RAG.** `extract-text --format ndjson` emits one JSON object per page
+(`{ pageIndex, text, runs? }`), which streams cleanly into a retrieval pipeline; add `--runs`
+for positioned runs, `--password` for encrypted PDFs. No OCR — image-only pages yield empty text.
 
 ---
 
@@ -188,7 +204,11 @@ For `verify`/`inspect`, read the JSON result on stdout and use `--strict` /
 - **No secrets in output.** `sign` never emits key material — errors are the fixed
   `E_SIGN` / "Failed to sign PDF." Pass keys via `PDFNATIVE_SIGN_KEY` /
   `PDFNATIVE_SIGN_CERT` (env wins over `--key` / `--cert`). Native `node:crypto` signing is
-  the default; `--pure-crypto` selects the portable pure-JS path.
+  the default; `--pure-crypto` selects the portable pure-JS path. Passwords come from env
+  (a **non-empty** value wins over the flag) and are never logged.
+- **One password per `merge`.** `merge` applies a single `--password` to *every* source, so
+  merging encrypted sources with **different** passwords fails with `E_PASSWORD`. Decrypt the
+  outliers first, then merge. (`split` / `extract` take a single input — no ambiguity.)
 - **Bounded input.** JSON input is capped at 50 MB; paths are checked against
   traversal. `merge` / `split` / `extract` also honour `--max-output-size`. Prefer
   `--output <file>` over shell redirection for large PDFs.

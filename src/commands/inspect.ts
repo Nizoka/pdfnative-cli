@@ -1,10 +1,11 @@
-import { openPdf, validatePdfUA, isStream } from '../core-bridge/index.js';
-import type { PdfReader, PdfUAValidationResult, PageLabelRange, ParsedAnnotation } from '../core-bridge/index.js';
+import { openPdf, validatePdfUA, isStream, readFormFields } from '../core-bridge/index.js';
+import type { PdfReader, PdfUAValidationResult, PageLabelRange, ParsedAnnotation, PdfEncryptionInfo } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../utils/args.js';
 import { readFileOrStdin } from '../utils/io.js';
 import { CliError, ErrorCode } from '../utils/error.js';
 import { isJsonMode } from '../utils/agent.js';
 import { selectFields, serializeJson, parseFieldList } from '../utils/projection.js';
+import { resolveSourcePassword, mapPdfError } from '../utils/pdfops.js';
 
 const VALID_CHECKS = new Set(['pdfa', 'signed', 'encrypted', 'pdfua']);
 
@@ -32,6 +33,21 @@ interface PageLabelInfo {
     readonly start: number | null;
 }
 
+interface EncryptionDetail {
+    readonly algorithm: string;
+    readonly revision: number;
+    readonly authenticatedAs: string;
+}
+
+interface FormFieldInfo {
+    readonly name: string;
+    readonly type: string;
+    readonly value: string | readonly string[] | boolean | null;
+    readonly readOnly: boolean;
+    readonly required: boolean;
+    readonly options?: readonly string[];
+}
+
 interface InspectResult {
     readonly version: string;
     readonly pageCount: number;
@@ -46,6 +62,8 @@ interface InspectResult {
         readonly producer: string | null;
     };
     readonly pageLabels?: readonly PageLabelInfo[];
+    readonly encryption?: EncryptionDetail | null;
+    readonly formFields?: readonly FormFieldInfo[];
     readonly pages?: readonly PageInfo[];
     readonly annotations?: readonly AnnotationInfo[];
     readonly pdfua?: {
@@ -200,6 +218,26 @@ function inspectPageLabels(reader: PdfReader): readonly PageLabelInfo[] | undefi
     }));
 }
 
+/** Report the document's encryption scheme (pdfnative 1.6.0), or null. */
+function inspectEncryption(reader: PdfReader): EncryptionDetail | null {
+    const enc: PdfEncryptionInfo | null = reader.encryption;
+    if (enc === null) return null;
+    return { algorithm: enc.algorithm, revision: enc.revision, authenticatedAs: enc.authenticatedAs };
+}
+
+/** Enumerate interactive form fields (pdfnative 1.6.0 `readFormFields`). */
+function inspectFormFields(bytes: Uint8Array, password: string | undefined): readonly FormFieldInfo[] {
+    const fields = readFormFields(bytes, password !== undefined ? { password } : undefined);
+    return fields.map((f) => ({
+        name: f.name,
+        type: f.type,
+        value: f.value,
+        readOnly: f.readOnly,
+        required: f.required,
+        ...(f.options !== undefined ? { options: f.options.map((o) => o.export) } : {}),
+    }));
+}
+
 /** Read markup / link annotations across all pages (pdfnative 1.5.0). */
 function inspectAnnotations(reader: PdfReader): readonly AnnotationInfo[] {
     const out: AnnotationInfo[] = [];
@@ -278,6 +316,9 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     const verbose = hasFlag(args.flags, 'verbose');
     const includePages = hasFlag(args.flags, 'pages');
     const includeAnnotations = hasFlag(args.flags, 'annotations');
+    const includeFormFields = hasFlag(args.flags, 'form-fields');
+    const includeEncryption = hasFlag(args.flags, 'encryption');
+    const password = resolveSourcePassword(args.flags);
     const checks = getStringFlagAll(args.flags, 'check');
     const includePdfua = hasFlag(args.flags, 'pdfua') || checks.includes('pdfua');
 
@@ -290,10 +331,9 @@ export async function inspect(args: ParsedArgs): Promise<void> {
 
     let reader: PdfReader;
     try {
-        reader = openPdf(pdfBytes);
+        reader = openPdf(pdfBytes, password !== undefined ? { password } : undefined);
     } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        throw new CliError(`Failed to read PDF: ${message}`, 1, ErrorCode.PARSE);
+        throw mapPdfError(e, 'Failed to read PDF');
     }
 
     const info = reader.getInfo();
@@ -313,9 +353,19 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     };
 
     const pageLabels = inspectPageLabels(reader);
+    let formFields: readonly FormFieldInfo[] | undefined;
+    if (includeFormFields) {
+        try {
+            formFields = inspectFormFields(pdfBytes, password);
+        } catch (e) {
+            throw mapPdfError(e, 'Failed to read form fields');
+        }
+    }
     const result: InspectResult = {
         ...baseResult,
         ...(pageLabels !== undefined ? { pageLabels } : {}),
+        ...(includeEncryption ? { encryption: inspectEncryption(reader) } : {}),
+        ...(formFields !== undefined ? { formFields } : {}),
         ...(includePages ? { pages: inspectPages(reader) } : {}),
         ...(includeAnnotations ? { annotations: inspectAnnotations(reader) } : {}),
         ...(includePdfua ? { pdfua: runPdfUaCheck(pdfBytes) } : {}),
@@ -351,6 +401,23 @@ export async function inspect(args: ParsedArgs): Promise<void> {
                 lines.push(
                     `  #${p.index + 1}: ${p.width ?? '?'}x${p.height ?? '?'}pt rot=${p.rotation}° annots=${p.annotations} fields=${p.formFields}`,
                 );
+            }
+        }
+        if (result.encryption !== undefined) {
+            if (result.encryption === null) {
+                lines.push('Encryption:     none');
+            } else {
+                lines.push(
+                    `Encryption:     ${result.encryption.algorithm} (R${result.encryption.revision}, opened as ${result.encryption.authenticatedAs})`,
+                );
+            }
+        }
+        if (result.formFields !== undefined) {
+            lines.push(`Form fields:    ${result.formFields.length}`);
+            for (const f of result.formFields) {
+                const flags = [f.required ? 'required' : '', f.readOnly ? 'read-only' : ''].filter((s) => s !== '').join(', ');
+                const val = f.value === null ? '' : Array.isArray(f.value) ? f.value.join('|') : String(f.value);
+                lines.push(`  ${f.name} [${f.type}]${val !== '' ? ` = ${val}` : ''}${flags !== '' ? ` (${flags})` : ''}`);
             }
         }
         if (result.pageLabels !== undefined) {

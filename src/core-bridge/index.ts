@@ -55,6 +55,40 @@ export { openPdf, isRef, isName, isDict, isArray, isStream, nameValue } from 'pd
 export { mergePdfs, splitPdf, extractPages } from 'pdfnative';
 export type { PageRange, MergeOptions } from 'pdfnative';
 
+// ── Streaming page-tree — constant-memory merge/split/extract (v1.6.0) ─
+export { streamMergedPdfs, streamSplitPdf, streamExtractPages } from 'pdfnative';
+export type { StreamMergeOptions, SplitPdfStream, PdfSourceInput } from 'pdfnative';
+
+// ── Encryption / decryption on read + re-encryption (v1.6.0) ──────────
+// `openPdf` (below) gained an { password } option; `reader.encryption`
+// surfaces the Standard Security Handler details. `MergeOptions.encrypt`
+// (above) re-encrypts page-tree output with AES-128/256.
+export { PdfPasswordError, PdfEncryptionUnsupportedError } from 'pdfnative';
+export type { OpenPdfOptions, PdfEncryptionInfo } from 'pdfnative';
+// Note: `EncryptionOptions` is already re-exported below in the shared types block.
+
+// ── Text extraction — reading-order Unicode + positioned runs (v1.6.0) ─
+export { extractText } from 'pdfnative';
+export type { ExtractTextOptions, ExtractedPageText, ExtractedTextRun } from 'pdfnative';
+
+// ── AcroForm fill & flatten of existing PDFs (v1.6.0) ─────────────────
+export { readFormFields, fillForm, flattenForm } from 'pdfnative';
+export {
+    FormFieldNotFoundError,
+    FormValueTypeError,
+    FormUnsupportedError,
+} from 'pdfnative';
+export type {
+    ParsedFormField,
+    ParsedFieldType,
+    FormFillValue,
+    FillFormOptions,
+    FlattenFormOptions,
+} from 'pdfnative';
+
+// ── Native vector charts — document `chart` block (v1.6.0) ────────────
+export type { ChartBlock, ChartSeries, ChartType } from 'pdfnative';
+
 // ── Incremental modifier + markup annotations (v1.5.0) ───────────────
 export { createModifier } from 'pdfnative';
 export { buildAnnotation, buildAnnotationBody } from 'pdfnative';

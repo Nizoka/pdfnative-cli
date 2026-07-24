@@ -1,0 +1,25 @@
+{
+  "blocks": [
+    { "type": "heading", "text": "Trends & Share", "level": 1 },
+    {
+      "type": "chart",
+      "chartType": "line",
+      "title": "Monthly active users (thousands)",
+      "categories": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+      "legend": "bottom",
+      "series": [
+        { "label": "Free", "values": [12, 18, 24, 30, 41, 55] },
+        { "label": "Pro", "values": [3, 5, 8, 13, 21, 34] }
+      ]
+    },
+    { "type": "spacer", "height": 16 },
+    {
+      "type": "chart",
+      "chartType": "donut",
+      "title": "Plan distribution",
+      "categories": ["Free", "Pro", "Team", "Enterprise"],
+      "legend": "bottom",
+      "series": [{ "label": "Accounts", "values": [62, 24, 10, 4] }]
+    }
+  ]
+}

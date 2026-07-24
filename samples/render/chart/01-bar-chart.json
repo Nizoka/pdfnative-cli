@@ -1,0 +1,17 @@
+{
+  "blocks": [
+    { "type": "heading", "text": "Quarterly Revenue", "level": 1 },
+    { "type": "paragraph", "text": "Native vector charts (pdfnative 1.6.0) render as pure PDF path operators — zero dependencies, no rasterisation, tagged as /Figure with alt text." },
+    {
+      "type": "chart",
+      "chartType": "bar",
+      "title": "Revenue by region (USD millions)",
+      "categories": ["North America", "EMEA", "APAC", "LATAM"],
+      "legend": "bottom",
+      "series": [
+        { "label": "FY2025", "values": [42, 35, 28, 12] },
+        { "label": "FY2026", "values": [55, 40, 33, 18] }
+      ]
+    }
+  ]
+}

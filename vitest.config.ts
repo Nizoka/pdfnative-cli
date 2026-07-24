@@ -5,6 +5,12 @@ export default defineConfig({
         globals: false,
         environment: 'node',
         include: ['tests/**/*.test.ts'],
+        // AES-256 (Standard Security Handler R6) key derivation runs many
+        // SHA-2 rounds per operation and is CPU-bound, so the encrypt /
+        // render-encryption tests can exceed the 5 s default on slower or
+        // loaded machines. Give every test more headroom (real hangs are still
+        // caught well within this bound).
+        testTimeout: 20000,
         coverage: {
             provider: 'v8',
             include: ['src/**/*.ts'],

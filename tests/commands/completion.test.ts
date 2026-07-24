@@ -47,16 +47,29 @@ describe('completion', () => {
         await expect(completion(parseArgs([]))).rejects.toMatchObject({ exitCode: 2 });
     });
 
-    it('throws CliError(2) for an unsupported shell', async () => {
-        await expect(completion(parseArgs(['powershell']))).rejects.toBeInstanceOf(CliError);
+    it('emits a PowerShell script with Register-ArgumentCompleter', async () => {
+        const out = await capture(() => completion(parseArgs(['powershell'])));
+        expect(out).toContain('Register-ArgumentCompleter');
+        expect(out).toContain('pdfnative');
+        expect(out).toContain("'extract-text'");
     });
 
-    it('includes the schema command and agent global flags in each shell', async () => {
-        for (const shell of ['bash', 'zsh', 'fish']) {
+    it('throws CliError(2) for an unsupported shell', async () => {
+        await expect(completion(parseArgs(['tcsh']))).rejects.toBeInstanceOf(CliError);
+    });
+
+    it('includes the new 1.3.0 commands and page-tree crypto flags in each shell', async () => {
+        for (const shell of ['bash', 'zsh', 'fish', 'powershell']) {
             const out = await capture(() => completion(parseArgs([shell])));
             expect(out).toContain('schema');
             expect(out).toContain('json');
             expect(out).toContain('dry-run');
+            expect(out).toContain('extract-text');
+            expect(out).toContain('fill');
+            expect(out).toContain('encrypt');
+            expect(out).toContain('decrypt');
+            // fish strips the leading `--` (emits `-l password`), so match the bare name.
+            expect(out).toContain('password');
         }
     });
 });

@@ -1,0 +1,9 @@
+{
+  "blocks": [
+    { "type": "heading", "text": "Membership Application", "level": 1 },
+    { "type": "formField", "fieldType": "text", "name": "fullName", "label": "Full name" },
+    { "type": "formField", "fieldType": "text", "name": "email", "label": "Email" },
+    { "type": "formField", "fieldType": "checkbox", "name": "newsletter", "label": "Subscribe to the newsletter" },
+    { "type": "formField", "fieldType": "dropdown", "name": "plan", "label": "Plan", "options": ["free", "pro", "team"] }
+  ]
+}

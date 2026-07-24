@@ -47,6 +47,7 @@ const DEFAULT_MESSAGE: Readonly<Record<ErrorCodeValue, string>> = {
     [ErrorCode.CHECK_FAILED]: 'one or more checks failed',
     [ErrorCode.POLICY]: 'AI-governance policy violation',
     [ErrorCode.UNSUPPORTED]: 'unsupported operation',
+    [ErrorCode.PASSWORD]: 'missing or incorrect password',
     [ErrorCode.RUNTIME]: 'runtime error',
 };
 

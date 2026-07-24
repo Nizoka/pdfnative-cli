@@ -82,10 +82,15 @@ samples/
 │   ├── table-smart/              (v1.0.0) Smart tables: zebra, caption, repeat-header, wrap
 │   ├── outline/                  (v1.2.0) PDF bookmarks — `--outline auto` + explicit tree
 │   ├── math/                     (v1.2.0) Math/technical symbols via `--font math`
-│   └── inspect-layout/           (v1.2.0) `--inspect-layout` report + `--debug-layout` guides
+│   ├── inspect-layout/           (v1.2.0) `--inspect-layout` report + `--debug-layout` guides
+│   └── chart/                    (v1.3.0) Native vector charts (bar/line/pie/donut)
 ├── merge/                        (v1.2.0) Concatenate PDFs (pdfnative page-tree)
 ├── split/                        (v1.2.0) Split one PDF into many (per-page or per-range)
 ├── extract/                      (v1.2.0) Pull selected pages into a new PDF
+├── extract-text/                 (v1.3.0) Reading-order text (text | json | ndjson)
+├── fill/                         (v1.3.0) Fill, flatten & export AcroForms
+├── encrypt/                      (v1.3.0) Encrypt / decrypt (AES-128/256, --password, --stream)
+├── doctor/                       (v1.3.0) Environment / capability preflight
 ├── annotate/                     (v1.2.0) Attach markup annotations (incremental save)
 ├── govern/                       (v1.2.0) AI-governance / HITL: rules, policy, verify-issue
 ├── batch/                        (v1.0.0) Parallel directory render (pdfnative batch)
@@ -254,9 +259,11 @@ This is the Factur-X / ZUGFeRD pattern — a human-readable PDF/A-3 with a machi
 
 ### `render/multilang/` — Non-Latin Scripts & Multilingual PDFs (v0.2.0)
 
-pdfnative ships Noto Sans font data for 16 scripts inside the package itself
-(`pdfnative/dist/../fonts/noto-*-data.js`). No external font files, no network
-access, no extra dependencies. Font data is loaded lazily on first use and cached.
+pdfnative ships Noto Sans font data for 22 Unicode scripts (plus a math font and
+COLRv1 colour emoji) inside the package itself (`pdfnative/dist/../fonts/noto-*-data.js`).
+No external font files, no network access, no extra dependencies. Font data is
+loaded lazily on first use and cached. The `render --font <code>` allow-list
+covers all 22 script codes — see the README feature table.
 
 Because the pdfnative CLI starts a fresh process per invocation, font loaders must
 be registered via `registerFonts()` **before** the render call — which is only
@@ -456,6 +463,60 @@ pdfnative 1.5.0's page-tree API powers three composable document operations. Eac
 | [01-extract.sh](extract/01-extract.sh) | Extracts pages in arbitrary order (`--pages 4,1-2`; order preserved, repeats allowed) |
 | [01-extract.ps1](extract/01-extract.ps1) | PowerShell equivalent |
 
+Page-tree commands (`merge`, `split`, `extract`) also accept `--password` for encrypted sources, `--encrypt [aes-128|aes-256]` (with `--owner-password`) to re-encrypt the output, and `--stream` for constant-memory output — all new in pdfnative 1.6.0.
+
+---
+
+## Text, Forms & Encryption Samples (v1.3.0, pdfnative 1.6.0)
+
+### `extract-text/` — Reading-Order Text Extraction
+
+| File | Description |
+|------|-------------|
+| [document.json](extract-text/document.json) | A two-page source document |
+| [01-extract-text.sh](extract-text/01-extract-text.sh) | Extracts text as plain text, JSON, and NDJSON (`--runs` for positioned runs) |
+| [01-extract-text.ps1](extract-text/01-extract-text.ps1) | PowerShell equivalent |
+
+No OCR — image-only pages yield empty text. NDJSON (one object per page) streams cleanly into RAG/agent pipelines.
+
+### `fill/` — Fill & Flatten AcroForms
+
+| File | Description |
+|------|-------------|
+| [form.json](fill/form.json) | An interactive form (text, checkbox, dropdown fields) |
+| [form-values.json](fill/form-values.json) | Field name → value map for `--data` |
+| [01-fill.sh](fill/01-fill.sh) | Lists fields, **exports a `--data` template** (`--export`), fills them, then flattens |
+| [01-fill.ps1](fill/01-fill.ps1) | PowerShell equivalent |
+
+The fill uses an incremental save, so an existing signature stays valid for its revision. `fill --export` dumps the current field values as a ready-to-edit `--data` map (read → edit → fill round-trip).
+
+### `encrypt/` — Encrypt & Decrypt
+
+| File | Description |
+|------|-------------|
+| [01-encrypt-decrypt.sh](encrypt/01-encrypt-decrypt.sh) | Encrypts (AES-256), confirms with `inspect --encryption`, then decrypts |
+| [01-encrypt-decrypt.ps1](encrypt/01-encrypt-decrypt.ps1) | PowerShell equivalent |
+
+Passwords are read from `$PDFNATIVE_ENCRYPT_OWNER_PASS` / `$PDFNATIVE_ENCRYPT_USER_PASS` (or `$PDFNATIVE_PASSWORD` to open), winning over flags (a non-empty env value only) and never logged. `encrypt`/`decrypt` rebuild the page tree (like `merge`), so signatures and form fields are dropped. Add `--stream` (+ `--chunk-size`) to process a large PDF at constant memory.
+
+### `doctor/` — Environment / Capability Preflight
+
+| File | Description |
+|------|-------------|
+| [01-doctor.sh](doctor/01-doctor.sh) | Human-readable + `--format json` capability report (agent pre-flight) |
+| [01-doctor.ps1](doctor/01-doctor.ps1) | PowerShell equivalent |
+
+`doctor` checks the CLI/Node/pdfnative versions, Web Crypto (CSPRNG) availability — which `encrypt` requires — and the registered command count. Exit code 0 when all checks pass, 1 otherwise. Fully offline.
+
+### `render/chart/` — Native Vector Charts
+
+| File | Description |
+|------|-------------|
+| [01-bar-chart.json](render/chart/01-bar-chart.json) | Multi-series bar chart with legend |
+| [02-line-and-pie.json](render/chart/02-line-and-pie.json) | Line chart + donut chart |
+
+Charts render as pure PDF path operators (bar, barH, line, pie, donut) — zero dependencies, no rasterisation, tagged `/Figure` with alt text. Rendered by `run-all.js` like any other document sample.
+
 ---
 
 ## Annotate Samples (v1.2.0)
@@ -587,7 +648,7 @@ Render flags other than `--input-dir` / `--output-dir` / `--concurrency` / `--fa
 
 ## Completion Samples (v1.0.0)
 
-Demonstrate the `pdfnative completion` command — emits shell-completion scripts for **bash**, **zsh**, and **fish**.
+Demonstrate the `pdfnative completion` command — emits shell-completion scripts for **bash**, **zsh**, **fish**, and **powershell**.
 
 | Script | Description |
 |--------|-------------|
@@ -677,7 +738,7 @@ node samples/run-all.js --clean
 {
   "scripts": {
     "build:pdf": "pdfnative render --input data/document.json --output dist/report.pdf",
-    "build:pdf:archive": "pdfnative render --input data/document.json --output dist/report.pdf --conformance pdfa2b"
+    "build:pdf:archive": "pdfnative render --input data/document.json --output dist/report.pdf --tagged pdfa2b"
   }
 }
 ```
