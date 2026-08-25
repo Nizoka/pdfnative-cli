@@ -5,18 +5,19 @@ message: >-
 title: "pdfnative-cli — Official CLI for the pdfnative PDF generation library"
 abstract: >-
   A zero-dependency command-line interface for pdfnative — a pure-TypeScript,
-  ISO 32000-1 compliant PDF generation library. pdfnative-cli exposes six
-  composable commands: render (JSON → PDF, including PDF/A conformance, 22
-  Unicode scripts, COLRv1 colour emoji, and true constant-memory streaming),
-  sign (CMS/PKCS#7 digital signatures via RSA or ECDSA), inspect (structured
-  PDF metadata analysis and PDF/UA structural validation), verify (CMS/PKCS#7
-  signature verification with certificate-chain, trust, RFC 3161 timestamp and
-  OCSP/CRL revocation evaluation), batch (parallel directory rendering), and
-  completion (shell-completion scripts). An agent-native contract — a global
-  --json envelope, stable error codes, --dry-run, and a schema command —
-  lets autonomous AI agents and CI pipelines drive the CLI deterministically.
-  Designed for shell pipelines, CI/CD automation, and server-side document
-  generation.
+  ISO 32000-1 compliant PDF generation library. pdfnative-cli exposes 21
+  composable commands covering the full document lifecycle: rendering JSON
+  document definitions to PDF (PDF/A conformance, 22 Unicode scripts, native
+  vector charts, print production, streaming), reading-order text extraction,
+  AcroForm filling and flattening, page-tree operations (merge, split,
+  extract), AES-128/256 encryption and decryption, metadata editing,
+  annotation, and CMS/PKCS#7 digital signatures with RFC 3161 timestamps and
+  long-term validation (PAdES B-T / B-LT / B-LTA), plus signature
+  verification, text/structural PDF comparison, and multi-step pipeline
+  orchestration (batch manifests). An agent-first contract — a global --json
+  envelope, stable error codes, --dry-run, versioned JSON Schemas and a
+  capability manifest — lets autonomous AI agents and CI pipelines drive the
+  CLI deterministically under a human-in-the-loop governance model.
 type: software
 authors:
   - name: "Nizoka"
@@ -25,8 +26,8 @@ authors:
 repository-code: "https://github.com/Nizoka/pdfnative-cli"
 url: "https://pdfnative.dev"
 license: MIT
-version: 1.2.0
-date-released: "2026-07-06"
+version: 1.4.0
+date-released: "2026-08-26"
 keywords:
   - pdf
   - cli

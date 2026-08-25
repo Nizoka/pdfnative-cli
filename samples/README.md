@@ -13,7 +13,7 @@ A comprehensive collection of sample files covering every feature of pdfnative-c
 2. ✅ View sample JSON: [render/document/01-minimal.json](render/document/01-minimal.json)
 3. ✅ Try a different feature: `node samples/run-all.js --category barcode`
 4. ✅ Read the docs: [../docs/KNOWLEDGE_BASE.md](../docs/KNOWLEDGE_BASE.md)
-5. ✅ Check FAQ: [../docs/KNOWLEDGE_BASE.md#11-frequently-asked-questions](../docs/KNOWLEDGE_BASE.md#11-frequently-asked-questions)
+5. ✅ Check FAQ: [../docs/KNOWLEDGE_BASE.md#12-frequently-asked-questions](../docs/KNOWLEDGE_BASE.md#12-frequently-asked-questions)
 
 ---
 
@@ -51,7 +51,7 @@ pdfnative render `
 
 ```
 samples/
-├── run-all.js                    Cross-platform batch renderer (Node.js ≥ 20)
+├── run-all.js                    Cross-platform batch renderer (Node.js ≥ 22)
 ├── render/                       JSON payloads for pdfnative render
 │   ├── document/                 General-purpose documents (06-max-blocks.* = --max-blocks guard, v1.1.0)
 │   ├── table/                    Table-heavy layouts
@@ -83,7 +83,15 @@ samples/
 │   ├── outline/                  (v1.2.0) PDF bookmarks — `--outline auto` + explicit tree
 │   ├── math/                     (v1.2.0) Math/technical symbols via `--font math`
 │   ├── inspect-layout/           (v1.2.0) `--inspect-layout` report + `--debug-layout` guides
-│   └── chart/                    (v1.3.0) Native vector charts (bar/line/pie/donut)
+│   ├── chart/                    (v1.3.0) Native vector charts
+│   │   ├── 01-bar-chart.json     Multi-series bar chart with legend
+│   │   ├── 02-line-and-pie.json  Line chart + donut chart
+│   │   ├── 03-stacked-bars.json  (v1.4.0) stackedBar / stackedBarH + dataLabels
+│   │   ├── 04-area-scatter.json  (v1.4.0) area + dual axes (axis2) + log-scale scatter
+│   │   └── 05-time-axis.json     (v1.4.0) time x-axis (ISO xValues) + labelRotation
+│   └── print/                    (v1.4.0) Print production & viewer preferences (pdfnative 1.7.0)
+│       ├── 01-bleed-marks.json   (v1.4.0) layout.print — bleed, TrimBox, crop/registration marks, trapped
+│       └── 02-viewer-prefs.json  (v1.4.0) layout.viewerPreferences — duplex, copies, print range, tray
 ├── merge/                        (v1.2.0) Concatenate PDFs (pdfnative page-tree)
 ├── split/                        (v1.2.0) Split one PDF into many (per-page or per-range)
 ├── extract/                      (v1.2.0) Pull selected pages into a new PDF
@@ -92,8 +100,14 @@ samples/
 ├── encrypt/                      (v1.3.0) Encrypt / decrypt (AES-128/256, --password, --stream)
 ├── doctor/                       (v1.3.0) Environment / capability preflight
 ├── annotate/                     (v1.2.0) Attach markup annotations (incremental save)
+├── metadata/                     (v1.4.0) Incremental /Info + XMP metadata update (keeps signatures)
+├── compare/                      (v1.4.0) Text/structure diff of two PDFs (CI exit codes)
 ├── govern/                       (v1.2.0) AI-governance / HITL: rules, policy, verify-issue
-├── batch/                        (v1.0.0) Parallel directory render (pdfnative batch)
+├── batch/                        (v1.0.0) Parallel directory render + manifest pipelines
+│   ├── 01-batch.*                Parallel directory render
+│   ├── 02-fail-fast.*            (v1.1.0) --fail-fast abort demo
+│   ├── 03-manifest.*             (v1.4.0) `batch --manifest` — render → encrypt → inspect pipeline
+│   └── manifest/                 (v1.4.0) tasks.json (@id refs) + report.json input
 ├── agent/                        (v1.1.0) Agent-native contract: --json envelope, --dry-run, schema
 │   ├── 01-json-and-dry-run.*     --json status envelope + --dry-run validation
 │   ├── 02-schema.*               `schema` command — versioned JSON Schemas
@@ -107,8 +121,10 @@ samples/
 │   ├── 03-ecdsa.*                (v0.3.0) P-256 ECDSA-SHA256 sign
 │   ├── 04-roundtrip.*            (v0.3.0) render → sign → verify pipeline
 │   ├── 05-cert-chain.*           (v1.1.0) Root-CA → signer chain via --cert-chain + verify --trust
-│   ├── 06-timestamp-reserved.*   (v1.1.0) --timestamp is reserved → exit 2 (E_UNSUPPORTED)
-│   └── 07-native-crypto.*        (v1.2.0) Native node:crypto (default) vs pure-JS (--pure-crypto)
+│   ├── 06-timestamp.*            (v1.4.0) PAdES B-T — sign --timestamp <tsa> --profile pades
+│   ├── 07-native-crypto.*        (v1.2.0) Native node:crypto (default) vs pure-JS (--pure-crypto)
+│   ├── 08-ltv.*                  (v1.4.0) Full PAdES ladder: B-B → B-T → B-LT → B-LTA
+│   └── 09-multiple-signatures.*  (v1.4.0) Two signers via --allow-multiple / --field-name
 ├── inspect/                      PDF inspection shell / PowerShell scripts
 │   ├── 01-json.*                 JSON metadata report
 │   ├── 02-text.*                 Human-readable text report
@@ -116,7 +132,8 @@ samples/
 │   ├── 04-check-pdfa.*           CI gate: assert PDF/A conformance
 │   ├── 05-pdfua.*                (v1.1.0) PDF/UA (ISO 14289-1) structural validation gate
 │   ├── 06-check-signed-encrypted.* (v1.1.0) CI gates for --check signed / --check encrypted
-│   └── 07-annotations.*          (v1.2.0) List markup + link annotations (inspect --annotations)
+│   ├── 07-annotations.*          (v1.2.0) List markup + link annotations (inspect --annotations)
+│   └── 08-list-signatures.*      (v1.4.0) inspect --signatures inventory + --check "signatures>=N"
 ├── verify/                       Signature verification shell / PowerShell scripts
 │   ├── 01-self-signed.*          (v0.2.0) Verify a self-signed PDF
 │   ├── 02-strict-mode.*          (v0.2.0) `--strict` exits non-zero on failure
@@ -514,8 +531,11 @@ Passwords are read from `$PDFNATIVE_ENCRYPT_OWNER_PASS` / `$PDFNATIVE_ENCRYPT_US
 |------|-------------|
 | [01-bar-chart.json](render/chart/01-bar-chart.json) | Multi-series bar chart with legend |
 | [02-line-and-pie.json](render/chart/02-line-and-pie.json) | Line chart + donut chart |
+| [03-stacked-bars.json](render/chart/03-stacked-bars.json) | (v1.4.0) `stackedBar` / `stackedBarH` with per-segment `dataLabels` (prefix/suffix/decimals) |
+| [04-area-scatter.json](render/chart/04-area-scatter.json) | (v1.4.0) `area` with a secondary right axis (`series.yAxis` + `axis2`) and a `scatter` on a linear `xAxis` with a log-scale value axis |
+| [05-time-axis.json](render/chart/05-time-axis.json) | (v1.4.0) `line` on a time `xAxis` (ISO 8601 `xValues`) + bar chart with `labelRotation: 45` |
 
-Charts render as pure PDF path operators (bar, barH, line, pie, donut) — zero dependencies, no rasterisation, tagged `/Figure` with alt text. Rendered by `run-all.js` like any other document sample.
+Charts render as pure PDF path operators — zero dependencies, no rasterisation, tagged `/Figure` with alt text. Charts v2 (v1.4.0, pdfnative 1.7.0) grows the family to 9 types (`bar`, `barH`, `stackedBar`, `stackedBarH`, `line`, `area`, `scatter`, `pie`, `donut`) with dual axes (`axis2`), `xAxis` `category|linear|time`, logarithmic value scale, `dataLabels`, and `labelStride`/`labelRotation`. Rendered by `run-all.js` like any other document sample.
 
 ---
 
@@ -530,6 +550,54 @@ Charts render as pure PDF path operators (bar, barH, line, pie, donut) — zero 
 | [01-annotate.ps1](annotate/01-annotate.ps1) | PowerShell equivalent |
 
 Annotations are attached with an incremental save, so any existing signature stays intact. Read them back with `inspect --annotations`.
+
+---
+
+## Long-term signatures & document ops Samples (v1.4.0, pdfnative 1.7.0)
+
+v1.4.0 lights up the sign-side LTV ladder (PAdES B-T → B-LT → B-LTA) and adds document
+operations: metadata editing, PDF comparison, manifest pipelines, and print production.
+
+### `metadata/` — Incremental Metadata Update (v1.4.0)
+
+| File | Description |
+|------|-------------|
+| [document.json](metadata/document.json) | (v1.4.0) Source document with placeholder `/Info` metadata |
+| [01-update-metadata.sh](metadata/01-update-metadata.sh) | (v1.4.0) Render → `metadata --title --author` (incremental save — existing signatures stay valid) → `inspect` |
+| [01-update-metadata.ps1](metadata/01-update-metadata.ps1) | (v1.4.0) PowerShell equivalent |
+
+`metadata` rewrites `/Info` and keeps the XMP packet in sync (`xmp:ModifyDate`, `pdf:Keywords`, …). Pass a fixed `--mod-date` for reproducible output. Reading metadata stays in `inspect`.
+
+### `compare/` — Text & Structure Diff (v1.4.0)
+
+| File | Description |
+|------|-------------|
+| [document-a.json](compare/document-a.json) | (v1.4.0) Baseline contract document |
+| [document-b.json](compare/document-b.json) | (v1.4.0) Near-identical contract with one changed clause |
+| [01-compare.sh](compare/01-compare.sh) | (v1.4.0) Renders both, then `compare` — differences exit 1 (`E_CHECK_FAILED`), identical documents exit 0 |
+| [01-compare.ps1](compare/01-compare.ps1) | (v1.4.0) PowerShell equivalent |
+
+`compare` diffs extracted reading-order text and/or structure (`--mode text|structure|both`, `--tolerance`, `--ignore-whitespace`, `--pages`, `--password-a`/`--password-b`). The non-zero exit on difference is the CI feature. Visual/pixel diffing is out of scope (pdfnative has no rasteriser).
+
+### `render/print/` — Print Production & Viewer Preferences (v1.4.0)
+
+| File | Description |
+|------|-------------|
+| [01-bleed-marks.json](render/print/01-bleed-marks.json) | (v1.4.0) `layout.print` — 9 pt bleed shorthand (derives `/TrimBox`, sets `/BleedBox`), crop + registration marks, `metadata.trapped` |
+| [02-viewer-prefs.json](render/print/02-viewer-prefs.json) | (v1.4.0) `layout.viewerPreferences` — duplex, `numCopies`, `printPageRange`, `pickTrayByPDFSize` print-dialog defaults |
+
+Both are plain document samples rendered by `run-all.js`. `layout.print` also accepts explicit `trimBox`/`bleedBox`/`artBox`/`cropBox` and `userUnit`; an `outputIntent` (ICC RGB) can be declared alongside.
+
+### Network-dependent samples
+
+The timestamp / LTV samples ([sign/06-timestamp.*](sign/06-timestamp.sh) and
+[sign/08-ltv.*](sign/08-ltv.sh)) run **offline by default**: they always perform the
+offline part (render → PAdES B-B sign) and only exercise the network — through the
+CLI's SSRF-guarded client — when the `PDFNATIVE_TSA_URL` environment variable points
+at an RFC 3161 TSA. Without it, the network rungs are printed as explained commands.
+Network access in pdfnative-cli is always an explicit opt-in (`sign --timestamp`,
+`doc-timestamp --url`, `ltv --online`, `verify --revocation online`,
+`batch --allow-network`).
 
 ---
 
@@ -566,10 +634,14 @@ Demonstrate the `pdfnative sign` command. Both Unix shell and PowerShell scripts
 | [sign/04-roundtrip.ps1](sign/04-roundtrip.ps1) | (v0.3.0) PowerShell equivalent |
 | [sign/05-cert-chain.sh](sign/05-cert-chain.sh) | (v1.1.0) Build a root-CA → signer chain, sign with `--cert-chain`, then `verify --trust <root>` |
 | [sign/05-cert-chain.ps1](sign/05-cert-chain.ps1) | (v1.1.0) PowerShell equivalent |
-| [sign/06-timestamp-reserved.sh](sign/06-timestamp-reserved.sh) | (v1.1.0) Shows `--timestamp` is reserved and exits 2 (`E_UNSUPPORTED`) — sign-side LTV is upstream-blocked |
-| [sign/06-timestamp-reserved.ps1](sign/06-timestamp-reserved.ps1) | (v1.1.0) PowerShell equivalent |
+| [sign/06-timestamp.sh](sign/06-timestamp.sh) | (v1.4.0) PAdES B-T — `sign --timestamp <tsa> --profile pades` embeds a verified RFC 3161 token at signing time (network only when `PDFNATIVE_TSA_URL` is set) |
+| [sign/06-timestamp.ps1](sign/06-timestamp.ps1) | (v1.4.0) PowerShell equivalent |
 | [sign/07-native-crypto.sh](sign/07-native-crypto.sh) | (v1.2.0) Signs the same PDF with native `node:crypto` (default) and pure-JS (`--pure-crypto`), verifying both |
 | [sign/07-native-crypto.ps1](sign/07-native-crypto.ps1) | (v1.2.0) PowerShell equivalent |
+| [sign/08-ltv.sh](sign/08-ltv.sh) | (v1.4.0) The full PAdES ladder — B-B → B-T (`--timestamp`) → B-LT (`ltv add --online`) → B-LTA (`doc-timestamp --url`); offline by default |
+| [sign/08-ltv.ps1](sign/08-ltv.ps1) | (v1.4.0) PowerShell equivalent |
+| [sign/09-multiple-signatures.sh](sign/09-multiple-signatures.sh) | (v1.4.0) Two signers on one PDF with `--allow-multiple` / `--field-name`, inventoried with `inspect --signatures` and both verified — fully offline |
+| [sign/09-multiple-signatures.ps1](sign/09-multiple-signatures.ps1) | (v1.4.0) PowerShell equivalent |
 
 **Prerequisites:** `openssl` on your PATH (ships with Git for Windows).
 
@@ -605,6 +677,8 @@ Demonstrate the `pdfnative inspect` command.
 | [inspect/06-check-signed-encrypted.ps1](inspect/06-check-signed-encrypted.ps1) | (v1.1.0) PowerShell equivalent |
 | [inspect/07-annotations.sh](inspect/07-annotations.sh) | (v1.2.0) Render → annotate → `inspect --annotations` to list markup + link annotations |
 | [inspect/07-annotations.ps1](inspect/07-annotations.ps1) | (v1.2.0) PowerShell equivalent |
+| [inspect/08-list-signatures.sh](inspect/08-list-signatures.sh) | (v1.4.0) `inspect --signatures` JSON inventory + `--check "signatures>=N"` CI gates (pass and clean-fail shown) — fully offline |
+| [inspect/08-list-signatures.ps1](inspect/08-list-signatures.ps1) | (v1.4.0) PowerShell equivalent |
 
 ---
 
@@ -627,7 +701,7 @@ Demonstrate the `pdfnative verify` command — verifies CMS/PKCS#7 signatures em
 | [verify/06-online-revocation.sh](verify/06-online-revocation.sh) | (v1.1.0) Offline-by-default verify, with a commented SSRF-guarded `--revocation online` variant |
 | [verify/06-online-revocation.ps1](verify/06-online-revocation.ps1) | (v1.1.0) PowerShell equivalent |
 
-**Scope (v1.0.0):** verify checks **integrity** (byte-range SHA-256), **CMS signature value** (RSA-PKCS#1 v1.5 SHA-256 and ECDSA-SHA256 over P-256), **certificate chain signatures**, **trust** (against `--trust <root.pem>` PEM roots, or self-signed acceptance), **RFC 3161 timestamp validation (PAdES-T)**, and **OCSP (RFC 6960) + CRL (RFC 5280) revocation** — embedded from the PDF `/DSS` offline by default, with opt-in SSRF-guarded online fetching via `--revocation online`. Sign-side LTV (embedding timestamps/DSS at signing time) is upstream-blocked in pdfnative — see [ROADMAP.md](../ROADMAP.md) and [SECURITY.md](../SECURITY.md#network-access--revocation-checking).
+**Scope:** verify checks **integrity** (byte-range SHA-256), **CMS signature value** (RSA-PKCS#1 v1.5 — SHA-256/384/512 since v1.4.0 — and ECDSA-SHA256 over P-256), **certificate chain signatures**, **trust** (against `--trust <root.pem>` PEM roots, or self-signed acceptance), **RFC 3161 timestamp validation (PAdES-T)**, and **OCSP (RFC 6960) + CRL (RFC 5280) revocation** — embedded from the PDF `/DSS` offline by default, with opt-in SSRF-guarded online fetching via `--revocation online`. Since v1.4.0 each signature also reports its `fieldName`, and `/DocTimeStamp` revisions (PAdES B-LTA) are validated as RFC 3161 tokens (`isDocTimestamp: true`). Sign-side LTV **shipped in v1.4.0** — see [sign/06-timestamp.*](sign/06-timestamp.sh), [sign/08-ltv.sh](sign/08-ltv.sh), and [SECURITY.md](../SECURITY.md#network-access--revocation-checking).
 
 ---
 
@@ -641,8 +715,12 @@ Demonstrate the `pdfnative batch` command — renders every `*.json` in a direct
 | [batch/01-batch.ps1](batch/01-batch.ps1) | PowerShell equivalent |
 | [batch/02-fail-fast.sh](batch/02-fail-fast.sh) | (v1.1.0) `--fail-fast` aborts on the first failure (one valid + one invalid input); asserts non-zero exit |
 | [batch/02-fail-fast.ps1](batch/02-fail-fast.ps1) | (v1.1.0) PowerShell equivalent |
+| [batch/03-manifest.sh](batch/03-manifest.sh) | (v1.4.0) `batch --manifest` — declarative render → encrypt → inspect pipeline; fully offline (network flags in a manifest require `--allow-network`) |
+| [batch/03-manifest.ps1](batch/03-manifest.ps1) | (v1.4.0) PowerShell equivalent |
+| [batch/manifest/tasks.json](batch/manifest/tasks.json) | (v1.4.0) The pipeline manifest (schema subject `batch-manifest`) — `"@id"` flag values reference an earlier task's output |
+| [batch/manifest/report.json](batch/manifest/report.json) | (v1.4.0) Document definition rendered by the manifest's first task |
 
-Render flags other than `--input-dir` / `--output-dir` / `--concurrency` / `--fail-fast` / `--format` are forwarded to every file.
+In directory mode, render flags other than `--input-dir` / `--output-dir` / `--concurrency` / `--fail-fast` / `--format` are forwarded to every file. In manifest mode (v1.4.0), tasks run sequentially and may use 16 whitelisted commands; add `--continue-on-error` to keep going past a failure (tasks depending on it via `@` are skipped).
 
 ---
 
@@ -814,7 +892,7 @@ Every block type accepted by `pdfnative render` is demonstrated in [render/docum
 | `spacer` | `height` | any document sample |
 | `pageBreak` | *(no fields)* | [03-all-blocks.json](render/document/03-all-blocks.json) |
 
-> `ImageBlock` and `SvgBlock` require binary data (`Uint8Array`) and cannot be expressed in plain JSON. Use the `pdfnative` Node.js API directly for those block types.
+> `SvgBlock` is fully usable from JSON (its `data` field is an SVG **string**, pdfnative ≥ 1.5.0). `ImageBlock` is JSON-usable since v1.4.0 via `src` (a JPEG/PNG path, resolved relative to the `--input` JSON's directory) or `dataBase64` (inline base64).
 
 ---
 

@@ -1,0 +1,32 @@
+{
+  "blocks": [
+    { "type": "heading", "text": "Time X-Axis & Label Rotation (charts v2)", "level": 1 },
+    { "type": "paragraph", "text": "A line chart on a time x-axis positions points by ISO-8601 xValues (tick labels are formatted in UTC), and a bar chart rotates its long category labels 45 degrees counter-clockwise so they stay readable without striding." },
+    {
+      "type": "chart",
+      "chartType": "line",
+      "title": "Monthly active users, 2026",
+      "legend": "bottom",
+      "markers": true,
+      "xAxis": { "type": "time", "grid": true },
+      "series": [
+        {
+          "label": "MAU (k)",
+          "values": [41, 45, 52, 58, 63, 71],
+          "xValues": ["2026-01-01", "2026-02-01", "2026-03-01", "2026-04-01", "2026-05-01", "2026-06-01"]
+        }
+      ]
+    },
+    { "type": "spacer", "height": 18 },
+    {
+      "type": "chart",
+      "chartType": "bar",
+      "title": "Sign-ups by acquisition channel",
+      "labelRotation": 45,
+      "categories": ["Organic search", "Paid social campaigns", "Developer newsletter", "Conference booth leads", "Partner referrals"],
+      "series": [
+        { "label": "2026 H1", "values": [860, 410, 275, 130, 190] }
+      ]
+    }
+  ]
+}

@@ -20,6 +20,8 @@ import { render } from '../../src/commands/render.js';
 import { sign } from '../../src/commands/sign.js';
 import { verify } from '../../src/commands/verify.js';
 import { parseArgs } from '../../src/utils/args.js';
+import { setTimestampProvider } from '../../src/core-bridge/index.js';
+import { createMockPki, createMockTimestampProvider } from '../helpers/mock-pki.js';
 
 const FIXTURES = path.dirname(fileURLToPath(import.meta.url));
 const RSA_KEY = path.join(FIXTURES, '..', 'fixtures', 'rsa-key.pem');
@@ -34,6 +36,9 @@ const minimalParams = JSON.stringify({
 
 interface VerifyOutput {
     readonly signatures: ReadonlyArray<{
+        readonly fieldName: string | null;
+        readonly subFilter: string | null;
+        readonly isDocTimestamp: boolean;
         readonly integrity: boolean;
         readonly chainValid: boolean;
         readonly trustedRoot: boolean;
@@ -86,6 +91,7 @@ describe('sign → verify round-trip', () => {
     async function signWith(
         algorithm: 'rsa-sha256' | 'ecdsa-sha256',
         pureCrypto = false,
+        extraFlags: readonly string[] = [],
     ): Promise<string> {
         const src = await renderUnsigned();
         const out = path.join(os.tmpdir(), `rt-signed-${Date.now()}-${Math.random()}.pdf`);
@@ -98,6 +104,7 @@ describe('sign → verify round-trip', () => {
             '--key', key,
             '--cert', cert,
             '--algorithm', algorithm,
+            ...extraFlags,
         ];
         if (pureCrypto) argv.push('--pure-crypto');
         await sign(parseArgs(argv));
@@ -153,6 +160,76 @@ describe('sign → verify round-trip', () => {
         const pure = await verifyJson(await signWith('ecdsa-sha256', true));
         expect(pure.allValid).toBe(true);
         expect(pure.signatures[0]!.signatureValid).toBe(true);
+    });
+
+    it('RSA + --timestamp (mock TSA): signs PAdES B-T style and verify reports the timestamp', async () => {
+        // Offline RFC 3161: the injected global provider beats the CLI's HTTP
+        // transport, so the .invalid URL is never contacted.
+        setTimestampProvider(createMockTimestampProvider(createMockPki()));
+        try {
+            const src = await renderUnsigned();
+            const out = path.join(os.tmpdir(), `rt-ts-signed-${Date.now()}-${Math.random()}.pdf`);
+            tmpFiles.push(out);
+            await sign(parseArgs([
+                '--input', src,
+                '--output', out,
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+                '--timestamp', 'http://tsa.mock.invalid/tsr',
+            ]));
+
+            const result = await verifyJson(out);
+            expect(result.signatures).toHaveLength(1);
+            const sig = result.signatures[0]!;
+            expect(sig.integrity).toBe(true);
+            expect(sig.signatureValid).toBe(true);
+            expect(sig.timestampPresent).toBe(true);
+            expect(result.allValid).toBe(true);
+        } finally {
+            setTimestampProvider(null);
+        }
+    });
+
+    it('RSA + --digest sha384: signs and verifies as rsa-sha384 (v1.4.0)', async () => {
+        const signed = await signWith('rsa-sha256', false, ['--digest', 'sha384']);
+        const result = await verifyJson(signed);
+        expect(result.signatures).toHaveLength(1);
+        const sig = result.signatures[0]!;
+        expect(sig.integrity).toBe(true);
+        expect(sig.signatureValid).toBe(true);
+        expect(sig.signatureAlgorithm).toBe('rsa-sha384');
+        expect(result.allValid).toBe(true);
+    });
+
+    it('RSA + --digest sha512: signs and verifies as rsa-sha512 (v1.4.0)', async () => {
+        const signed = await signWith('rsa-sha256', false, ['--digest', 'sha512']);
+        const result = await verifyJson(signed);
+        expect(result.signatures).toHaveLength(1);
+        const sig = result.signatures[0]!;
+        expect(sig.integrity).toBe(true);
+        expect(sig.signatureValid).toBe(true);
+        expect(sig.signatureAlgorithm).toBe('rsa-sha512');
+        expect(result.allValid).toBe(true);
+    });
+
+    it('--pure-crypto + --digest sha384 also round-trips (pure-JS RSA path)', async () => {
+        const signed = await signWith('rsa-sha256', true, ['--digest', 'sha384']);
+        const result = await verifyJson(signed);
+        expect(result.signatures[0]!.signatureAlgorithm).toBe('rsa-sha384');
+        expect(result.signatures[0]!.signatureValid).toBe(true);
+        expect(result.allValid).toBe(true);
+    });
+
+    it('--profile pades: ETSI.CAdES.detached signature verifies as fully valid (v1.4.0)', async () => {
+        const signed = await signWith('rsa-sha256', false, ['--profile', 'pades']);
+        const result = await verifyJson(signed);
+        expect(result.signatures).toHaveLength(1);
+        const sig = result.signatures[0]!;
+        expect(sig.subFilter).toBe('ETSI.CAdES.detached');
+        expect(sig.isDocTimestamp).toBe(false);
+        expect(sig.integrity).toBe(true);
+        expect(sig.signatureValid).toBe(true);
+        expect(result.allValid).toBe(true);
     });
 
     it('detects tampering (RSA): integrity FAIL after byte mutation', async () => {

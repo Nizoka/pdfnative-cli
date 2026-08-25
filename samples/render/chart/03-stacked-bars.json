@@ -1,0 +1,33 @@
+{
+  "blocks": [
+    { "type": "heading", "text": "Stacked Bars (charts v2)", "level": 1 },
+    { "type": "paragraph", "text": "stackedBar / stackedBarH stack every series into one bar per category; dataLabels annotate each segment with its value — here formatted with a currency prefix and a millions suffix." },
+    {
+      "type": "chart",
+      "chartType": "stackedBar",
+      "title": "Revenue composition by quarter (USD millions)",
+      "categories": ["Q1", "Q2", "Q3", "Q4"],
+      "legend": "bottom",
+      "dataLabels": { "prefix": "$", "suffix": "M", "decimals": 0 },
+      "series": [
+        { "label": "Licences", "values": [18, 22, 25, 31] },
+        { "label": "Services", "values": [9, 11, 10, 14] },
+        { "label": "Support", "values": [6, 7, 8, 8] }
+      ]
+    },
+    { "type": "spacer", "height": 18 },
+    {
+      "type": "chart",
+      "chartType": "stackedBarH",
+      "title": "Headcount by office (stacked horizontal)",
+      "categories": ["Paris", "Berlin", "Lisbon"],
+      "legend": "bottom",
+      "dataLabels": true,
+      "series": [
+        { "label": "Engineering", "values": [42, 28, 17] },
+        { "label": "Sales", "values": [15, 12, 6] },
+        { "label": "Ops", "values": [8, 5, 4] }
+      ]
+    }
+  ]
+}

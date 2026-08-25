@@ -24,7 +24,7 @@ interface Check {
     readonly detail: string;
 }
 
-const MIN_NODE_MAJOR = 20;
+const MIN_NODE_MAJOR = 22;
 
 function nodeCheck(): Check {
     const raw = process.versions.node;

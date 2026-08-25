@@ -30,6 +30,10 @@ const SUBJECTS = [
     'verify-summary',
     'batch-summary',
     'govern-verify',
+    'metadata',
+    'ltv-data',
+    'compare',
+    'batch-manifest',
     'status',
     'manifest',
     'doctor',
@@ -53,10 +57,38 @@ function renderSchema(): JsonSchema {
         properties: {
             blocks: {
                 type: 'array',
-                description: 'Ordered document blocks (text, table, image, toc, …).',
+                description: 'Ordered document blocks (heading, paragraph, table, list, '
+                    + 'spacer, pageBreak, image, link, toc, barcode, svg, formField, '
+                    + 'chart). Chart blocks support 9 kinds (bar, barH, line, pie, '
+                    + 'donut, stackedBar, stackedBarH, area, scatter) plus xValues, '
+                    + 'yAxis "left"|"right", axis.scale "linear"|"log", axis2, xAxis '
+                    + '{type: "category"|"linear"|"time"}, dataLabels, labelStride and '
+                    + 'labelRotation (pdfnative 1.7.0). Image blocks accept "src" (a '
+                    + 'path resolved against the --input JSON\'s directory), '
+                    + '"dataBase64" (inline base64 JPEG/PNG), or "data" (byte array) — '
+                    + 'the CLI resolves them to bytes before rendering.',
                 items: { type: 'object' },
             },
-            layout: { type: 'object', description: 'PdfLayoutOptions overrides.' },
+            layout: {
+                type: 'object',
+                description: 'PdfLayoutOptions overrides. Includes print production '
+                    + '(print: {bleed, trimBox, bleedBox, artBox, cropBox, marks, '
+                    + 'userUnit}), outputIntent ({iccProfile: number[], '
+                    + 'outputConditionIdentifier, …}, ICC RGB), viewerPreferences '
+                    + '(duplex, pickTrayByPDFSize, printPageRange [[first,last]…], '
+                    + 'numCopies) and strict (escalate PDF/A diagnostics to errors) — '
+                    + 'pdfnative 1.7.0.',
+            },
+            metadata: {
+                type: 'object',
+                description: 'Document metadata → /Info + XMP (pdfnative 1.7.0).',
+                properties: {
+                    author: { type: 'string' },
+                    subject: { type: 'string' },
+                    keywords: { type: 'string' },
+                    trapped: { type: 'string', enum: ['True', 'False', 'Unknown'] },
+                },
+            },
             fontEntries: {
                 type: 'array',
                 description: 'Pre-registered font entries (usually set via --font/--lang).',
@@ -73,6 +105,16 @@ function renderSchema(): JsonSchema {
             title: { type: 'string' },
             headers: { type: 'array', items: { type: 'string' } },
             rows: { type: 'array', items: { type: 'array' } },
+            metadata: {
+                type: 'object',
+                description: 'Document metadata → /Info + XMP (pdfnative 1.7.0).',
+                properties: {
+                    author: { type: 'string' },
+                    subject: { type: 'string' },
+                    keywords: { type: 'string' },
+                    trapped: { type: 'string', enum: ['True', 'False', 'Unknown'] },
+                },
+            },
         },
     };
     return {
@@ -99,7 +141,29 @@ function inspectSchema(): JsonSchema {
             pageCount: { type: 'integer', minimum: 0 },
             encrypted: { type: 'boolean' },
             pdfaConformance: { type: ['string', 'null'] },
-            signatures: { type: 'integer', minimum: 0 },
+            signatures: {
+                description: 'Signature count, or — with `inspect --signatures` '
+                    + '(pdfnative 1.7.0) — the detailed signature-field list (never '
+                    + 'the signature bytes).',
+                oneOf: [
+                    { type: 'integer', minimum: 0 },
+                    {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                fieldName: { type: ['string', 'null'] },
+                                subFilter: { type: 'string' },
+                                byteRange: { type: 'array', items: { type: 'integer' } },
+                                isDocTimestamp: { type: 'boolean' },
+                                isPlaceholder: { type: 'boolean' },
+                                sigObjNum: { type: 'integer' },
+                                contentsLength: { type: 'integer' },
+                            },
+                        },
+                    },
+                ],
+            },
             metadata: {
                 type: 'object',
                 additionalProperties: false,
@@ -109,6 +173,7 @@ function inspectSchema(): JsonSchema {
                     creationDate: { type: ['string', 'null'] },
                     subject: { type: ['string', 'null'] },
                     producer: { type: ['string', 'null'] },
+                    trapped: { type: 'string', enum: ['True', 'False', 'Unknown'] },
                 },
             },
             pages: {
@@ -122,6 +187,11 @@ function inspectSchema(): JsonSchema {
                         rotation: { type: 'number' },
                         annotations: { type: 'integer' },
                         formFields: { type: 'integer' },
+                        cropBox: { type: 'array', minItems: 4, maxItems: 4, items: { type: 'number' } },
+                        trimBox: { type: 'array', minItems: 4, maxItems: 4, items: { type: 'number' } },
+                        bleedBox: { type: 'array', minItems: 4, maxItems: 4, items: { type: 'number' } },
+                        artBox: { type: 'array', minItems: 4, maxItems: 4, items: { type: 'number' } },
+                        userUnit: { type: 'number' },
                     },
                 },
             },
@@ -227,7 +297,18 @@ function verifySchema(): JsonSchema {
                         chainValid: { type: 'boolean' },
                         trustedRoot: { type: 'boolean' },
                         signatureValid: { type: 'boolean' },
-                        signatureAlgorithm: { type: ['string', 'null'], enum: ['rsa-sha256', 'ecdsa-sha256', null] },
+                        signatureAlgorithm: {
+                            type: ['string', 'null'],
+                            enum: ['rsa-sha256', 'rsa-sha384', 'rsa-sha512', 'ecdsa-sha256',
+                                'ecdsa-sha384', 'ecdsa-sha512', null],
+                            description: 'ecdsa-sha384/512 are detected and labelled but '
+                                + 'never verify (pdfnative verification is P-256 + SHA-256 only).',
+                        },
+                        isDocTimestamp: {
+                            type: 'boolean',
+                            description: 'True for /DocTimeStamp revisions (SubFilter '
+                                + 'ETSI.RFC3161, PAdES B-LTA) — validated as RFC 3161 tokens.',
+                        },
                         timestampPresent: { type: 'boolean' },
                         timestampValid: { type: 'boolean' },
                         timestampTime: { type: ['string', 'null'] },
@@ -250,14 +331,21 @@ function batchSchema(): JsonSchema {
         $schema: DRAFT,
         $id: id('batch'),
         title: 'pdfnative-cli batch output',
-        description: 'JSON emitted by `pdfnative batch --format json`.',
+        description: 'JSON emitted by `pdfnative batch --format json`. Directory mode '
+            + 'reports per-file `results`; manifest mode (`--manifest`, pdfnative-cli '
+            + '1.4.0) reports per-task `tasks` plus `mode: "manifest"` and `skipped`.',
         type: 'object',
-        required: ['total', 'succeeded', 'failed', 'results'],
+        required: ['total', 'succeeded', 'failed'],
         additionalProperties: false,
         properties: {
+            ok: { type: 'boolean', description: 'Manifest mode only.' },
+            command: { const: 'batch', description: 'Manifest mode only.' },
             total: { type: 'integer', minimum: 0 },
             succeeded: { type: 'integer', minimum: 0 },
             failed: { type: 'integer', minimum: 0 },
+            skipped: { type: 'integer', minimum: 0 },
+            mode: { type: 'string', enum: ['manifest'] },
+            dryRun: { type: 'boolean' },
             results: {
                 type: 'array',
                 items: {
@@ -269,6 +357,27 @@ function batchSchema(): JsonSchema {
                         output: { type: 'string' },
                         ok: { type: 'boolean' },
                         error: { type: ['string', 'null'] },
+                    },
+                },
+            },
+            tasks: {
+                type: 'array',
+                items: {
+                    type: 'object',
+                    required: ['id', 'command', 'ok'],
+                    properties: {
+                        id: { type: 'string' },
+                        command: { type: 'string' },
+                        ok: { type: 'boolean' },
+                        output: { type: 'string' },
+                        skipped: { type: 'boolean' },
+                        error: {
+                            type: 'object',
+                            properties: {
+                                code: { type: 'string' },
+                                message: { type: 'string' },
+                            },
+                        },
                     },
                 },
             },
@@ -385,14 +494,21 @@ function batchSummarySchema(): JsonSchema {
         $schema: DRAFT,
         $id: id('batch-summary'),
         title: 'pdfnative-cli batch summary output',
-        description: 'JSON emitted by `pdfnative batch --summary` (minimal verdict, no per-file results).',
+        description: 'JSON emitted by `pdfnative batch --summary` (minimal verdict, no '
+            + 'per-file results). Manifest mode additionally emits ok, command, mode, '
+            + 'skipped and (under --dry-run) dryRun.',
         type: 'object',
         required: ['total', 'succeeded', 'failed'],
         additionalProperties: false,
         properties: {
+            ok: { type: 'boolean', description: 'Manifest mode only.' },
+            command: { const: 'batch', description: 'Manifest mode only.' },
+            mode: { type: 'string', enum: ['manifest'] },
             total: { type: 'integer', minimum: 0 },
             succeeded: { type: 'integer', minimum: 0 },
             failed: { type: 'integer', minimum: 0 },
+            skipped: { type: 'integer', minimum: 0 },
+            dryRun: { type: 'boolean' },
         },
     };
 }
@@ -505,7 +621,8 @@ function statusSchema(): JsonSchema {
         title: 'pdfnative-cli agent status envelope',
         description: 'The success envelope written to stderr under --json by the write '
             + 'commands (render, sign, merge, split, extract, annotate, fill, encrypt, '
-            + 'decrypt, batch). Additional command-specific fields may be present.',
+            + 'decrypt, batch, metadata, ltv, doc-timestamp, compare). Additional '
+            + 'command-specific fields may be present.',
         type: 'object',
         required: ['ok', 'command'],
         properties: {
@@ -514,6 +631,170 @@ function statusSchema(): JsonSchema {
             dryRun: { type: 'boolean' },
             output: { type: 'string' },
             bytes: { type: 'integer', minimum: 0 },
+            timestamp: {
+                type: 'object',
+                description: 'sign --timestamp: the TSA that produced the embedded token.',
+                properties: {
+                    url: { type: 'string' },
+                    digest: { type: 'string', enum: ['sha256', 'sha384', 'sha512'] },
+                },
+            },
+            diagnostics: {
+                type: 'array',
+                description: 'render: non-strict PDF/A conformance diagnostics.',
+                items: {
+                    type: 'object',
+                    properties: {
+                        code: { type: 'string' },
+                        severity: { type: 'string', enum: ['warning'] },
+                        message: { type: 'string' },
+                    },
+                },
+            },
+        },
+    };
+}
+
+function metadataSchema(): JsonSchema {
+    return {
+        $schema: DRAFT,
+        $id: id('metadata'),
+        title: 'pdfnative-cli metadata input',
+        description: 'JSON accepted via --from-json by `pdfnative metadata`. All fields '
+            + 'are optional, but at least one must be present. modDate is an ISO 8601 '
+            + 'timestamp (defaults to now when omitted).',
+        type: 'object',
+        additionalProperties: false,
+        minProperties: 1,
+        properties: {
+            title: { type: 'string' },
+            author: { type: 'string' },
+            subject: { type: 'string' },
+            keywords: { type: 'string' },
+            modDate: { type: 'string' },
+        },
+    };
+}
+
+function ltvDataSchema(): JsonSchema {
+    return {
+        $schema: DRAFT,
+        $id: id('ltv-data'),
+        title: 'pdfnative-cli ltv collected validation data',
+        description: 'JSON emitted by `pdfnative ltv collect` and accepted by '
+            + '`pdfnative ltv embed --data`: the certificates, OCSP responses and '
+            + 'CRLs to archive in /DSS + /VRI (PAdES B-LT). All binary values are '
+            + 'base64-encoded DER. Replayable and offline-embeddable.',
+        type: 'object',
+        required: ['version', 'certificates', 'ocspResponses', 'crls', 'vri'],
+        additionalProperties: false,
+        properties: {
+            version: { const: 1 },
+            certificates: { type: 'array', items: { type: 'string', description: 'base64 DER certificate' } },
+            ocspResponses: { type: 'array', items: { type: 'string', description: 'base64 DER OCSPResponse' } },
+            crls: { type: 'array', items: { type: 'string', description: 'base64 DER CertificateList' } },
+            vri: {
+                type: 'array',
+                items: {
+                    type: 'object',
+                    required: ['key', 'certs', 'ocsps', 'crls'],
+                    additionalProperties: false,
+                    properties: {
+                        key: {
+                            type: 'string',
+                            description: 'Uppercase SHA-1 hex of the signature /Contents (VRI key).',
+                        },
+                        certs: { type: 'array', items: { type: 'integer', minimum: 0 } },
+                        ocsps: { type: 'array', items: { type: 'integer', minimum: 0 } },
+                        crls: { type: 'array', items: { type: 'integer', minimum: 0 } },
+                    },
+                },
+            },
+        },
+    };
+}
+
+function compareSchema(): JsonSchema {
+    return {
+        $schema: DRAFT,
+        $id: id('compare'),
+        title: 'pdfnative-cli compare output',
+        description: 'JSON emitted by `pdfnative compare --format json`. Identical '
+            + 'documents exit 0; any difference exits 1 with code E_CHECK_FAILED '
+            + '(the report is printed before the error). Visual diffing is out of '
+            + 'scope (no rasteriser).',
+        type: 'object',
+        required: ['equal', 'modes', 'differences'],
+        additionalProperties: false,
+        properties: {
+            equal: { type: 'boolean' },
+            modes: { type: 'array', items: { type: 'string', enum: ['structure', 'text'] } },
+            differences: {
+                type: 'array',
+                items: {
+                    type: 'object',
+                    required: ['kind'],
+                    properties: {
+                        kind: {
+                            type: 'string',
+                            enum: ['pageCount', 'pageSize', 'box', 'userUnit', 'metadata',
+                                'formFields', 'annotations', 'encryption', 'signatures', 'text'],
+                        },
+                        page: { type: 'integer', minimum: 1 },
+                        path: { type: 'string' },
+                        a: { description: 'Value in the first PDF (JSON-serialisable, never raw bytes).' },
+                        b: { description: 'Value in the second PDF.' },
+                        detail: { type: 'string' },
+                    },
+                },
+            },
+        },
+    };
+}
+
+function batchManifestSchema(): JsonSchema {
+    return {
+        $schema: DRAFT,
+        $id: id('batch-manifest'),
+        title: 'pdfnative-cli batch manifest input',
+        description: 'Input for `pdfnative batch --manifest`. Flag values "@<id>" '
+            + 'reference the output of an EARLIER task. Relative paths resolve '
+            + 'against the manifest file\'s directory. Tasks run sequentially, '
+            + 'fail-fast by default. Network flags inside a manifest additionally '
+            + 'require --allow-network on the command line.',
+        type: 'object',
+        required: ['version', 'tasks'],
+        additionalProperties: false,
+        properties: {
+            version: { const: 1 },
+            tasks: {
+                type: 'array',
+                minItems: 1,
+                items: {
+                    type: 'object',
+                    required: ['id', 'command'],
+                    additionalProperties: false,
+                    properties: {
+                        id: { type: 'string', pattern: '^[A-Za-z0-9_-]+$' },
+                        command: {
+                            enum: ['render', 'sign', 'verify', 'inspect', 'merge', 'split',
+                                'extract', 'extract-text', 'fill', 'encrypt', 'decrypt',
+                                'annotate', 'metadata', 'doc-timestamp'],
+                        },
+                        flags: {
+                            type: 'object',
+                            additionalProperties: {
+                                anyOf: [
+                                    { type: 'string' },
+                                    { type: 'number' },
+                                    { type: 'boolean' },
+                                    { type: 'array', items: { type: 'string' } },
+                                ],
+                            },
+                        },
+                    },
+                },
+            },
         },
     };
 }
@@ -554,6 +835,10 @@ const BUILDERS: Readonly<Record<Subject, () => JsonSchema>> = {
     'verify-summary': verifySummarySchema,
     'batch-summary': batchSummarySchema,
     'govern-verify': governVerifySchema,
+    metadata: metadataSchema,
+    'ltv-data': ltvDataSchema,
+    compare: compareSchema,
+    'batch-manifest': batchManifestSchema,
     status: statusSchema,
     manifest: manifestDocument,
     doctor: doctorSchema,

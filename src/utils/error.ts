@@ -25,6 +25,8 @@ export const ErrorCode = {
     UNSUPPORTED: 'E_UNSUPPORTED',
     /** Encrypted PDF: password missing or incorrect (encrypt/decrypt/read). */
     PASSWORD: 'E_PASSWORD',
+    /** Opt-in network operation failed (TSA / OCSP / CRL fetch). */
+    NETWORK: 'E_NETWORK',
     /** Catch-all runtime error (exit 1). */
     RUNTIME: 'E_RUNTIME',
 } as const;

@@ -40,7 +40,7 @@ describe('doctor', () => {
         expect(names).toEqual(expect.arrayContaining(['cli', 'node', 'webcrypto', 'pdfnative', 'commands']));
     });
 
-    it('passes in this environment (Node >= 20, Web Crypto present) and leaves exit code 0', async () => {
+    it('passes in this environment (Node >= 22, Web Crypto present) and leaves exit code 0', async () => {
         const out = capture();
         await doctor(parseArgs(['--format', 'json']));
         out.restore();

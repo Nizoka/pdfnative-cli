@@ -20,12 +20,19 @@ machine-readable JSON manifest run `pdfnative schema manifest`.
   Place `--json` AFTER the sub-command name.
 - **Stable error codes** (branch on these, not on the message):
   `E_USAGE, E_INPUT, E_PARSE, E_IO, E_SIGN, E_VERIFY_FAILED, E_CHECK_FAILED,`
-  `E_POLICY, E_UNSUPPORTED, E_PASSWORD, E_RUNTIME`.
+  `E_POLICY, E_UNSUPPORTED, E_PASSWORD, E_NETWORK, E_RUNTIME`.
+- **Offline by default**: the ONLY network opt-ins are `verify --revocation online`,
+  `sign --timestamp <url>`, `ltv --online`, `doc-timestamp --url`, and
+  `batch --allow-network`; all SSRF-guarded, no redirects. Failures → `E_NETWORK`.
 - **Token economy**: `--summary` (minimal verdict), `--fields a,b.c` (dot-path
   projection), compact JSON by default under `--json` (`--pretty` opts out).
 - **`--dry-run`** validates inputs without writing output.
-- **Self-description**: `pdfnative schema <subject>` (Draft 2020-12) and
+- **Self-description**: `pdfnative schema <subject>` (Draft 2020-12, 19 subjects
+  incl. `metadata`, `ltv-data`, `compare`, `batch-manifest`) and
   `pdfnative schema manifest` (capability list) — validate before you invoke.
+- **PAdES ladder**: `sign --timestamp <tsa> --profile pades` (B-T) →
+  `ltv add --online` (B-LT) → `doc-timestamp --url <tsa>` (B-LTA) →
+  `ltv add --online`.
 
 ## Commands
 
@@ -42,12 +49,30 @@ machine-readable JSON manifest run `pdfnative schema manifest`.
 - `merge` / `split` / `extract` — page-tree ops; support encrypted sources
   (`--password`), output re-encryption (`--encrypt`), and constant-memory
   streaming (`--stream`).
-- `annotate` — attach markup annotations via incremental save.
+- `annotate` — attach markup annotations via incremental save (`--password` for
+  encrypted PDFs).
+- `metadata` — update /Info + XMP metadata via incremental save (existing
+  signatures stay valid); reading metadata stays in `inspect`.
 - `sign` / `verify` — CMS/PKCS#7 RSA & ECDSA signing (native constant-time
-  crypto) and verification with LTV (RFC 3161 timestamps, OCSP, CRL).
-- `inspect` — metadata, conformance, signatures, annotations, form fields
-  (`--form-fields`), encryption scheme (`--encryption`), PDF/UA validation.
-- `batch` — render a directory of JSON inputs in parallel.
+  crypto; `--timestamp <tsa-url>` for RFC 3161 / PAdES B-T, `--profile pades`,
+  `--digest sha256|sha384|sha512`, `--allow-multiple` for multi-signatures,
+  visible `--signature-rect`) and verification with LTV (RFC 3161 timestamps,
+  /DocTimeStamp revisions, OCSP, CRL).
+- `ltv` — PAdES B-LT: `collect` (needs `--online`) / `embed` (100% offline) /
+  `add` — archive OCSP+CRL validation data into /DSS + /VRI.
+- `doc-timestamp` — PAdES B-LTA: append an RFC 3161 /DocTimeStamp revision
+  (`--url <tsa>` required; repeat to renew).
+- `compare` — diff two PDFs by text + structure; identical → exit 0,
+  different → exit 1 / `E_CHECK_FAILED`. No visual/raster diff.
+- `inspect` — metadata, conformance, signatures (`--signatures` inventory),
+  annotations, form fields (`--form-fields`), encryption scheme
+  (`--encryption`), PDF/UA validation, `--check "signatures>=N"`.
+- `batch` — render a directory of JSON inputs in parallel, or run a
+  declarative multi-command pipeline (`--manifest tasks.json`, `@<id>` output
+  references, `--allow-network` gate). 14 whitelisted manifest commands:
+  render, sign, verify, inspect, merge, split, extract, extract-text, fill,
+  encrypt, decrypt, annotate, metadata, doc-timestamp (ltv and compare need
+  positional arguments and are not yet manifest-callable).
 - `govern` — AI-governance / Human-in-the-Loop contract (`rules`, `policy`,
   `verify-issue`).
 - `schema` / `completion` — self-description and shell completions
@@ -68,4 +93,4 @@ gates drafts (exit `1` / `E_POLICY` on violation). See AGENTS.md.
 - README.md — features, examples, command reference.
 - AGENTS.md — the full agent-automation contract.
 - docs/KNOWLEDGE_BASE.md — deep reference.
-- Requires Node ≥ 20 (also runs on Bun and Deno). MIT licensed.
+- Requires Node ≥ 22 (also runs on Bun and Deno). MIT licensed.

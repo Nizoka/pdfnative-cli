@@ -2,10 +2,16 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { inspect } from '../../src/commands/inspect.js';
 import { render } from '../../src/commands/render.js';
+import { sign } from '../../src/commands/sign.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { CliError, ErrorCode } from '../../src/utils/error.js';
+
+const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
+const RSA_KEY = path.join(FIXTURES, 'rsa-key.pem');
+const RSA_CERT = path.join(FIXTURES, 'rsa-cert.pem');
 
 const minimalParams = JSON.stringify({
     title: 'Inspect Test',
@@ -469,6 +475,188 @@ describe('inspect', () => {
         it('--summary and --fields compose', async () => {
             const out = await runJson(['--summary', '--fields', 'pages']);
             expect(JSON.parse(out)).toEqual({ pages: expect.any(Number) });
+        });
+    });
+
+    // ──────────────────────────────────────────────────────────────────
+    // v1.4.0 — --signatures, page boxes/userUnit, metadata.trapped
+    // ──────────────────────────────────────────────────────────────────
+
+    describe('v1.4.0 enrichments', () => {
+        async function inspectJson(argv: readonly string[]): Promise<Record<string, unknown>> {
+            const chunks: string[] = [];
+            const original = process.stdout.write.bind(process.stdout);
+            process.stdout.write = (c: unknown) => {
+                chunks.push(String(c));
+                return true;
+            };
+            try {
+                await inspect(parseArgs([...argv]));
+            } finally {
+                process.stdout.write = original;
+            }
+            return JSON.parse(chunks.join('')) as Record<string, unknown>;
+        }
+
+        async function renderWith(params: unknown, extraFlags: readonly string[] = []): Promise<string> {
+            const stamp = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const inputPath = path.join(os.tmpdir(), `inspect14-in-${stamp}.json`);
+            const outputPath = path.join(os.tmpdir(), `inspect14-out-${stamp}.pdf`);
+            tmpFiles.push(inputPath, outputPath);
+            await fs.writeFile(inputPath, JSON.stringify(params), 'utf8');
+            await render(parseArgs(['--input', inputPath, '--output', outputPath, ...extraFlags]));
+            return outputPath;
+        }
+
+        async function writeLayout(layout: unknown): Promise<string> {
+            const layoutPath = path.join(os.tmpdir(), `inspect14-layout-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+            tmpFiles.push(layoutPath);
+            await fs.writeFile(layoutPath, JSON.stringify(layout), 'utf8');
+            return layoutPath;
+        }
+
+        async function signedPdf(): Promise<string> {
+            const src = await generateTestPdf();
+            const out = path.join(os.tmpdir(), `inspect14-signed-${Date.now()}-${Math.random().toString(36).slice(2)}.pdf`);
+            tmpFiles.push(out);
+            await sign(parseArgs([
+                '--input', src,
+                '--output', out,
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+                '--algorithm', 'rsa-sha256',
+            ]));
+            return out;
+        }
+
+        it('--signatures on an unsigned PDF emits signatures: []', async () => {
+            const pdfPath = await generateTestPdf();
+            const result = await inspectJson(['--input', pdfPath, '--signatures']);
+            expect(result['signatures']).toEqual([]);
+        });
+
+        it('without --signatures the signatures field stays a number (no shape change)', async () => {
+            const pdfPath = await generateTestPdf();
+            const result = await inspectJson(['--input', pdfPath]);
+            expect(typeof result['signatures']).toBe('number');
+            expect(Array.isArray(result['signatures'])).toBe(false);
+        });
+
+        it('--signatures on a signed PDF lists one entry with subFilter/byteRange (no contents bytes)', async () => {
+            const signedPath = await signedPdf();
+            const result = await inspectJson(['--input', signedPath, '--signatures']);
+            const sigs = result['signatures'] as Array<Record<string, unknown>>;
+            expect(Array.isArray(sigs)).toBe(true);
+            expect(sigs).toHaveLength(1);
+            const s = sigs[0] as Record<string, unknown>;
+            expect(s['subFilter']).toBe('adbe.pkcs7.detached');
+            const byteRange = s['byteRange'] as number[];
+            expect(byteRange).toHaveLength(4);
+            expect(byteRange[0]).toBe(0);
+            expect(byteRange[1]).toBeGreaterThan(0);
+            expect(s['isPlaceholder']).toBe(false);
+            expect(s['isDocTimestamp']).toBe(false);
+            expect(typeof s['sigObjNum']).toBe('number');
+            expect(s['contentsLength']).toBeGreaterThan(0);
+            expect('contents' in s).toBe(false);
+        });
+
+        it('--check signed passes on a signed PDF and fails on an unsigned one', async () => {
+            const silence = process.stdout.write.bind(process.stdout);
+            process.stdout.write = () => true;
+            const origStderr = process.stderr.write.bind(process.stderr);
+            process.stderr.write = () => true;
+            try {
+                // Signed → no throw.
+                const signedPath = await signedPdf();
+                await inspect(parseArgs(['--input', signedPath, '--check', 'signed']));
+                // Unsigned → E_CHECK_FAILED.
+                const plain = await generateTestPdf();
+                const err = await inspect(parseArgs(['--input', plain, '--check', 'signed']))
+                    .catch((e: unknown) => e);
+                expect(err).toBeInstanceOf(CliError);
+                expect((err as CliError).code).toBe(ErrorCode.CHECK_FAILED);
+            } finally {
+                process.stdout.write = silence;
+                process.stderr.write = origStderr;
+            }
+        });
+
+        it('--check "signatures>=N" counts non-placeholder signatures', async () => {
+            const signedPath = await signedPdf();
+            const silence = process.stdout.write.bind(process.stdout);
+            process.stdout.write = () => true;
+            const origStderr = process.stderr.write.bind(process.stderr);
+            process.stderr.write = () => true;
+            try {
+                // >=1 passes on a singly-signed doc.
+                await inspect(parseArgs(['--input', signedPath, '--check', 'signatures>=1']));
+                // >=2 fails with the stable check code.
+                const err = await inspect(parseArgs(['--input', signedPath, '--check', 'signatures>=2']))
+                    .catch((e: unknown) => e);
+                expect(err).toBeInstanceOf(CliError);
+                expect((err as CliError).exitCode).toBe(1);
+                expect((err as CliError).code).toBe(ErrorCode.CHECK_FAILED);
+            } finally {
+                process.stdout.write = silence;
+                process.stderr.write = origStderr;
+            }
+        });
+
+        it('--pages reports trimBox/bleedBox from a print.bleed render', async () => {
+            const layoutPath = await writeLayout({ print: { bleed: 8.5 } });
+            const pdfPath = await renderWith(
+                { title: 'Bleed', blocks: [{ type: 'paragraph', text: 'x' }] },
+                ['--layout', layoutPath],
+            );
+            const result = await inspectJson(['--input', pdfPath, '--pages']);
+            const pages = result['pages'] as Array<Record<string, unknown>>;
+            expect(pages.length).toBeGreaterThanOrEqual(1);
+            const p = pages[0] as Record<string, unknown>;
+            const w = p['width'] as number;
+            const h = p['height'] as number;
+            const trim = p['trimBox'] as number[];
+            expect(trim).toHaveLength(4);
+            expect(trim[0]).toBeCloseTo(8.5, 2);
+            expect(trim[1]).toBeCloseTo(8.5, 2);
+            expect(trim[2]).toBeCloseTo(w - 8.5, 2);
+            expect(trim[3]).toBeCloseTo(h - 8.5, 2);
+            expect(p['bleedBox']).toEqual([0, 0, w, h]);
+        });
+
+        it('--pages omits box keys when the page has none', async () => {
+            const pdfPath = await generateTestPdf();
+            const result = await inspectJson(['--input', pdfPath, '--pages']);
+            const p = (result['pages'] as Array<Record<string, unknown>>)[0] as Record<string, unknown>;
+            expect('trimBox' in p).toBe(false);
+            expect('bleedBox' in p).toBe(false);
+            expect('artBox' in p).toBe(false);
+            expect('userUnit' in p).toBe(false);
+        });
+
+        it('--pages reports userUnit from a print.userUnit render', async () => {
+            const layoutPath = await writeLayout({ print: { userUnit: 2 } });
+            const pdfPath = await renderWith(
+                { title: 'Big', blocks: [{ type: 'paragraph', text: 'x' }] },
+                ['--layout', layoutPath],
+            );
+            const result = await inspectJson(['--input', pdfPath, '--pages']);
+            const p = (result['pages'] as Array<Record<string, unknown>>)[0] as Record<string, unknown>;
+            expect(p['userUnit']).toBe(2);
+        });
+
+        it('metadata.trapped surfaces /Info /Trapped and is omitted otherwise', async () => {
+            const trappedPdf = await renderWith({
+                title: 'Trapped',
+                metadata: { trapped: 'True' },
+                blocks: [{ type: 'paragraph', text: 'x' }],
+            });
+            const withTrapped = await inspectJson(['--input', trappedPdf]);
+            expect((withTrapped['metadata'] as Record<string, unknown>)['trapped']).toBe('True');
+
+            const plainPdf = await generateTestPdf();
+            const without = await inspectJson(['--input', plainPdf]);
+            expect('trapped' in (without['metadata'] as Record<string, unknown>)).toBe(false);
         });
     });
 });

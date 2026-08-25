@@ -18,7 +18,7 @@ export interface CommandSpec {
     readonly flags: readonly string[];
 }
 
-export const GLOBAL_FLAGS = ['--help', '--version', '--no-color', '--quiet', '--json', '--dry-run', '--config', '--no-config'];
+export const GLOBAL_FLAGS = ['--help', '--version', '--no-color', '--quiet', '--json', '--dry-run', '--config', '--no-config', '--max-inflate-size'];
 
 // Shared password / re-encryption / streaming flags for the page-tree commands
 // (merge, split, extract) — pdfnative 1.6.0.
@@ -44,7 +44,7 @@ export const COMMANDS: readonly CommandSpec[] = [
             '--watermark-position',
             '--encrypt', '--owner-password', '--user-password', '--permissions',
             '--encrypt-algorithm', '--encrypt-owner-pass', '--encrypt-user-pass',
-            '--encrypt-permissions', '--attachment',
+            '--encrypt-permissions', '--attachment', '--strict', '--chunk-size',
         ],
     },
     {
@@ -53,7 +53,9 @@ export const COMMANDS: readonly CommandSpec[] = [
         flags: [
             '--input', '--output', '--key', '--cert', '--cert-chain', '--algorithm',
             '--reason', '--name', '--location', '--contact', '--signing-time', '--timestamp',
-            '--pure-crypto',
+            '--timestamp-digest', '--timestamp-nonce', '--allow-multiple', '--field-name',
+            '--profile', '--digest', '--signature-rect', '--signature-page',
+            '--placeholder-bytes', '--pure-crypto',
         ],
     },
     {
@@ -62,9 +64,19 @@ export const COMMANDS: readonly CommandSpec[] = [
         flags: ['--input', '--trust', '--strict', '--revocation', '--revocation-policy', '--format', '--summary', '--fields', '--pretty'],
     },
     {
+        name: 'ltv',
+        summary: 'PAdES B-LT: collect/embed OCSP+CRL validation data (/DSS)',
+        flags: ['--input', '--output', '--online', '--prefer', '--extra-cert', '--data', '--timeout'],
+    },
+    {
+        name: 'doc-timestamp',
+        summary: 'PAdES B-LTA: append an RFC 3161 document timestamp',
+        flags: ['--input', '--output', '--url', '--digest', '--field-name', '--placeholder-bytes', '--nonce', '--timeout'],
+    },
+    {
         name: 'inspect',
         summary: 'Analyse a PDF and output metadata',
-        flags: ['--input', '--format', '--verbose', '--pages', '--pdfua', '--annotations', '--form-fields', '--encryption', '--password', '--check', '--summary', '--fields', '--pretty'],
+        flags: ['--input', '--format', '--verbose', '--pages', '--pdfua', '--annotations', '--form-fields', '--encryption', '--signatures', '--password', '--check', '--summary', '--fields', '--pretty'],
     },
     {
         name: 'merge',
@@ -104,12 +116,22 @@ export const COMMANDS: readonly CommandSpec[] = [
     {
         name: 'annotate',
         summary: 'Attach markup annotations to a PDF',
-        flags: ['--input', '--output', '--annotations'],
+        flags: ['--input', '--output', '--annotations', '--password'],
+    },
+    {
+        name: 'metadata',
+        summary: 'Update PDF /Info + XMP metadata (incremental — keeps signatures)',
+        flags: ['--input', '--output', '--title', '--author', '--subject', '--keywords', '--mod-date', '--from-json', '--password'],
+    },
+    {
+        name: 'compare',
+        summary: 'Diff two PDFs by text and structure',
+        flags: ['--mode', '--format', '--tolerance', '--ignore-whitespace', '--pages', '--password-a', '--password-b', '--pretty'],
     },
     {
         name: 'batch',
-        summary: 'Render many JSON inputs to PDF in parallel',
-        flags: ['--input-dir', '--output-dir', '--concurrency', '--fail-fast', '--format', '--layout', '--variant', '--summary', '--fields', '--pretty'],
+        summary: 'Render a directory or run a multi-command manifest pipeline',
+        flags: ['--input-dir', '--output-dir', '--concurrency', '--fail-fast', '--manifest', '--allow-network', '--continue-on-error', '--format', '--layout', '--variant', '--summary', '--fields', '--pretty'],
     },
     {
         name: 'govern',

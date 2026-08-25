@@ -28,7 +28,7 @@ describe('schema', () => {
     it.each([
         'render', 'inspect', 'verify', 'batch', 'annotate', 'extract-text', 'fill',
         'form-export', 'inspect-summary', 'verify-summary', 'batch-summary',
-        'govern-verify', 'status', 'doctor',
+        'govern-verify', 'metadata', 'ltv-data', 'compare', 'batch-manifest', 'status', 'doctor',
     ])(
         'prints a valid Draft 2020-12 schema for "%s"',
         async (subject) => {
@@ -85,6 +85,10 @@ describe('schema', () => {
             'verify-summary',
             'batch-summary',
             'govern-verify',
+            'metadata',
+            'ltv-data',
+            'compare',
+            'batch-manifest',
             'status',
             'manifest',
             'doctor',
@@ -108,5 +112,38 @@ describe('schema', () => {
             expect(err.exitCode).toBe(2);
             expect(err.code).toBe(ErrorCode.USAGE);
         });
+    });
+
+    it('should cover every key the batch manifest-mode envelope emits (full and --summary)', async () => {
+        // Guard against the pinned schema rejecting the real output: every key
+        // emitted by `batch --manifest` (see emitManifestSummary in batch.ts)
+        // must be declared, because both schemas set additionalProperties:false.
+        const manifestModeKeys = ['ok', 'command', 'mode', 'dryRun', 'total', 'succeeded', 'failed', 'skipped'];
+
+        const out = captureStdout();
+        await schema(parseArgs(['batch']));
+        out.restore();
+        const full = JSON.parse(out.calls.join(''));
+        for (const key of [...manifestModeKeys, 'tasks', 'results']) {
+            expect(Object.keys(full.properties), `batch schema missing "${key}"`).toContain(key);
+        }
+
+        const out2 = captureStdout();
+        await schema(parseArgs(['batch-summary']));
+        out2.restore();
+        const summary = JSON.parse(out2.calls.join(''));
+        for (const key of manifestModeKeys) {
+            expect(Object.keys(summary.properties), `batch-summary schema missing "${key}"`).toContain(key);
+        }
+    });
+
+    it('should print the metadata --from-json input schema', async () => {
+        const out = captureStdout();
+        await schema(parseArgs(['metadata']));
+        out.restore();
+        const doc = JSON.parse(out.calls.join(''));
+        expect(doc.title).toBe('pdfnative-cli metadata input');
+        expect(Object.keys(doc.properties)).toEqual(['title', 'author', 'subject', 'keywords', 'modDate']);
+        expect(doc.additionalProperties).toBe(false);
     });
 });

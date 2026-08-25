@@ -1,0 +1,24 @@
+{
+  "title": "Print Dialog Defaults — Duplex, Copies & Page Range",
+  "layout": {
+    "viewerPreferences": {
+      "duplex": "duplexFlipLongEdge",
+      "numCopies": 2,
+      "printPageRange": [[1, 2]],
+      "pickTrayByPDFSize": true
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "Office Handout — Print Defaults Preset", "level": 1 },
+    { "type": "paragraph", "text": "This document carries layout.viewerPreferences (pdfnative 1.7.0 print-dialog keys). Open the print dialog in a conforming viewer and the defaults below are pre-selected — purely presentational, PDF/A-safe hints the user can still override." },
+    { "type": "table", "headers": ["Preference", "Value", "PDF key"], "rows": [
+      { "cells": ["Paper handling", "Double-sided, flip on long edge", "/Duplex /DuplexFlipLongEdge"], "type": "normal", "pointed": false },
+      { "cells": ["Copies", "2", "/NumCopies 2"], "type": "normal", "pointed": false },
+      { "cells": ["Page range", "Pages 1-2", "/PrintPageRange [0 1]"], "type": "normal", "pointed": false },
+      { "cells": ["Input tray", "Pick by PDF page size", "/PickTrayByPDFSize true"], "type": "normal", "pointed": false }
+    ] },
+    { "type": "pageBreak" },
+    { "type": "heading", "text": "Page 2 — included in the default print range", "level": 2 },
+    { "type": "paragraph", "text": "The /PrintPageRange entry uses inclusive 1-based pairs in the JSON ([[1, 2]] here) and is written 0-based to the PDF. Viewers honour /NumCopies values from 2 to 5 (ISO 32000-1 Table 150); other values are ignored." }
+  ]
+}

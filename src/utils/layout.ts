@@ -87,6 +87,20 @@ export async function loadLayoutFile(
             return rest;
         });
     }
+    // Revive outputIntent.iccProfile (pdfnative 1.7.0 CustomOutputIntent):
+    // JSON can only carry a number array, but the engine expects Uint8Array.
+    // ICC profiles are not executable payloads and the engine validates the
+    // 128-byte header + RGB colour space before embedding.
+    const oi = obj.outputIntent;
+    if (typeof oi === 'object' && oi !== null && !Array.isArray(oi)) {
+        const oiRec = oi as Record<string, unknown>;
+        if (Array.isArray(oiRec.iccProfile)) {
+            obj.outputIntent = {
+                ...oiRec,
+                iccProfile: Uint8Array.from(oiRec.iccProfile as readonly number[]),
+            };
+        }
+    }
     return obj as Partial<PdfLayoutOptions>;
 }
 

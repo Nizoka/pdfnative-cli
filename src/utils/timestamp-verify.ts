@@ -23,11 +23,13 @@ import {
     extractEContent,
     extractCmsCertificates,
     extractSignedMessageDigest,
+    extractSignerDigestAlgorithm,
     decodeOid,
+    type CmsSignatureAlgorithm,
 } from './cms-verify.js';
 import { buildChain, isTrustedRoot } from './cert-chain.js';
-import { parseCertificate } from '../core-bridge/index.js';
-import type { X509Certificate } from '../core-bridge/index.js';
+import { parseCertificate, parseTimestampToken, verifyTimestampImprint } from '../core-bridge/index.js';
+import type { X509Certificate, TstInfo as ParsedTstInfo } from '../core-bridge/index.js';
 
 // ── OID constants ─────────────────────────────────────────────────────
 
@@ -267,5 +269,203 @@ export function verifyTimestamp(
         chainValid: built.chainValid,
         trusted,
         note: null,
+    };
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// /DocTimeStamp revision validation (PAdES B-LTA, ISO 32000-2 §12.8.5)
+//
+// A /DocTimeStamp signature field's /Contents is NOT a classic CMS document
+// signature: it is a bare RFC 3161 TimeStampToken whose messageImprint
+// covers the /ByteRange of the timestamped revision. Verification proves:
+//   1. the TSTInfo messageImprint equals hash(/ByteRange bytes) computed
+//      with the TSTInfo's own hash algorithm (byte-range binding);
+//   2. the TSA SignerInfo signature over its signedAttrs is valid, and the
+//      signed messageDigest matches the encapsulated TSTInfo (both
+//      delegated to the same cms-verify machinery PAdES-T reuses);
+//   3. the TSA certificate chain builds and (optionally) anchors to trust —
+//      reported, but like PAdES-T never folded into `valid`.
+// ──────────────────────────────────────────────────────────────────────
+
+/** Decode raw OID content bytes (no tag/length) to dotted-decimal. */
+function oidContentToString(bytes: Uint8Array): string | null {
+    if (bytes.length === 0) return null;
+    const first = bytes[0] as number;
+    const parts: number[] = [Math.floor(first / 40), first % 40];
+    let v = 0;
+    for (let i = 1; i < bytes.length; i++) {
+        const byte = bytes[i] as number;
+        v = (v << 7) | (byte & 0x7f);
+        if ((byte & 0x80) === 0) {
+            parts.push(v);
+            v = 0;
+        }
+    }
+    return parts.join('.');
+}
+
+function toHex(bytes: Uint8Array): string {
+    let s = '';
+    for (let i = 0; i < bytes.length; i++) {
+        s += (bytes[i] as number).toString(16).padStart(2, '0');
+    }
+    return s;
+}
+
+export interface DocTimestampVerifyResult {
+    /** True when both the byte-range imprint and the token signature verify. */
+    readonly valid: boolean;
+    /** TSTInfo messageImprint == hash of the /ByteRange-covered bytes. */
+    readonly imprintValid: boolean;
+    /** TSA SignerInfo signature over the TSTInfo is valid. */
+    readonly signatureValid: boolean;
+    /** Detected TSA signature algorithm, when the token parsed. */
+    readonly algorithm: CmsSignatureAlgorithm | null;
+    /** Hex of the recomputed byte-range hash (imprint digest), or null. */
+    readonly imprintHex: string | null;
+    /** TSTInfo genTime as ISO 8601, or null. */
+    readonly genTime: string | null;
+    /** TSA signer certificate subject CN, or null. */
+    readonly tsaSubject: string | null;
+    /** True when the TSA chain resolved to a (self-signed) root. */
+    readonly chainValid: boolean;
+    /** True when the TSA chain root is trusted (anchors or self-signed). */
+    readonly trusted: boolean;
+    /** Diagnostic for failures; never leaks byte offsets. */
+    readonly note: string | null;
+}
+
+/**
+ * Verify a /DocTimeStamp revision's TimeStampToken against the PDF bytes.
+ *
+ * @param tokenBytes  The /Contents value with trailing zero-padding already
+ *        trimmed to the DER length of the outer ContentInfo.
+ * @param pdfBytes    The complete PDF file bytes.
+ * @param byteRange   The /ByteRange of the /DocTimeStamp signature dict.
+ * @param trustRoots  Optional trust anchors for the TSA chain.
+ */
+export function verifyDocTimestamp(
+    tokenBytes: Uint8Array,
+    pdfBytes: Uint8Array,
+    byteRange: readonly [number, number, number, number],
+    trustRoots: readonly X509Certificate[],
+): DocTimestampVerifyResult {
+    const fail = (note: string): DocTimestampVerifyResult => ({
+        valid: false,
+        imprintValid: false,
+        signatureValid: false,
+        algorithm: null,
+        imprintHex: null,
+        genTime: null,
+        tsaSubject: null,
+        chainValid: false,
+        trusted: false,
+        note,
+    });
+
+    let info: ParsedTstInfo;
+    try {
+        info = parseTimestampToken(tokenBytes);
+    } catch {
+        return fail('failed to parse timestamp token (malformed or not RFC 3161)');
+    }
+    const genTime = Number.isNaN(info.genTime.getTime()) ? null : info.genTime.toISOString();
+
+    // (1) Byte-range binding: recompute the imprint with the TSTInfo's own
+    // hash algorithm and byte-compare against the token's messageImprint.
+    const algOid = oidContentToString(info.hashAlgorithmOid);
+    const digestName = algOid !== null ? DIGEST_BY_OID[algOid] ?? null : null;
+    if (digestName === null) {
+        return fail('unsupported messageImprint hash algorithm in timestamp token');
+    }
+    const [a, b, c, d] = byteRange;
+    const hash = createHash(digestName);
+    hash.update(pdfBytes.subarray(a, a + b));
+    hash.update(pdfBytes.subarray(c, c + d));
+    const imprint = new Uint8Array(hash.digest());
+    const imprintValid = verifyTimestampImprint(info, imprint);
+    const imprintHex = toHex(imprint);
+
+    // (2) TSA SignerInfo signature + eContent digest — same checks the
+    // PAdES-T verifier applies to a signature-time-stamp token.
+    let tsaCerts: X509Certificate[];
+    try {
+        tsaCerts = (info.tsaCertificates.length > 0
+            ? [...info.tsaCertificates]
+            : extractCmsCertificates(tokenBytes)
+        ).map((der) => parseCertificate(der));
+    } catch {
+        tsaCerts = [];
+    }
+    if (tsaCerts.length === 0) {
+        return {
+            ...fail('no TSA certificate embedded in timestamp token'),
+            imprintValid,
+            imprintHex,
+            genTime,
+        };
+    }
+
+    // eContent integrity: signed messageDigest == digest(TSTInfo).
+    const encap = extractEContent(tokenBytes);
+    const tokenMd = extractSignedMessageDigest(tokenBytes);
+    if (encap !== null && tokenMd !== null) {
+        const mdDigest = extractSignerDigestAlgorithm(tokenBytes) ?? 'sha256';
+        const eHash = new Uint8Array(createHash(mdDigest).update(encap.content).digest());
+        if (!bytesEqual(tokenMd, eHash)) {
+            return {
+                ...fail('timestamp eContent digest mismatch'),
+                imprintValid,
+                imprintHex,
+                genTime,
+            };
+        }
+    }
+
+    // The TSA signer is whichever embedded cert verifies the token signature.
+    let tsaLeaf: X509Certificate | null = null;
+    let algorithm: CmsSignatureAlgorithm | null = null;
+    let sigNote: string | null = null;
+    for (const cand of tsaCerts) {
+        const r = verifyCmsSignatureValue(tokenBytes, cand);
+        if (r.signatureValid) {
+            tsaLeaf = cand;
+            algorithm = r.algorithm;
+            break;
+        }
+        sigNote = r.note;
+    }
+    const signatureValid = tsaLeaf !== null;
+
+    // (3) TSA chain + trust — reported, never folded into `valid` (matches
+    // the PAdES-T timestamp verifier: TSA trust is a separate signal).
+    let chainValid = false;
+    let trusted = false;
+    let tsaSubject: string | null = null;
+    if (tsaLeaf !== null) {
+        const built = buildChain(tsaLeaf, tsaCerts.concat(trustRoots));
+        chainValid = built.chainValid;
+        trusted = isTrustedRoot(built.root, trustRoots);
+        tsaSubject = cnOf(tsaLeaf);
+    }
+
+    let note: string | null = null;
+    if (!imprintValid) {
+        note = 'timestamp messageImprint does not match the signed byte range';
+    } else if (!signatureValid) {
+        note = `TSA signature invalid${sigNote !== null ? ` (${sigNote})` : ''}`;
+    }
+
+    return {
+        valid: imprintValid && signatureValid,
+        imprintValid,
+        signatureValid,
+        algorithm,
+        imprintHex,
+        genTime,
+        tsaSubject,
+        chainValid,
+        trusted,
+        note,
     };
 }

@@ -1,5 +1,5 @@
-import { openPdf, validatePdfUA, isStream, readFormFields } from '../core-bridge/index.js';
-import type { PdfReader, PdfUAValidationResult, PageLabelRange, ParsedAnnotation, PdfEncryptionInfo } from '../core-bridge/index.js';
+import { openPdf, validatePdfUA, isStream, readFormFields, listSignatures, nameValue } from '../core-bridge/index.js';
+import type { PdfReader, PdfUAValidationResult, PageLabelRange, ParsedAnnotation, PdfEncryptionInfo, PdfSignatureInfo, PdfDict } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../utils/args.js';
 import { readFileOrStdin } from '../utils/io.js';
 import { CliError, ErrorCode } from '../utils/error.js';
@@ -9,6 +9,9 @@ import { resolveSourcePassword, mapPdfError } from '../utils/pdfops.js';
 
 const VALID_CHECKS = new Set(['pdfa', 'signed', 'encrypted', 'pdfua']);
 
+/** Parametrized check: `--check "signatures>=N"` (N non-placeholder signatures). */
+const SIG_COUNT_CHECK = /^signatures>=(\d+)$/;
+
 interface PageInfo {
     readonly index: number;
     readonly width: number | null;
@@ -16,6 +19,29 @@ interface PageInfo {
     readonly rotation: number;
     readonly annotations: number;
     readonly formFields: number;
+    /** `/CropBox` — viewer display region, when present on the page dict. */
+    readonly cropBox?: readonly number[];
+    /** `/TrimBox` — finished page size after cutting (ISO 32000-1 §14.11.2). */
+    readonly trimBox?: readonly number[];
+    /** `/BleedBox` — content clipped in production. */
+    readonly bleedBox?: readonly number[];
+    /** `/ArtBox` — meaningful-content extent. */
+    readonly artBox?: readonly number[];
+    /** `/UserUnit` — user-space unit in multiples of 1/72 inch (large-format pages). */
+    readonly userUnit?: number;
+}
+
+/** One entry of `inspect --signatures` (pdfnative 1.7.0 `listSignatures`).
+ *  `contentsLength` replaces the raw `/Contents` bytes — key material and
+ *  CMS blobs are never emitted. */
+interface SignatureDetail {
+    readonly fieldName: string | null;
+    readonly subFilter: string;
+    readonly byteRange: readonly number[];
+    readonly isDocTimestamp: boolean;
+    readonly isPlaceholder: boolean;
+    readonly sigObjNum: number;
+    readonly contentsLength: number;
 }
 
 interface AnnotationInfo {
@@ -60,6 +86,8 @@ interface InspectResult {
         readonly creationDate: string | null;
         readonly subject: string | null;
         readonly producer: string | null;
+        /** `/Info /Trapped` (ISO 32000-1 §14.11.6) — omitted when absent. */
+        readonly trapped?: 'True' | 'False' | 'Unknown';
     };
     readonly pageLabels?: readonly PageLabelInfo[];
     readonly encryption?: EncryptionDetail | null;
@@ -148,7 +176,9 @@ function countSignatures(reader: PdfReader): number {
         let count = 0;
         for (const ref of fieldsVal) {
             const field = reader.resolveValue(ref as Parameters<PdfReader['resolveValue']>[0]);
-            if (field instanceof Map && field.get('FT') === '/Sig') {
+            if (!(field instanceof Map)) continue;
+            const ft = field.get('FT');
+            if (ft !== undefined && nameValue(ft) === 'Sig') {
                 count++;
             }
         }
@@ -156,6 +186,60 @@ function countSignatures(reader: PdfReader): number {
     } catch {
         return 0;
     }
+}
+
+/** Read a `[x1 y1 x2 y2]` page-box entry from the page dict, or undefined.
+ *  No /Pages-tree inheritance is attempted — consistent with the MediaBox
+ *  handling above, and the production boxes are not inheritable anyway
+ *  (only MediaBox/CropBox/Rotate/Resources are, ISO 32000-1 §7.7.3.4). */
+function readPageBox(reader: PdfReader, page: PdfDict, key: string): readonly number[] | undefined {
+    const raw = page.get(key);
+    if (raw === undefined) return undefined;
+    let value: unknown;
+    try {
+        value = reader.resolveValue(raw as Parameters<PdfReader['resolveValue']>[0]);
+    } catch {
+        return undefined;
+    }
+    if (!Array.isArray(value) || value.length !== 4) return undefined;
+    return value.every((n) => typeof n === 'number' && Number.isFinite(n))
+        ? (value as readonly number[])
+        : undefined;
+}
+
+/** Read the page's `/UserUnit` (positive finite number), or undefined. */
+function readUserUnit(reader: PdfReader, page: PdfDict): number | undefined {
+    const raw = page.get('UserUnit');
+    if (raw === undefined) return undefined;
+    let value: unknown;
+    try {
+        value = reader.resolveValue(raw as Parameters<PdfReader['resolveValue']>[0]);
+    } catch {
+        return undefined;
+    }
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+/** Read `/Info /Trapped` (a PDF *name*: /True, /False or /Unknown), or undefined. */
+function readTrapped(info: PdfDict | null): 'True' | 'False' | 'Unknown' | undefined {
+    if (info === null) return undefined;
+    const raw = info.get('Trapped');
+    if (raw === undefined) return undefined;
+    const v = nameValue(raw);
+    return v === 'True' || v === 'False' || v === 'Unknown' ? v : undefined;
+}
+
+/** Project a pdfnative signature entry to the stable CLI shape (never the raw /Contents bytes). */
+function toSignatureDetail(s: PdfSignatureInfo): SignatureDetail {
+    return {
+        fieldName: s.fieldName ?? null,
+        subFilter: s.subFilter,
+        byteRange: s.byteRange,
+        isDocTimestamp: s.isDocTimestamp,
+        isPlaceholder: s.isPlaceholder,
+        sigObjNum: s.sigObjNum,
+        contentsLength: s.contents.length,
+    };
 }
 
 function inspectPages(reader: PdfReader): readonly PageInfo[] {
@@ -183,15 +267,35 @@ function inspectPages(reader: PdfReader): readonly PageInfo[] {
                 annotations++;
                 try {
                     const annot = reader.resolveValue(ref as Parameters<PdfReader['resolveValue']>[0]);
-                    if (annot instanceof Map && annot.get('Subtype') === '/Widget') {
-                        formFields++;
+                    if (annot instanceof Map) {
+                        const subtype = annot.get('Subtype');
+                        if (subtype !== undefined && nameValue(subtype) === 'Widget') {
+                            formFields++;
+                        }
                     }
                 } catch {
                     // best-effort — keep counting other annotations
                 }
             }
         }
-        out.push({ index: i, width, height, rotation, annotations, formFields });
+        const cropBox = readPageBox(reader, page, 'CropBox');
+        const trimBox = readPageBox(reader, page, 'TrimBox');
+        const bleedBox = readPageBox(reader, page, 'BleedBox');
+        const artBox = readPageBox(reader, page, 'ArtBox');
+        const userUnit = readUserUnit(reader, page);
+        out.push({
+            index: i,
+            width,
+            height,
+            rotation,
+            annotations,
+            formFields,
+            ...(cropBox !== undefined ? { cropBox } : {}),
+            ...(trimBox !== undefined ? { trimBox } : {}),
+            ...(bleedBox !== undefined ? { bleedBox } : {}),
+            ...(artBox !== undefined ? { artBox } : {}),
+            ...(userUnit !== undefined ? { userUnit } : {}),
+        });
     }
     return out;
 }
@@ -290,19 +394,28 @@ function toInspectSummary(result: InspectResult): Record<string, unknown> {
     };
 }
 
-function evaluateChecks(checks: readonly string[], result: InspectResult): CheckResult {
+function evaluateChecks(
+    checks: readonly string[],
+    result: InspectResult,
+    signedCount: number,
+): CheckResult {
     const out: { name: string; passed: boolean }[] = [];
     for (const c of checks) {
-        if (!VALID_CHECKS.has(c)) {
+        const sigCount = SIG_COUNT_CHECK.exec(c);
+        if (!VALID_CHECKS.has(c) && sigCount === null) {
             throw new CliError(
-                `Invalid --check value "${c}". Valid: ${[...VALID_CHECKS].join(', ')}.`,
+                `Invalid --check value "${c}". Valid: ${[...VALID_CHECKS].join(', ')}, signatures>=N.`,
                 2,
             );
         }
         if (c === 'pdfa') out.push({ name: c, passed: result.pdfaConformance !== null });
-        if (c === 'signed') out.push({ name: c, passed: result.signatures > 0 });
+        if (c === 'signed') out.push({ name: c, passed: signedCount > 0 });
         if (c === 'encrypted') out.push({ name: c, passed: result.encrypted });
         if (c === 'pdfua') out.push({ name: c, passed: result.pdfua?.valid === true });
+        if (sigCount !== null) {
+            const wanted = Number.parseInt(sigCount[1] as string, 10);
+            out.push({ name: c, passed: signedCount >= wanted });
+        }
     }
     return {
         checks: out.map((x) => `${x.name}=${x.passed ? 'pass' : 'fail'}`),
@@ -318,6 +431,7 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     const includeAnnotations = hasFlag(args.flags, 'annotations');
     const includeFormFields = hasFlag(args.flags, 'form-fields');
     const includeEncryption = hasFlag(args.flags, 'encryption');
+    const includeSignatures = hasFlag(args.flags, 'signatures');
     const password = resolveSourcePassword(args.flags);
     const checks = getStringFlagAll(args.flags, 'check');
     const includePdfua = hasFlag(args.flags, 'pdfua') || checks.includes('pdfua');
@@ -337,6 +451,7 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     }
 
     const info = reader.getInfo();
+    const trapped = readTrapped(info);
     const baseResult: InspectResult = {
         version: extractVersion(reader),
         pageCount: reader.pageCount,
@@ -349,8 +464,26 @@ export async function inspect(args: ParsedArgs): Promise<void> {
             creationDate: info !== null ? safeInfoString(info.get('CreationDate')) : null,
             subject: info !== null ? safeInfoString(info.get('Subject')) : null,
             producer: info !== null ? safeInfoString(info.get('Producer')) : null,
+            ...(trapped !== undefined ? { trapped } : {}),
         },
     };
+
+    // --signatures / signature-count checks: enumerate the signature fields via
+    // pdfnative 1.7.0 `listSignatures`. Non-placeholder, non-timestamp entries
+    // are what `--check signed` / `--check "signatures>=N"` count. When only a
+    // check needs the count and enumeration fails (e.g. an encryption scheme the
+    // standalone lister cannot open), fall back to the legacy /Sig field count.
+    const sigCountChecks = checks.filter((c) => c === 'signed' || SIG_COUNT_CHECK.test(c));
+    let signatureDetails: readonly SignatureDetail[] | undefined;
+    let signedCount = baseResult.signatures;
+    if (includeSignatures || sigCountChecks.length > 0) {
+        try {
+            signatureDetails = listSignatures(pdfBytes).map(toSignatureDetail);
+            signedCount = signatureDetails.filter((s) => !s.isPlaceholder && !s.isDocTimestamp).length;
+        } catch (e) {
+            if (includeSignatures) throw mapPdfError(e, 'Failed to list signatures');
+        }
+    }
 
     const pageLabels = inspectPageLabels(reader);
     let formFields: readonly FormFieldInfo[] | undefined;
@@ -375,7 +508,14 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     if (format === 'json') {
         const summary = hasFlag(args.flags, 'summary');
         const fieldsRaw = getStringFlag(args.flags, 'fields');
-        let out: unknown = summary ? toInspectSummary(result) : result;
+        // With --signatures the top-level `signatures` field carries the
+        // detailed entries instead of the bare count (opt-in shape change; the
+        // --summary verdict keeps its stable numeric `signatures`).
+        let out: unknown = summary
+            ? toInspectSummary(result)
+            : (includeSignatures && signatureDetails !== undefined
+                ? { ...result, signatures: signatureDetails }
+                : result);
         if (fieldsRaw !== undefined) {
             out = selectFields(out, parseFieldList(fieldsRaw));
         }
@@ -395,11 +535,33 @@ export async function inspect(args: ParsedArgs): Promise<void> {
             `Subject:        ${result.metadata.subject ?? '—'}`,
             `Producer:       ${result.metadata.producer ?? '—'}`,
         ];
+        if (result.metadata.trapped !== undefined) {
+            lines.push(`Trapped:        ${result.metadata.trapped}`);
+        }
+        if (includeSignatures && signatureDetails !== undefined) {
+            lines.push('Signatures detail:');
+            for (let i = 0; i < signatureDetails.length; i++) {
+                const s = signatureDetails[i] as SignatureDetail;
+                const tags = [
+                    s.isDocTimestamp ? 'doc-timestamp' : '',
+                    s.isPlaceholder ? 'placeholder' : '',
+                ].filter((t) => t !== '').join(', ');
+                lines.push(
+                    `  #${i + 1} ${s.fieldName ?? '(unnamed)'} [${s.subFilter !== '' ? s.subFilter : '?'}] contents=${s.contentsLength}B obj=${s.sigObjNum}${tags !== '' ? ` (${tags})` : ''}`,
+                );
+            }
+        }
         if (result.pages !== undefined) {
             lines.push('Pages detail:');
             for (const p of result.pages) {
+                const extras: string[] = [];
+                if (p.cropBox !== undefined) extras.push(`crop=[${p.cropBox.join(' ')}]`);
+                if (p.trimBox !== undefined) extras.push(`trim=[${p.trimBox.join(' ')}]`);
+                if (p.bleedBox !== undefined) extras.push(`bleed=[${p.bleedBox.join(' ')}]`);
+                if (p.artBox !== undefined) extras.push(`art=[${p.artBox.join(' ')}]`);
+                if (p.userUnit !== undefined) extras.push(`userUnit=${p.userUnit}`);
                 lines.push(
-                    `  #${p.index + 1}: ${p.width ?? '?'}x${p.height ?? '?'}pt rot=${p.rotation}° annots=${p.annotations} fields=${p.formFields}`,
+                    `  #${p.index + 1}: ${p.width ?? '?'}x${p.height ?? '?'}pt rot=${p.rotation}° annots=${p.annotations} fields=${p.formFields}${extras.length > 0 ? ` ${extras.join(' ')}` : ''}`,
                 );
             }
         }
@@ -453,7 +615,7 @@ export async function inspect(args: ParsedArgs): Promise<void> {
 
     // --check semantics: if any check is given, exit code reflects the result.
     if (checks.length > 0) {
-        const evaluation = evaluateChecks(checks, result);
+        const evaluation = evaluateChecks(checks, result, signedCount);
         if (!evaluation.allPassed) {
             const detail = `check failed: ${evaluation.checks.join(', ')}`;
             // exit 1 = check failure (semantic), distinct from a usage error (2)

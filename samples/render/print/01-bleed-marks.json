@@ -1,0 +1,28 @@
+{
+  "title": "Print Production — Bleed & Printer's Marks",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "Professional print production: bleed, TrimBox/BleedBox and crop/registration marks",
+    "keywords": "print, bleed, trim, marks, trapped",
+    "trapped": "True"
+  },
+  "layout": {
+    "print": {
+      "bleed": 9,
+      "marks": true
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "Press-Ready A4 Flyer", "level": 1 },
+    { "type": "paragraph", "text": "This document is built with layout.print (pdfnative 1.7.0): a 9 pt bleed shorthand derives the /TrimBox (the finished page after cutting) and sets the /BleedBox to the full MediaBox, while marks: true draws crop marks in the corners and registration targets on the edge midpoints — strictly outside the TrimBox." },
+    { "type": "heading", "text": "How the bleed shorthand works", "level": 2 },
+    { "type": "list", "items": [
+      "Design the page at trim size + 2 x bleed and let backgrounds run to the page edge.",
+      "bleed: 9 insets the TrimBox by 9 pt on every side (3 mm is about 8.5 pt).",
+      "The printer cuts along the TrimBox; anything between TrimBox and page edge is trimmed away.",
+      "marks: true adds professional crop + registration marks for press alignment."
+    ] },
+    { "type": "heading", "text": "Trapping flag", "level": 2 },
+    { "type": "paragraph", "text": "metadata.trapped: \"True\" records in /Info /Trapped (ISO 32000-1 section 14.11.6) that this document has been trapped for high-end colour printing; the flag is mirrored to XMP as pdf:Trapped under tagged/PDF-A output." }
+  ]
+}

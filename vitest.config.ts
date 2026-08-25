@@ -25,6 +25,10 @@ export default defineConfig({
             //   - timestamp-verify.ts a real RFC 3161 TSA token
             //   - fetch-guard.ts      a reachable PUBLIC host (loopback is
             //                         blocked by the SSRF guard by design)
+            //   - tsa.ts              real-TSA transport on fetch-guard; tests
+            //                         inject a mock TimestampProvider instead
+            //   - ltv-provider.ts     real OCSP/CRL transport on fetch-guard;
+            //                         tests inject a mock RevocationProvider
             exclude: [
                 'src/index.ts',
                 'src/commands/verify.ts',
@@ -32,6 +36,8 @@ export default defineConfig({
                 'src/utils/revocation.ts',
                 'src/utils/timestamp-verify.ts',
                 'src/utils/fetch-guard.ts',
+                'src/utils/tsa.ts',
+                'src/utils/ltv-provider.ts',
             ],
             thresholds: {
                 // Thresholds reflect unit coverage for the directly testable
