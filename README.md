@@ -153,7 +153,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 | Page breaks, spacers | ✅ | Explicit pagination control |
 | Table of contents | ✅ | Auto-generated with `/GoTo` links |
 | **Advanced Layouts (v0.2.0)** | | |
-| PDF/A archival (1b, 2b, 2u, 3b) | ✅ | `--tagged pdfa<level>` (preferred) or `--conformance` (deprecated) |
+| PDF/A archival (1b, 2b, 2u, 3b) | ✅ | `--tagged pdfa<level>` (preferred) or `--conformance` (deprecated); validated against the **veraPDF** reference validator in CI (blocking) |
 | Streaming output | ✅ | `--stream` (single-pass) for large documents |
 | Compression | ✅ | `--compress` flag |
 | Encryption (AES-128/256) | ✅ | `--encrypt-*` flags + env-var precedence |
@@ -251,6 +251,21 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 
 **Note:** everything listed works today. Planned work is tracked in [ROADMAP.md](ROADMAP.md).
 
+### PDF/A status (v1.4.0)
+
+The CLI's PDF/A outputs are **validated against the [veraPDF](https://verapdf.org)
+reference validator in CI (blocking)**: a 12-file corpus produced by the CLI itself
+(renders across all four levels plus attachments, headers/footers, outline, watermark,
+an incremental PAdES signature and a `metadata` update) is checked against the profile
+each file claims in XMP, and it includes **negative canaries** that veraPDF must
+reject — so a validator that accepts everything fails the run instead of turning it
+green. The conformance recipe is `--tagged pdfa<level> --font latin --lang latin`
+(fonts must be embedded per ISO 19005; the sRGB OutputIntent is emitted automatically
+by the engine). Run the same gate locally with `npm run validate:pdfa` — without
+veraPDF installed it prints install hints and exits 0 as a **skip, not a pass**. See
+[CONTRIBUTING.md](CONTRIBUTING.md#pdfa-validation-verapdf) for details. Not a
+certification — validation evidence against a specific veraPDF version (1.30.2).
+
 ## Installation
 
 ```bash
@@ -290,8 +305,10 @@ pdfnative render --input big-doc.json --output report.pdf --stream
 # True constant-memory streaming (lowest peak memory; byte-identical)
 pdfnative render --input big-doc.json --output report.pdf --stream-true
 
-# PDF/A conformance
-pdfnative render --input document.json --output archived.pdf --tagged pdfa2b
+# PDF/A conformance (embed the bundled Latin font — ISO 19005 requires embedded
+# fonts; this recipe is what the blocking veraPDF CI gate validates)
+pdfnative render --input document.json --output archived.pdf \
+  --tagged pdfa2b --font latin --lang latin
 ```
 
 `document.json` is a [`DocumentParams`](https://github.com/Nizoka/pdfnative) object:

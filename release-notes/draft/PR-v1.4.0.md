@@ -27,6 +27,12 @@
    `compare`, `batch-manifest`, `metadata`), global `--max-inflate-size`, completions +
    manifest + `llms.txt` for all 21 commands.
 7. Fixes a long-standing `inspect` bug (signature/form-field counters always 0).
+8. veraPDF integration: the CLI's PDF/A claims are now validated against the veraPDF
+   reference validator — a 12-file CLI-generated corpus (10 positive + 2 negative
+   canaries) checked in a **blocking** CI workflow and again pre-publish; local gate
+   via `npm run validate:pdfa` (exit 0 without veraPDF = skip, not a pass). The PDF/A
+   samples themselves are now rendered actually-conformant (`--font latin --lang latin`
+   via `run-all.js`).
 
 ## Changes
 
@@ -99,9 +105,31 @@
   `render/print/02-viewer-prefs`, `render/chart/03-stacked-bars`,
   `render/chart/04-area-scatter`, `render/chart/05-time-axis`.
 
+### scripts/ & workflows (veraPDF PDF/A gate)
+- `scripts/generate-pdfa-corpus.mjs` — drives the **built** CLI to write a 12-file
+  PDF/A corpus to `test-output/pdfa/` + `manifest.json`: 10 positive entries
+  (`--strict --font latin --lang latin` across 1b/2b/2u/3b, attachments,
+  headers/footers, outline, opaque watermark, incremental PAdES sign, incremental
+  `metadata`) and 2 negative canaries veraPDF must reject (no-fonts render —
+  ISO 19005-2 §6.2.11.4.1; `--variant table` — ISO 19005-1 §6.3.4, the table path
+  cannot embed fonts from the CLI).
+- `scripts/validate-pdfa.mjs` — validates each file against its claimed XMP profile
+  with veraPDF and compares with `expectCompliant`. Outcomes PASS/FAIL/XFAIL/XPASS/
+  INFRA/SKIP; exit 0 ok/skip · 1 conformance (incl. fatal XPASS + coverage canary) ·
+  2 no corpus · 3 INFRA. `VERAPDF_REQUIRED=1` fail-closed; `VERAPDF_HOME`,
+  `VERAPDF_REPORT_DIR` supported; Windows `.bat` launcher handled.
+- `package.json` — new scripts `corpus:pdfa` and `validate:pdfa`.
+- `.github/workflows/verapdf.yml` — **blocking** (no `continue-on-error`), pinned
+  veraPDF 1.30.2 installer with SHA-256 verified before `java -jar`, report + raw
+  XML uploaded as artifact and rendered in the job summary.
+- `.github/workflows/publish.yml` — the same veraPDF gate repeated pre-publish.
+- Zero npm dependencies added — veraPDF is an external tool, never bundled.
+
 ### Docs
-- README (What's new, Highlights, Supported Features group, Quick Start, 21-command
-  reference, Node ≥ 22), KNOWLEDGE_BASE (§2/4/5/6/8/10), AGENTS.md, llms.txt, ROADMAP
+- README (What's new, Highlights, Supported Features group, "PDF/A status" callout,
+  Quick Start, 21-command reference, Node ≥ 22), KNOWLEDGE_BASE (§2/4/5/6/8/9/10),
+  CONTRIBUTING.md (new "PDF/A validation (veraPDF)" section: scripts, exit codes,
+  skip semantics, install recipes, PR checklist), CLAUDE.md, AGENTS.md, llms.txt, ROADMAP
   (v1.4.0 released; Next cleared; deferred items recorded), samples/README,
   CHANGELOG, release-notes/v1.4.0.md, CITATION.cff re-synchronised (was 1.2.0 / "six
   composable commands"), CI matrix 22/24.
@@ -143,6 +171,8 @@
   and an end-to-end render → metadata → compare → inspect --signatures round-trip.
 - `node samples/run-all.js` green; new `.sh`/`.ps1` samples executed offline on
   Git Bash + PowerShell.
+- `npm run validate:pdfa` with veraPDF 1.30.2 installed locally: **10 PASS +
+  2 XFAIL** (both negative canaries correctly rejected by the validator), exit 0.
 - Zero-network guarantee in tests: mock providers injected via
   `setTimestampProvider`/`setRevocationProvider`, RFC 2606 `.invalid` URLs.
 

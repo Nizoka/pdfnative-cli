@@ -234,11 +234,21 @@ PDF/A conformance can also be set from the CLI via the `--tagged` flag (or the d
 
 ```bash
 # Preferred (v0.2.0+)
-pdfnative render --input doc.json --output doc.pdf --tagged pdfa2b
+pdfnative render --input doc.json --output doc.pdf --tagged pdfa2b --font latin --lang latin
 
 # Deprecated alias — still works, prints a stderr deprecation notice
-pdfnative render --input doc.json --output doc.pdf --conformance 2b
+pdfnative render --input doc.json --output doc.pdf --conformance 2b --font latin --lang latin
 ```
+
+> **PDF/A conformance:** the `--tagged pdfa*` flag only *declares* the claim —
+> real conformance requires embedded fonts (ISO 19005 §6.2.11.4.1 / §6.3.4), so
+> always pass `--font latin --lang latin` (`run-all.js` applies them
+> automatically for the `pdfa` and `attachments` categories). Without them the
+> render emits a `PDFA_NO_FONT_ENTRIES` warning and the output fails the
+> reference validator. PDF/A outputs are validated with veraPDF in CI
+> (blocking — conformant corpus plus negative canaries); run
+> `npm run validate:pdfa` locally, but note it exits 0 as a *skip* when veraPDF
+> is not installed — that is not a proof of conformance.
 
 ### `render/encryption/` — Password Protection (v0.2.0)
 

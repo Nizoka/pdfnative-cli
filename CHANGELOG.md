@@ -143,6 +143,19 @@ command surface; the support policy moves to Node.js ≥ 22 (see *Changed*).
   + OCSP responder issuing *genuine* RFC 3161 tokens, OCSP responses and CRLs entirely
   in-process, so the whole PAdES ladder is tested with **zero network** and zero binary
   fixtures. 600 tests total (up from 452).
+- **veraPDF PDF/A validation gate** — the CLI's PDF/A claims are now validated against the
+  [veraPDF](https://verapdf.org) reference validator. `npm run corpus:pdfa` drives the built
+  CLI to generate a 12-file corpus (10 positive entries across 1b/2b/2u/3b — including an
+  incremental PAdES signature and a `metadata` update over claiming files — plus 2 **negative
+  canaries** veraPDF must reject: a no-fonts render violating ISO 19005-2 §6.2.11.4.1 and a
+  `--variant table` render violating ISO 19005-1 §6.3.4, since that path cannot embed fonts
+  from the CLI); `npm run validate:pdfa` checks each file against the profile it claims in XMP
+  (exit 0 ok/skip · 1 conformance · 2 no corpus · 3 infra; an unexpected canary pass — XPASS —
+  is fatal). Without veraPDF installed the run **skips with exit 0** (not a pass);
+  `VERAPDF_REQUIRED=1` fails closed. **Blocking in CI** (`.github/workflows/verapdf.yml`,
+  pinned veraPDF 1.30.2 installer with SHA-256 verification before `java -jar`) and repeated
+  as a pre-publish gate in `publish.yml`. veraPDF is an external CI tool, never bundled — zero
+  extra runtime dependencies unchanged.
 
 ### Changed
 
@@ -168,6 +181,12 @@ command surface; the support policy moves to Node.js ≥ 22 (see *Changed*).
   parsed PDF name objects against raw strings (`'/Sig'`, `'/Widget'`), which never matched,
   so `signatures` and per-page `formFields` under-reported on every signed PDF. Both now go
   through the parser's `nameValue`.
+- **PDF/A samples now render actually-conformant outputs** — `samples/run-all.js` renders the
+  `render/pdfa/` and `render/attachments/` samples with `--font latin --lang latin`, embedding
+  the bundled Latin font. Previously those samples rendered without embedded fonts, so their
+  outputs claimed PDF/A in XMP but violated the ISO 19005 font-embedding requirements
+  (non-embedded base-14 Helvetica) and did not pass the reference validator. The blocking
+  veraPDF CI gate now guards this recipe (see *Tooling & tests*).
 
 ### Documentation
 

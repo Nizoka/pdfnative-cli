@@ -26,6 +26,8 @@
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc --project tsconfig.test.json --noEmit",
     "typecheck:all": "npm run typecheck && npm run typecheck:tests",
+    "corpus:pdfa": "node scripts/generate-pdfa-corpus.mjs",
+    "validate:pdfa": "npm run build && npm run corpus:pdfa && node scripts/validate-pdfa.mjs",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

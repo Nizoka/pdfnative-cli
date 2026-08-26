@@ -209,6 +209,16 @@ For `verify`/`inspect`, read the JSON result on stdout and use `--strict` /
 `--check` to turn findings into exit codes for unattended gating. Add
 `--summary` (or `--fields`) to keep that stdout JSON token-cheap — see §3.
 
+**PDF/A changes → veraPDF gate.** An agent working **on this repository** must run
+`npm run validate:pdfa` for any change touching PDF/A behaviour (render, fonts,
+metadata/XMP, signing over claiming files, the `samples/render/pdfa/` inputs): it
+builds the CLI, generates a 12-file corpus (including negative canaries veraPDF must
+reject) and validates every file against the profile it claims. Mind the skip
+semantics — **without veraPDF installed the script exits 0 as a SKIP, not a pass**;
+set `VERAPDF_REQUIRED=1` to fail closed. The same gate runs blocking in CI and
+pre-publish. For rendering, the conformance recipe is
+`--tagged pdfa<level> --font latin --lang latin` (ISO 19005 requires embedded fonts).
+
 **Assert with `compare` (v1.4.0).** `compare a.pdf b.pdf` is a ready-made CI/agent
 assertion: identical documents exit `0`; any text or structure difference exits `1`
 with `E_CHECK_FAILED` (the diff report lands on stdout first — add `--format json`

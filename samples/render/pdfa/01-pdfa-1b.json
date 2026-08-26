@@ -6,17 +6,17 @@
     { "type": "spacer",    "height": 12 },
     { "type": "heading",   "text": "What PDF/A-1b Guarantees", "level": 2 },
     { "type": "list", "style": "bullet", "items": [
-        "All fonts are fully embedded in the file.",
+        "All fonts must be fully embedded in the file (this sample embeds the bundled Latin font via --font latin --lang latin).",
         "No external content or encrypted streams.",
         "Colour spaces are device-independent (ICC-based).",
         "PDF version: 1.4."
     ]},
     { "type": "spacer",    "height": 12 },
     { "type": "heading",   "text": "How to Generate", "level": 2 },
-    { "type": "paragraph", "text": "Use the CLI --conformance 1b flag, or set layout.tagged to 'pdfa1b' in the JSON input." },
+    { "type": "paragraph", "text": "Use the CLI --tagged pdfa1b flag (or set layout.tagged to 'pdfa1b' in the JSON input), together with --font latin --lang latin: the PDF/A flag only declares the claim, while --font/--lang is what actually embeds the fonts the standard requires." },
     { "type": "list", "style": "numbered", "items": [
-        "CLI: pdfnative render --input doc.json --output archived.pdf --conformance 1b",
-        "JSON: set \\\"layout\\\": { \\\"tagged\\\": \\\"pdfa1b\\\" } in your DocumentParams"
+        "CLI: pdfnative render --input doc.json --output archived.pdf --tagged pdfa1b --font latin --lang latin",
+        "JSON: set \\\"layout\\\": { \\\"tagged\\\": \\\"pdfa1b\\\" } in your DocumentParams (still pass --font latin --lang latin on the CLI)"
     ]}
   ],
   "footerText": "Archived — PDF/A-1b — ISO 19005-1",

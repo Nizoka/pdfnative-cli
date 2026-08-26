@@ -37,7 +37,9 @@ machine-readable JSON manifest run `pdfnative schema manifest`.
 ## Commands
 
 - `render` — JSON document/table → PDF (22 Unicode scripts, math, colour emoji,
-  bookmarks, native charts, watermarks, PDF/A, encryption, streaming).
+  bookmarks, native charts, watermarks, PDF/A, encryption, streaming). PDF/A
+  outputs are validated against the veraPDF reference validator in CI
+  (blocking); conformance recipe: `--tagged pdfa<level> --font latin --lang latin`.
 - `extract-text` — reading-order Unicode text as `text | json | ndjson`
   (`--runs` for positioned runs, `--password` for encrypted PDFs). No OCR.
 - `fill` — fill, flatten, and/or **export** an AcroForm (`--data values.json`,

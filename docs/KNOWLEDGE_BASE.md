@@ -965,6 +965,7 @@ See [AGENTS.md](../AGENTS.md) for the agent-facing summary.
 | Untrusted batch manifests triggering network I/O | Network flags inside a `batch --manifest` are refused unless `batch` itself is invoked with `--allow-network` |
 | Binary injection via inspect output | All metadata fields are string-coerced; no raw binary blobs emitted |
 | Supply-chain risk | Zero extra runtime dependencies; OIDC-signed npm provenance; CodeQL + Scorecard CI; CycloneDX SBOM attached to each release |
+| False PDF/A conformance claims | Blocking veraPDF CI gate (`.github/workflows/verapdf.yml` + pre-publish in `publish.yml`): a CLI-generated corpus is validated against the veraPDF reference validator, with negative canaries an "accepts-everything" validator would expose. veraPDF is an **external CI tool**, never bundled — the zero-extra-runtime-dependency policy is unchanged — and its pinned 1.30.2 installer's SHA-256 is verified before `java -jar` executes it |
 
 ### Network model (v1.4.0)
 
@@ -1082,6 +1083,10 @@ npm run build
 npm test
 npm run test:coverage
 
+# PDF/A validation (veraPDF — external tool; without it the run SKIPs with exit 0)
+npm run corpus:pdfa     # build + generate the 12-file PDF/A corpus (test-output/pdfa/)
+npm run validate:pdfa   # build + corpus + veraPDF validation (see CONTRIBUTING.md)
+
 # Typecheck
 npm run typecheck
 
@@ -1111,7 +1116,7 @@ Complete, runnable examples live in [`samples/`](../samples/), organized by feat
 | [`render/link/`](../samples/render/link/) | 1 | Resource directory with hyperlinks |
 | [`render/watermark/`](../samples/render/watermark/) | 2 | Draft and confidential watermarks |
 | [`render/layout/`](../samples/render/layout/) | 3 | US Letter, A5 portrait, A4 landscape |
-| [`render/pdfa/`](../samples/render/pdfa/) | 4 | PDF/A-1b, PDF/A-2b, PDF/A-2u, PDF/A-3b archival conformance |
+| [`render/pdfa/`](../samples/render/pdfa/) | 4 | PDF/A-1b, PDF/A-2b, PDF/A-2u, PDF/A-3b archival conformance (rendered with `--font latin --lang latin`; veraPDF-validated in CI) |
 | [`render/chart/`](../samples/render/chart/) | 5 | Native vector charts — incl. (v1.4.0) stacked bars, area + dual axes, log-scale scatter, time x-axis |
 | [`render/print/`](../samples/render/print/) | 2 | (v1.4.0) Print production (`layout.print` bleed/marks) + viewer preferences (duplex/copies/range/tray) |
 | [`sign/`](../samples/sign/) | 9 demos | Digital signature (Bash + PowerShell) — incl. (v1.4.0) `06-timestamp.*` PAdES B-T, `08-ltv.*` full PAdES ladder, and `09-multiple-signatures.*` |
@@ -1126,6 +1131,12 @@ Run all render samples at once:
 ```bash
 node samples/run-all.js
 ```
+
+`run-all.js` renders the `render/pdfa/` and `render/attachments/` samples with
+`--font latin --lang latin`, so their outputs actually conform to their claimed
+PDF/A level (ISO 19005 requires embedded fonts); those same renders are validated
+against the veraPDF reference validator in the blocking CI gate (see
+[CONTRIBUTING.md](../CONTRIBUTING.md#pdfa-validation-verapdf)).
 
 See [`samples/README.md`](../samples/README.md) for the full block type reference and integration patterns.
 
