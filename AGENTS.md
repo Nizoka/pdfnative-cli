@@ -14,9 +14,11 @@ a process, pass flags, read stdout/stderr, branch on the exit code).
 
 ## 1. The process contract
 
+**Prerequisite:** Node.js ≥ 22 (check with `pdfnative doctor`).
+
 | Channel | Carries |
 |---------|---------|
-| **stdout** | The primary artifact: a PDF (`render`, `sign`, `merge`, `extract`, `annotate`, `fill`, `encrypt`, `decrypt`), extracted text (`extract-text`), a JSON report (`inspect`, `verify`, `batch --format json`, `govern verify-issue --json`, `doctor --format json`, `fill --export`), a JSON Schema (`schema`), the governance protocol/policy (`govern rules`/`policy`), or a completion script (`completion`). `split` writes its parts to `--output-dir`. |
+| **stdout** | The primary artifact: a PDF (`render`, `sign`, `merge`, `extract`, `annotate`, `fill`, `encrypt`, `decrypt`, `metadata`, `ltv embed`/`ltv add`, `doc-timestamp`), extracted text (`extract-text`), a JSON report (`inspect`, `verify`, `compare --format json`, `batch --format json`, `govern verify-issue --json`, `doctor --format json`, `fill --export`, `ltv collect`), a JSON Schema (`schema`), the governance protocol/policy (`govern rules`/`policy`), or a completion script (`completion`). `split` writes its parts to `--output-dir`. |
 | **stderr** | All diagnostics: progress, warnings, and the agent JSON envelopes below. |
 | **exit code** | `0` success · `1` runtime error · `2` usage error. Unchanged in every mode. |
 
@@ -38,12 +40,17 @@ default to JSON on stdout).
 ```
 
 **On success**, the write commands — `render` / `sign` / `merge` / `split` / `extract` /
-`annotate` / `fill` / `encrypt` / `decrypt` / `batch` — write a status line to stderr
-(schema: `pdfnative schema status`):
+`annotate` / `fill` / `encrypt` / `decrypt` / `metadata` / `ltv` / `doc-timestamp` /
+`batch` — write a status line to stderr (schema: `pdfnative schema status`):
 
 ```json
 { "ok": true, "command": "render", "variant": "document", "dryRun": false, "output": "out.pdf", "bytes": 12345 }
 ```
+
+Two additive fields can appear in the success envelope: a timestamped signature
+(`sign --timestamp`) adds `timestamp: { url, digest }`, and `render` adds a
+`diagnostics: [{ code, severity, message }]` array when non-strict PDF/A conformance
+diagnostics were found. Both are pinned by the `status` schema.
 
 `inspect`, `verify`, and `batch` put their result document on **stdout** as JSON;
 `--json` only adds the failure envelope on stderr and (for `batch`) forces the
@@ -61,10 +68,11 @@ Branch on `error.code`, never on the human message:
 | `E_IO` | Filesystem or stream I/O failure | 1 |
 | `E_SIGN` | Signing failed (message is always generic — no key material) | 1 |
 | `E_VERIFY_FAILED` | `verify --strict` found an invalid signature | 1 |
-| `E_CHECK_FAILED` | `inspect --check` assertion failed | 1 |
+| `E_CHECK_FAILED` | `inspect --check` assertion failed, `compare` found differences, or `render --strict` hit a PDF/A diagnostic | 1 |
 | `E_POLICY` | `govern verify-issue` found a governance violation | 1 |
 | `E_UNSUPPORTED` | Reserved / not-yet-available capability | 2 |
-| `E_PASSWORD` | Encrypted PDF: password missing or incorrect (`extract-text` / `fill` / `encrypt` / `decrypt` / `inspect` / page-tree) | 1 |
+| `E_PASSWORD` | Encrypted PDF: password missing or incorrect (`extract-text` / `fill` / `encrypt` / `decrypt` / `inspect` / `annotate` / `metadata` / page-tree) | 1 |
+| `E_NETWORK` | Opt-in network operation failed (TSA / OCSP / CRL fetch — `sign --timestamp`, `ltv collect`/`add`, `doc-timestamp`) | 1 |
 | `E_RUNTIME` | Catch-all runtime error | 1 |
 
 ---
@@ -97,7 +105,7 @@ omitted (so a conditionally-absent field never crashes the run). Precedence:
 ```bash
 # Smallest possible "is this PDF signed and valid?" probe:
 pdfnative verify --input doc.pdf --json --summary            # → {"valid":false,"signatures":0,"invalid":0}
-pdfnative verify --input doc.pdf --json --fields valid        # → {"valid":false}
+pdfnative verify --input doc.pdf --json --fields allValid     # → {"allValid":false}
 pdfnative inspect --input doc.pdf --json --fields pageCount,signatures
 pdfnative batch  --input-dir in --output-dir out --json --summary
 ```
@@ -109,11 +117,13 @@ The compact shapes are schema-pinned — validate them with
 
 ## 4. Validate first — `--dry-run`
 
-`render`, `sign`, `batch`, `merge`, `split`, `extract`, `annotate`, `fill`, `encrypt`, and `decrypt` accept `--dry-run`:
+`render`, `sign`, `batch`, `merge`, `split`, `extract`, `annotate`, `fill`, `encrypt`,
+`decrypt`, `metadata`, `ltv`, and `doc-timestamp` accept `--dry-run`:
 inputs are fully validated (JSON parsed, document/table shape checked, layout assembled,
 signing credentials loaded and the PDF prepared, page ranges and annotation specs
-bounds-checked) but **no output is produced or written**. Combine with `--json` for a
-`{ "ok": true, "dryRun": true, … }` envelope.
+bounds-checked) but **no output is produced or written**. `--dry-run` **never performs
+network I/O**, even when a network flag (`--timestamp`, `--url`, `--online`) is present.
+Combine with `--json` for a `{ "ok": true, "dryRun": true, … }` envelope.
 
 ```bash
 pdfnative render --input doc.json --dry-run --json
@@ -136,8 +146,12 @@ pdfnative schema annotate         # annotation-spec accepted by `annotate --anno
 pdfnative schema extract-text     # output of `extract-text --format json`
 pdfnative schema fill             # values map accepted by `fill --data`
 pdfnative schema form-export      # output of `fill --export`
+pdfnative schema metadata         # JSON accepted by `metadata --from-json` (v1.4.0)
 pdfnative schema doctor           # output of `doctor --format json`
 pdfnative schema govern-verify    # output of `govern verify-issue --json`
+pdfnative schema ltv-data         # replayable JSON from `ltv collect` / input of `ltv embed` (v1.4.0)
+pdfnative schema compare          # output of `compare --format json` (v1.4.0)
+pdfnative schema batch-manifest   # pipeline file accepted by `batch --manifest` (v1.4.0)
 pdfnative schema status           # the --json success envelope (write commands)
 pdfnative schema manifest         # capability manifest: commands, flags, error codes (DATA, not a schema)
 ```
@@ -195,12 +209,72 @@ For `verify`/`inspect`, read the JSON result on stdout and use `--strict` /
 `--check` to turn findings into exit codes for unattended gating. Add
 `--summary` (or `--fields`) to keep that stdout JSON token-cheap — see §3.
 
+**PDF/A changes → veraPDF gate.** An agent working **on this repository** must run
+`npm run validate:pdfa` for any change touching PDF/A behaviour (render, fonts,
+metadata/XMP, signing over claiming files, the `samples/render/pdfa/` inputs): it
+builds the CLI, generates a 12-file corpus (including negative canaries veraPDF must
+reject) and validates every file against the profile it claims. Mind the skip
+semantics — **without veraPDF installed the script exits 0 as a SKIP, not a pass**;
+set `VERAPDF_REQUIRED=1` to fail closed. The same gate runs blocking in CI and
+pre-publish. For rendering, the conformance recipe is
+`--tagged pdfa<level> --font latin --lang latin` (ISO 19005 requires embedded fonts).
+
+**Assert with `compare` (v1.4.0).** `compare a.pdf b.pdf` is a ready-made CI/agent
+assertion: identical documents exit `0`; any text or structure difference exits `1`
+with `E_CHECK_FAILED` (the diff report lands on stdout first — add `--format json`
+and, e.g., `--tolerance 1 --ignore-whitespace` to absorb benign drift). Use it to
+gate "did my edit change only what I intended?" without parsing anything.
+
+**Orchestrate with `batch --manifest` (v1.4.0).** Instead of shelling out N times,
+declare the whole pipeline once and run it fail-fast in a single process:
+
+```json
+{ "version": 1, "tasks": [
+  { "id": "r", "command": "render",  "flags": { "input": "doc.json", "output": "doc.pdf" } },
+  { "id": "s", "command": "sign",    "flags": { "input": "@r", "output": "signed.pdf" } },
+  { "id": "v", "command": "verify",  "flags": { "input": "@s", "strict": true } }
+] }
+```
+
+`"@<id>"` references the output of an earlier task; relative paths resolve against
+the manifest's directory; 14 commands are whitelisted — `render`, `sign`, `verify`,
+`inspect`, `merge`, `split`, `extract`, `extract-text`, `fill`, `encrypt`, `decrypt`,
+`annotate`, `metadata`, `doc-timestamp` (`ltv` and `compare` need positional arguments
+and are not yet manifest-callable; never `govern` / `schema` / `completion` / `doctor` /
+`batch`). Validate the file with `schema batch-manifest`, pre-flight with `--dry-run`,
+and remember: any network flag inside the manifest additionally requires
+`--allow-network` on the command line. A manifest has the filesystem access of the user
+who invokes `batch` — the same trust level as command-line flags; only network access is
+additionally gated behind `--allow-network`. Manifests are size-capped (50 MB) and
+bounded to 1 000 tasks, and path values undergo the same anti-traversal check as direct
+CLI flags.
+
+### The PAdES ladder (long-term signatures)
+
+```bash
+pdfnative sign --input doc.pdf --output bt.pdf \
+  --profile pades --timestamp https://tsa.example/tsr   # B-T   (network: --timestamp)
+pdfnative ltv add --input bt.pdf --output blt.pdf --online   # B-LT  (network: --online)
+pdfnative doc-timestamp --input blt.pdf --output blta.pdf \
+  --url https://tsa.example/tsr                              # B-LTA (network: --url)
+pdfnative ltv add --input blta.pdf --output final.pdf --online
+pdfnative verify --input final.pdf --strict                  # offline gate
+```
+
+Air-gapped variant: `ltv collect --online` on a connected machine emits a replayable
+JSON (`schema ltv-data`); `ltv embed --data ltv.json` applies it fully offline.
+
 ---
 
 ## 8. Safety notes for unattended use
 
-- **Offline by default.** Only `verify --revocation online` makes network requests,
-  and only through an SSRF guard. Nothing else touches the network — including `govern`.
+- **Offline by default.** The ONLY network opt-ins are `verify --revocation online`,
+  `sign --timestamp <url>`, `ltv collect|add --online`, `doc-timestamp --url <url>`, and
+  `batch --allow-network` (which gates network flags inside a manifest). Every request
+  goes through an SSRF guard and never follows redirects; a failed opt-in fetch maps to
+  the stable `E_NETWORK` code — never a silent fallback to an unprotected result.
+  Nothing else touches the network — including `govern` — and `--dry-run` never does,
+  even when a network flag is present.
 - **No secrets in output.** `sign` never emits key material — errors are the fixed
   `E_SIGN` / "Failed to sign PDF." Pass keys via `PDFNATIVE_SIGN_KEY` /
   `PDFNATIVE_SIGN_CERT` (env wins over `--key` / `--cert`). Native `node:crypto` signing is
@@ -210,10 +284,13 @@ For `verify`/`inspect`, read the JSON result on stdout and use `--strict` /
   merging encrypted sources with **different** passwords fails with `E_PASSWORD`. Decrypt the
   outliers first, then merge. (`split` / `extract` take a single input — no ambiguity.)
 - **Bounded input.** JSON input is capped at 50 MB; paths are checked against
-  traversal. `merge` / `split` / `extract` also honour `--max-output-size`. Prefer
+  traversal. `merge` / `split` / `extract` also honour `--max-output-size`, and the
+  global `--max-inflate-size <bytes>` caps the decompressed size of any single PDF
+  stream while parsing untrusted input (anti zip-bomb; default 100 MiB). Prefer
   `--output <file>` over shell redirection for large PDFs.
-- **Incremental, signature-safe edits.** `annotate` uses an incremental save, so existing
-  signatures on the input stay valid.
+- **Incremental, signature-safe edits.** `annotate`, `metadata`, `ltv embed`/`add`, and
+  `doc-timestamp` use incremental saves, so existing signatures on the input stay valid
+  (`doc-timestamp` keeps earlier revisions byte-identical).
 - **Human-in-the-loop for governance.** `govern` never submits anything; it only drafts and
   verifies. A human must review and submit under their own identity (see §6).
 - **One process per task.** The CLI is stateless; run it per unit of work and let

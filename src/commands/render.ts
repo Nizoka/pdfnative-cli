@@ -1,5 +1,6 @@
 import { watchFile, unwatchFile } from 'node:fs';
-import { resolve as resolvePath, dirname, join as joinPath } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { resolve as resolvePath, dirname, isAbsolute, join as joinPath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import {
@@ -24,6 +25,8 @@ import type {
     PdfColor,
     FontEntry,
     OutlineItem,
+    PdfDiagnosticHandler,
+    StreamOptions,
 } from '../core-bridge/index.js';
 import {
     type ParsedArgs,
@@ -37,7 +40,9 @@ import {
     writeOutput,
     writeStreamingOutput,
     assertJsonSizeLimit,
+    validatePath,
 } from '../utils/io.js';
+import { parseChunkSize } from '../utils/pdfops.js';
 import { CliError, ErrorCode } from '../utils/error.js';
 import { emitStatus, isDryRun, isJsonMode } from '../utils/agent.js';
 import { serializeJson } from '../utils/projection.js';
@@ -135,6 +140,135 @@ function hasTocBlock(params: DocumentParams): boolean {
         if (block.type === 'toc') return true;
     }
     return false;
+}
+
+// ── Conformance diagnostics + build-error mapping (pdfnative 1.7.0) ──────
+
+/** True when the global `--quiet`/`-q` flag is active (set by index.ts). */
+function isQuiet(): boolean {
+    return process.env['PDFNATIVE_QUIET'] === '1';
+}
+
+/** One diagnostic captured for the `--json` status envelope. */
+interface CollectedDiagnostic {
+    readonly code: string;
+    readonly severity: string;
+    readonly message: string;
+}
+
+/**
+ * Map errors thrown by pdfnative's builders to stable CLI error codes:
+ *   - strict-mode PDF/A diagnostic escalations (prefixed `pdfnative: ` by
+ *     `createDiagnosticEmitter`, thrown before the first output byte) →
+ *     exit 1 / `E_CHECK_FAILED` — a conformance check failed, by request.
+ *   - option-validation errors (`print.*` from validatePrintOptions —
+ *     including `print.userUnit` under pdfa1b — `chart:` from the chart
+ *     validators, `outputIntent.*` from the ICC profile guard) →
+ *     exit 1 / `E_INPUT` — the input JSON/layout asked for something invalid.
+ *   - anything else is rethrown unchanged (envelope default: `E_RUNTIME`).
+ */
+function mapBuildError(e: unknown, strict: boolean): never {
+    if (e instanceof CliError) throw e;
+    const message = e instanceof Error ? e.message : String(e);
+    if (strict && message.startsWith('pdfnative:')) {
+        throw new CliError(message, 1, ErrorCode.CHECK_FAILED);
+    }
+    if (
+        message.startsWith('print.') ||
+        message.startsWith('chart:') ||
+        message.startsWith('outputIntent.')
+    ) {
+        throw new CliError(message, 1, ErrorCode.INPUT);
+    }
+    throw e instanceof Error ? e : new Error(message);
+}
+
+// ── Image-block payload resolution (CLI JSON convenience) ────────────────
+
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
+
+/** Decode an image block `dataBase64` payload; invalid base64 → E_INPUT. */
+function decodeImageBase64(b64: string): Uint8Array {
+    const cleaned = b64.replace(/\s+/g, '');
+    if (cleaned.length === 0 || cleaned.length % 4 !== 0 || !BASE64_RE.test(cleaned)) {
+        throw new CliError(
+            'Invalid base64 payload in image block "dataBase64".',
+            1,
+            ErrorCode.INPUT,
+        );
+    }
+    const buf = Buffer.from(cleaned, 'base64');
+    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+}
+
+/**
+ * Resolve document `image` blocks whose payload arrives as a file path
+ * (`src`), base64 (`dataBase64`), or a JSON number array (`data`) into the
+ * `data: Uint8Array` shape pdfnative's `ImageBlock` requires. `src` and
+ * `dataBase64` are removed from the block after resolution.
+ *
+ * Security: `src` is only ever read from the user's own local input JSON —
+ * the same trust model as `--attachment <path>` — and passes through the
+ * same `validatePath` traversal guard. Relative paths resolve against the
+ * directory of the `--input` file (or the cwd when reading stdin).
+ *
+ * `DocumentBlock` has no nested block containers (list items nest text, not
+ * blocks), so a flat pass over `params.blocks` covers every image block.
+ */
+async function resolveImageBlocks(
+    params: DocumentParams,
+    baseDir: string,
+): Promise<DocumentParams> {
+    let touched = false;
+    const blocks: unknown[] = [];
+    for (const b of params.blocks) {
+        const block = b as { type?: unknown } & Record<string, unknown>;
+        if (block.type !== 'image' || block.data instanceof Uint8Array) {
+            blocks.push(b);
+            continue;
+        }
+        const { src, dataBase64, data } = block;
+        const resolved: Record<string, unknown> = { ...block };
+        delete resolved.src;
+        delete resolved.dataBase64;
+        if (Array.isArray(data)) {
+            // JSON round-trip of a Uint8Array — revive it.
+            resolved.data = Uint8Array.from(data as number[]);
+        } else if (typeof dataBase64 === 'string') {
+            if (typeof src === 'string') {
+                throw new CliError(
+                    'Image block cannot carry both "src" and "dataBase64" — provide a single payload source.',
+                    1,
+                    ErrorCode.INPUT,
+                );
+            }
+            resolved.data = decodeImageBase64(dataBase64);
+        } else if (typeof src === 'string') {
+            validatePath(src);
+            const abs = isAbsolute(src) ? src : resolvePath(baseDir, src);
+            try {
+                const buf = await readFile(abs);
+                resolved.data = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+            } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e);
+                throw new CliError(
+                    `Failed to read image block src "${src}": ${msg}`,
+                    1,
+                    ErrorCode.IO,
+                );
+            }
+        } else {
+            throw new CliError(
+                'Image block requires a payload: "data" (byte array), "dataBase64" (base64 string), or "src" (image file path).',
+                1,
+                ErrorCode.INPUT,
+            );
+        }
+        touched = true;
+        blocks.push(resolved);
+    }
+    if (!touched) return params;
+    return { ...params, blocks: blocks as unknown as DocumentParams['blocks'] };
 }
 
 // ── Smart-table defaults (pdfnative 1.2.0) ───────────────────────────────
@@ -335,6 +469,8 @@ interface RenderConfig {
     readonly inspectLayout: boolean;
     readonly pretty: boolean;
     readonly dryRun: boolean;
+    /** `--chunk-size` (bytes) for --stream / --stream-true StreamOptions. */
+    readonly chunkSize: number | undefined;
 }
 
 /** Parse `--outline`: `auto` selects heading-derived bookmarks; any other value
@@ -390,6 +526,25 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
         parsedInput = deepMerge(template, parsedInput);
     }
 
+    // Conformance diagnostics (pdfnative 1.7.0): always install a sink so
+    // warnings reach stderr (never console.warn) and the --json envelope.
+    // JSON layouts cannot carry functions, so this never clobbers user config.
+    // In strict mode the library ignores the handler — diagnostics throw
+    // before the first output byte instead (mapped to E_CHECK_FAILED below).
+    const diagnostics: CollectedDiagnostic[] = [];
+    const onDiagnostic: PdfDiagnosticHandler = (d) => {
+        diagnostics.push({ code: d.code, severity: d.severity, message: d.message });
+        if (!isQuiet()) {
+            process.stderr.write(`warning: [${d.code}] ${d.message}\n`);
+        }
+    };
+    const diagnosticsField = (): Record<string, unknown> =>
+        diagnostics.length > 0 ? { diagnostics } : {};
+
+    // --chunk-size → StreamOptions for the single-pass streaming builders.
+    const streamOpts: StreamOptions | undefined =
+        cfg.chunkSize !== undefined ? { chunkSize: cfg.chunkSize } : undefined;
+
     if (cfg.variant === 'table') {
         if (!isPdfParamsLike(parsedInput)) {
             throw new CliError(
@@ -402,22 +557,31 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
             emitStatus({ command: 'render', variant: 'table', dryRun: true, output: cfg.outputPath ?? '-' });
             return;
         }
+        const tableLayout: Partial<PdfLayoutOptions> = { ...cfg.layout, onDiagnostic };
         let bytes: number | null = null;
-        if (cfg.usePageStream) {
-            const generator = buildPDFStreamPageByPage(parsedInput, cfg.layout);
-            await writeStreamingOutput(generator, cfg.outputPath);
-        } else if (cfg.useStreamTrue) {
-            const generator = buildPDFStreamTrue(parsedInput, cfg.layout);
-            await writeStreamingOutput(generator, cfg.outputPath);
-        } else if (cfg.useStream) {
-            const generator = buildPDFStream(parsedInput, cfg.layout);
-            await writeStreamingOutput(generator, cfg.outputPath);
-        } else {
-            const pdfBytes = buildPDFBytes(parsedInput, cfg.layout);
-            bytes = pdfBytes.length;
-            await writeOutput(pdfBytes, cfg.outputPath);
+        try {
+            if (cfg.usePageStream) {
+                const generator = buildPDFStreamPageByPage(parsedInput, tableLayout);
+                await writeStreamingOutput(generator, cfg.outputPath);
+            } else if (cfg.useStreamTrue) {
+                const generator = buildPDFStreamTrue(parsedInput, tableLayout, streamOpts);
+                await writeStreamingOutput(generator, cfg.outputPath);
+            } else if (cfg.useStream) {
+                const generator = buildPDFStream(parsedInput, tableLayout, streamOpts);
+                await writeStreamingOutput(generator, cfg.outputPath);
+            } else {
+                const pdfBytes = buildPDFBytes(parsedInput, tableLayout);
+                bytes = pdfBytes.length;
+                await writeOutput(pdfBytes, cfg.outputPath);
+            }
+        } catch (e) {
+            mapBuildError(e, tableLayout.strict === true);
         }
-        emitStatus({ command: 'render', variant: 'table', dryRun: false, output: cfg.outputPath ?? '-', bytes });
+        emitStatus({
+            command: 'render', variant: 'table', dryRun: false,
+            output: cfg.outputPath ?? '-', bytes,
+            ...diagnosticsField(),
+        });
         return;
     }
 
@@ -436,6 +600,14 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
         params = applyTableDefaults(params, cfg.tableDefaults);
     }
 
+    // Image blocks: resolve `src` / `dataBase64` / number-array payloads to
+    // the `data: Uint8Array` the builder expects. Relative `src` paths are
+    // resolved against the --input file's directory (cwd for stdin input).
+    const imageBaseDir = cfg.inputPath !== undefined
+        ? dirname(resolvePath(cfg.inputPath))
+        : process.cwd();
+    params = await resolveImageBlocks(params, imageBaseDir);
+
     // --outline (pdfnative 1.4.0 bookmarks). Flag wins over any JSON-embedded
     // outline so the CLI stays authoritative.
     if (cfg.outline !== undefined) {
@@ -453,11 +625,13 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
     // CLI flags / --layout file (already in `layout`) override on top.
     // pdfnative uses `layoutOptions ?? params.layout` — an empty object from
     // the CLI side is not nullish, so params.layout would be silently dropped
-    // without this explicit merge.
-    const effectiveLayout: Partial<PdfLayoutOptions> =
-        params.layout !== undefined && params.layout !== null
-            ? { ...params.layout, ...cfg.layout }
-            : cfg.layout;
+    // without this explicit merge. A `strict` set in the user's JSON survives
+    // (the CLI only ever layers `strict: true` on top, never `false`).
+    const effectiveLayout: Partial<PdfLayoutOptions> = {
+        ...(params.layout ?? {}),
+        ...cfg.layout,
+        onDiagnostic,
+    };
 
     // --inspect-layout (pdfnative 1.5.0): emit the deterministic layout report
     // as JSON instead of rendering a PDF. A read-only pre-flight for agents.
@@ -497,27 +671,35 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
     }
 
     let bytes: number | null = null;
-    if (cfg.usePageStream) {
-        // Page-by-page streaming assembles the full PDF, then chunks it at PDF
-        // object boundaries — so TOC blocks and {pages} placeholders are fully
-        // supported (unlike single-pass --stream).
-        const generator = buildDocumentPDFStreamPageByPage(params, effectiveLayout);
-        await writeStreamingOutput(generator, cfg.outputPath);
-    } else if (cfg.useStreamTrue) {
-        // True constant-memory streaming: parts are emitted and freed as they
-        // go, so the joined binary never materialises. Same constraints as
-        // --stream (no TOC, no {pages}); byte-identical to buildDocumentPDFBytes.
-        const generator = buildDocumentPDFStreamTrue(params, effectiveLayout);
-        await writeStreamingOutput(generator, cfg.outputPath);
-    } else if (cfg.useStream) {
-        const generator = buildDocumentPDFStream(params, effectiveLayout);
-        await writeStreamingOutput(generator, cfg.outputPath);
-    } else {
-        const pdfBytes = buildDocumentPDFBytes(params, effectiveLayout);
-        bytes = pdfBytes.length;
-        await writeOutput(pdfBytes, cfg.outputPath);
+    try {
+        if (cfg.usePageStream) {
+            // Page-by-page streaming assembles the full PDF, then chunks it at PDF
+            // object boundaries — so TOC blocks and {pages} placeholders are fully
+            // supported (unlike single-pass --stream).
+            const generator = buildDocumentPDFStreamPageByPage(params, effectiveLayout);
+            await writeStreamingOutput(generator, cfg.outputPath);
+        } else if (cfg.useStreamTrue) {
+            // True constant-memory streaming: parts are emitted and freed as they
+            // go, so the joined binary never materialises. Same constraints as
+            // --stream (no TOC, no {pages}); byte-identical to buildDocumentPDFBytes.
+            const generator = buildDocumentPDFStreamTrue(params, effectiveLayout, streamOpts);
+            await writeStreamingOutput(generator, cfg.outputPath);
+        } else if (cfg.useStream) {
+            const generator = buildDocumentPDFStream(params, effectiveLayout, streamOpts);
+            await writeStreamingOutput(generator, cfg.outputPath);
+        } else {
+            const pdfBytes = buildDocumentPDFBytes(params, effectiveLayout);
+            bytes = pdfBytes.length;
+            await writeOutput(pdfBytes, cfg.outputPath);
+        }
+    } catch (e) {
+        mapBuildError(e, effectiveLayout.strict === true);
     }
-    emitStatus({ command: 'render', variant: 'document', dryRun: false, output: cfg.outputPath ?? '-', bytes });
+    emitStatus({
+        command: 'render', variant: 'document', dryRun: false,
+        output: cfg.outputPath ?? '-', bytes,
+        ...diagnosticsField(),
+    });
 }
 
 export async function render(args: ParsedArgs): Promise<void> {
@@ -536,6 +718,8 @@ export async function render(args: ParsedArgs): Promise<void> {
     const outlineSpec = getStringFlag(args.flags, 'outline');
     const inspectLayout = hasFlag(args.flags, 'inspect-layout');
     const pretty = hasFlag(args.flags, 'pretty');
+    const strict = hasFlag(args.flags, 'strict');
+    const chunkSize = parseChunkSize(getStringFlag(args.flags, 'chunk-size'));
 
     if (!VALID_VARIANTS.has(variant)) {
         throw new CliError(
@@ -551,6 +735,16 @@ export async function render(args: ParsedArgs): Promise<void> {
         );
     }
 
+    // --chunk-size targets the single-pass streaming builders (StreamOptions).
+    // Page-by-page streaming cuts chunks at PDF object boundaries by design,
+    // so a byte-size override would be a silent no-op — reject it explicitly.
+    if (chunkSize !== undefined && usePageStream) {
+        throw new CliError(
+            '--chunk-size is not supported with --stream-page-by-page (chunks are cut at PDF object boundaries). Use --stream or --stream-true.',
+            2,
+        );
+    }
+
     if (useWatch) {
         if (inputPath === undefined) {
             throw new CliError('--watch requires --input <file> (cannot watch stdin).', 2);
@@ -560,7 +754,10 @@ export async function render(args: ParsedArgs): Promise<void> {
         }
     }
 
-    const layout = await buildLayoutOptions(args);
+    let layout = await buildLayoutOptions(args);
+    // --strict only ever layers `strict: true` on top — a `strict` already set
+    // in a --layout file (or the input JSON's `layout`) is never overwritten.
+    if (strict) layout = { ...layout, strict: true };
     if (useStream || useStreamTrue) assertStreamingCompatible(layout);
 
     if (layout.compress === true) {
@@ -596,6 +793,7 @@ export async function render(args: ParsedArgs): Promise<void> {
         inspectLayout,
         pretty,
         dryRun,
+        chunkSize,
     };
 
     // Initial render (always runs, even in --watch mode).

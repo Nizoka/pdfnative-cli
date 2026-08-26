@@ -29,5 +29,7 @@ applyTo: "tests/**"
 
 ## Coverage targets
 
-- Statements ≥ 90% · Branches ≥ 80% · Functions ≥ 85% · Lines ≥ 90%.
-- `src/index.ts` excluded (entry point, covered by smoke test).
+- Enforced thresholds live in `vitest.config.ts` (single source of truth):
+  Statements ≥ 79% · Branches ≥ 68% · Functions ≥ 83% · Lines ≥ 79%.
+- `src/index.ts` and the network-transport / CMS-engine modules are excluded
+  (see the commented exclude block in `vitest.config.ts`).

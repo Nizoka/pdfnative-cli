@@ -146,42 +146,114 @@ This document outlines the planned development direction for pdfnative-cli. Prio
   (bundle-relative `package.json` path); version resolution is now bundle-safe. An empty
   env password no longer overrides an explicit `--password`.
 
-### Next — Sign-side LTV (PAdES-T / LT / LTA), upstream-coordinated
+### v1.4.0 — PAdES B-T/B-LT/B-LTA, compare, metadata & manifest pipelines _(released 2026-08-26)_
 
-Sign-side LTV is **PDF-writing logic that belongs in pdfnative**; the CLI exposes the
-surface and will light it up once the upstream primitives ship.
-
-- [ ] **`sign --timestamp <tsa-url>`** — embed an RFC 3161 timestamp token into the CMS
-  at signing time. Flag is reserved (errors clearly today); blocked on pdfnative
-  timestamp-embedding support.
-- [ ] **PAdES-B-LT / B-LTA** — emit `/DSS` dictionaries and document timestamps when
-  signing. Blocked on pdfnative DSS-writing primitives.
-- [ ] **OCSP / CRL stapling at signing time** — collect and embed revocation data into
-  the signed PDF for archival.
-
+- [x] **`pdfnative` bumped** to `^1.7.0` (was `^1.6.0`); **Node ≥ 22** (Node 20 is EOL).
+- [x] **`sign --timestamp <tsa-url>` (PAdES B-T)** — the formerly reserved flag now embeds a
+  verified RFC 3161 timestamp token in the CMS unsigned attributes at signing time
+  (`signPdfBytesWithTimestamp` + a CLI-injected, SSRF-guarded TSA provider). Plus
+  `--timestamp-digest sha256|sha384|sha512` and `--timestamp-nonce <hex>`.
+- [x] **`sign` — profiles, digests, placement & multiple signatures** — `--profile pkcs7|pades`
+  (ETSI.CAdES.detached, PAdES B-B), `--digest sha256|sha384|sha512` (RSA), and
+  `--allow-multiple` / `--field-name` / `--signature-rect` / `--signature-page` /
+  `--placeholder-bytes` for appending additional signature fields.
+- [x] **`ltv` command (PAdES B-LT)** — `collect` (fetch OCSP/CRL, **requires `--online`**) /
+  `embed` (offline, air-gap friendly) / `add` (both in one pass); writes `/DSS` + `/VRI` via
+  `collectValidationInfo` / `embedValidationInfo` / `addValidationInfo`.
+- [x] **`doc-timestamp` command (PAdES B-LTA)** — appends a `/DocTimeStamp` signature field
+  (SubFilter `/ETSI.RFC3161`) as an incremental revision via `addDocumentTimestamp`;
+  `--url` is the explicit network opt-in.
+- [x] **`verify` — LTV-era upgrades** — SHA-384/512 CMS digests, per-signature `fieldName`,
+  and `/DocTimeStamp` revisions validated as RFC 3161 tokens (`isDocTimestamp: true`).
+- [x] **`metadata` command** — update `/Info` + XMP (title/author/subject/keywords/modDate)
+  with an incremental save that keeps existing signatures valid (`modifier.updateMetadata`).
+- [x] **`compare` command** — text + structural diff of two PDFs (`--mode`, `--tolerance`,
+  `--ignore-whitespace`, `--pages`, per-side passwords); identical → exit 0, differences →
+  exit 1 with stable `E_CHECK_FAILED`. Visual/pixel diffing stays out of scope (no rasteriser).
+- [x] **`batch --manifest tasks.json`** — declarative multi-command pipelines (`@id` output
+  references, a 14-command whitelist, `--allow-network` gate, `--continue-on-error`);
+  Future Consideration, now shipped.
+- [x] **`render` — print production & charts v2** — `layout.print` (bleed/trim/art/crop boxes,
+  printer's marks, `userUnit`), `outputIntent` (ICC RGB), `viewerPreferences` (duplex,
+  `pickTrayByPDFSize`, `printPageRange`, `numCopies`), `params.metadata.trapped`; charts grow
+  to 9 types (`stackedBar`, `stackedBarH`, `area`, `scatter`) with `axis2`, `xAxis`
+  `category|linear|time`, log scale, `dataLabels`, `labelStride`/`labelRotation`.
+- [x] **`render` — PDF/A diagnostics + images** — `--strict` escalates conformance diagnostics
+  to a pre-output error (otherwise stderr warnings + a `diagnostics[]` array in the `--json`
+  envelope); `image` blocks are now JSON-usable via `src` (path) / `dataBase64`; `--chunk-size`
+  for the streaming modes.
+- [x] **`inspect` — signature inventory & print boxes** — `--signatures` (via `listSignatures`),
+  `--check "signatures>=N"`, per-page Bleed/Trim/Art boxes + `userUnit`, `metadata.trapped`;
+  **fix**: the per-page `signatures`/`formFields` counters always reported 0.
+- [x] **`annotate --password`** — annotate encrypted PDFs (appended objects encrypted under the
+  existing scheme).
+- [x] **Global `--max-inflate-size`** — anti-zip-bomb cap on any single decompressed PDF stream
+  (default 100 MiB) via `setMaxInflateOutputSize`.
+- [x] **Page-box preservation** — `merge`/`split`/`extract` now preserve Bleed/Trim/Art boxes
+  and `/UserUnit` (pdfnative 1.7.0).
+- [x] **Agent surface** — new stable `E_NETWORK` code; schema subjects `metadata`, `ltv-data`,
+  `compare`, `batch-manifest` (19 total).
+- [x] **Offline mock-PKI test infrastructure** — `tests/helpers/mock-pki.ts` runs a real
+  RFC 3161 TSA + OCSP/CRL responder in-process, so the network paths are tested without
+  touching the network (600 tests).
+- [x] **Blocking veraPDF PDF/A gate** — `npm run validate:pdfa` over a 12-file manifested
+  corpus (10 positives + 2 negative canaries with expected ISO 19005 clauses), blocking in
+  CI (`verapdf.yml`, pinned installer with verified SHA-256) and again before every
+  `npm publish`.
 
 ## Future Considerations
 
 Feasibility is called out honestly: some ideas need pdfnative to expose a primitive first
 (the CLI stays a thin dispatch layer and never re-implements engine logic).
 
-- **`batch --manifest tasks.json`** — turn `batch` into a file-driven task orchestrator: a JSON
-  manifest of steps (e.g. `render → sign → encrypt`), each an existing command, run in order
-  with a JSON summary and stable exit codes. **Feasible today** (composes existing commands, no
-  new pdfnative primitive) — a strong agent-automation candidate.
-- **`compare a.pdf b.pdf`** — diff two PDFs for CI / regression testing, with `--format json`,
-  a stable `E_CHECK_FAILED` exit, and `--tolerance`. **Text / structural** diff is feasible now
-  (`extractText` + object / metadata comparison). A **visual** (pixel) diff is **blocked**:
-  pdfnative is a generator/parser with **no rasteriser**, so rendering pages to images is out of
-  scope until an upstream raster primitive exists.
+- **`compare` — visual (pixel) diff** — the text / structural diff **shipped in v1.4.0**; a
+  **visual** diff remains **blocked**: pdfnative is a generator/parser with **no rasteriser**,
+  so rendering pages to images is out of scope until an upstream raster primitive exists.
 - **`optimize`** — shrink PDFs for web/archival: image re-compression/resampling, unused-object
   GC, and linearisation ("Fast Web View"). **Blocked** — pdfnative does not yet expose the
   low-level optimisation/linearisation primitives this would wrap.
-- **`modify` standalone command** — in-place object edits that preserve signatures/forms —
-  awaits the matching pdfnative primitives.
+- **`modify` standalone command** — **partially delivered** in v1.4.0 via `metadata`
+  (incremental `/Info` + XMP edits that keep signatures valid). Arbitrary in-place object
+  edits remain blocked on the matching pdfnative primitives.
+- **`render --font-file <ttf>`** — custom (non-bundled) fonts via pdfnative's
+  `validateFontData` / `parseFontData`. Feasible upstream; needs a security posture first
+  (parsing untrusted font binaries from the CLI surface).
+- **`link` annotations on existing PDFs** — `annotate` could gain the `link` type via
+  pdfnative's `buildLinkAnnotation` (today it covers markup types only).
+- **`doctor` — language-pack enumeration** — list the registered/bundled font packs via
+  `getRegisteredLangs` in the capability report.
+- **Dedicated TSA timeout flags** — `sign --timestamp` / `doc-timestamp` / `ltv` share the
+  guarded 10 s default (`--timeout` exists on `ltv` / `doc-timestamp`); a dedicated
+  per-TSA-request timeout flag on `sign` is a candidate refinement.
 - **Category help commands** (`pdfnative page --help`, `pdfnative security --help`) — the global
   `--help` already **groups** commands by category (Create & edit / Page tree / Security /
   Read & extract / Automation & meta); dedicated category dispatch commands are deferred (extra
   surface + category-vs-command ambiguity).
 - **Additional shell integrations** — PowerShell completion ✅ shipped in v1.3.0. **man pages**
   remain (deferred: ongoing maintenance cost vs. `--help`/completions already covering usage).
+- **Positional arguments in manifest tasks** — `batch --manifest` tasks carry only a flat flag
+  map today, so `ltv` (subcommand positional) and `compare` (two positional PDF paths) are
+  excluded from the manifest whitelist. Supporting positionals would reintroduce both.
+- **`verify` — weak-digest note for RFC 3161 timestamps** — emit a "weak digest" note when a
+  timestamp token's `messageImprint` uses SHA-1, and refuse it under `--strict`.
+- **fetch-guard — additional blocked ranges** — also block the benchmarking range
+  198.18.0.0/15, the documentation range 192.0.2.0/24 (TEST-NET-1), and the NAT64 prefix
+  64:ff9b::/96 in the SSRF guard.
+- **JSON size cap on `--layout`** — apply `assertJsonSizeLimit` to the `--layout` file the way
+  the 50 MB cap already guards the document input.
+- **`inspect` — ISO 8601 date normalisation** — `/Info` dates are emitted as the raw PDF date
+  string (e.g. `D:20260427120000+00'00'`); an opt-in flag could normalise them to ISO 8601.
+- **Global flags before the command name** — `pdfnative --json <cmd> …` currently swallows the
+  command name; the parser could accept global flags placed in front (`llms.txt` documents the
+  workaround: place `--json` after the sub-command).
+- **CHANGELOG compare-link retrofit** — add `[x.y.z]: …/compare/…` reference links across the
+  full historical release list.
+- **`--variant table` cannot embed fonts** — the `--lang` → `fontEntries` merge only exists on
+  the document path, and `PdfParams.fontEntries` needs binary data JSON cannot carry, so a
+  table-variant render under a PDF/A claim is structurally non-conformant (it serves as a
+  negative canary in the veraPDF corpus). Needs a CLI-side embedding path for the table
+  variant.
+- **veraPDF setup as a composite action** — the pinned installer block is duplicated between
+  `verapdf.yml` and `publish.yml`; extract `.github/actions/setup-verapdf` (validate with a
+  real CI run) so the URL/SHA-256 bump happens in one place. Also revisit the failed-rule
+  display regex (attribute-order-dependent, cosmetic) at the next veraPDF version bump.

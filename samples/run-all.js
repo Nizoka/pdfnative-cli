@@ -34,8 +34,14 @@ const CATEGORY_FLAGS = {
     '--footer-center', 'Page {page} of {pages}',
   ],
   encryption: [], // file-name-driven (see FILE_FLAGS): aes128 vs aes256 per file.
+  // pdfa / attachments: PDF/A conformance requires embedded fonts (ISO 19005
+  // §6.2.11.4.1 / §6.3.4) — --font latin --lang latin embeds the bundled Latin
+  // font; without it the claim fails veraPDF (PDFA_NO_FONT_ENTRIES).
+  pdfa: ['--font', 'latin', '--lang', 'latin'],
   attachments: [
     '--tagged',     'pdfa3b',
+    '--font',       'latin',
+    '--lang',       'latin',
     '--attachment', join(__dirname, 'render', 'attachments', 'invoice.xml')
                     + ':application/xml:Source:Structured invoice payload',
   ],
@@ -176,6 +182,14 @@ for (const job of jobs) {
 
   if (result.status === 0) {
     process.stdout.write('✓\n');
+    // Surface warnings (e.g. PDFA_*) emitted on stderr even when the render
+    // succeeds — a silent warning is how a non-conformant "PDF/A" slips out.
+    const warn = (result.stderr ?? '').trim();
+    if (warn) {
+      for (const line of warn.split(/\r?\n/)) {
+        process.stderr.write(`  ${line}\n`);
+      }
+    }
     passed++;
   } else {
     process.stdout.write('✗\n');
@@ -237,6 +251,13 @@ if (driverJobs.length > 0) {
 
     if (result.status === 0) {
       process.stdout.write('✓\n');
+      // Same as the render phase: surface non-fatal stderr warnings.
+      const warn = (result.stderr ?? '').trim();
+      if (warn) {
+        for (const line of warn.split(/\r?\n/)) {
+          process.stderr.write(`  ${line}\n`);
+        }
+      }
       driverPassed++;
     } else {
       process.stdout.write('✗\n');

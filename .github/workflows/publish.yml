@@ -30,7 +30,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: '>=20'
+          # A range resolves to the NEWEST available Node (currently 24.x),
+          # whose bundled npm >= 11.5.1 is required by npm Trusted Publishing
+          # (token-less OIDC). A '22.x' pin would ship npm 10.9 and break the
+          # publish. The floor mirrors the engines >= 22 support policy and
+          # the sibling pdfnative workflow.
+          node-version: '>=22.14.0'
           registry-url: https://registry.npmjs.org
           cache: npm
 
@@ -57,6 +62,62 @@ jobs:
 
       - name: Binary smoke test
         run: node dist/cli.cjs --help
+
+      # PDF/A gate: the release must never publish samples/claims that the
+      # reference validator rejects. Same pinned veraPDF (URL + SHA-256) as
+      # .github/workflows/verapdf.yml — BLOCKING, no continue-on-error.
+      - name: Setup Java (Temurin 17 LTS)
+        uses: actions/setup-java@d7793b545071e98d581d3bf084a51c3213318a07 # v4.9.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install veraPDF CLI
+        env:
+          VERAPDF_INSTALL_URL: 'https://software.verapdf.org/rel/1.30/verapdf-greenfield-1.30.2-installer.zip'
+          # SHA-256 of the installer zip. The step fails on mismatch: the
+          # archive is executed with `java -jar`, so a swapped artefact on
+          # the download host would otherwise run arbitrary code on the
+          # runner. Recompute when bumping the URL:
+          #   curl -fsSL <url> | sha256sum
+          VERAPDF_INSTALL_SHA256: '6cc6341cb1af644044054b81f00a6590a7918abb18f762243de115258bcad838'
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/verapdf-installer"
+          curl -fsSL -o "$HOME/verapdf-installer/installer.zip" "${VERAPDF_INSTALL_URL}"
+          echo "${VERAPDF_INSTALL_SHA256}  $HOME/verapdf-installer/installer.zip" | sha256sum --check --strict
+          unzip -q "$HOME/verapdf-installer/installer.zip" -d "$HOME/verapdf-installer"
+          INSTALLER_JAR=$(find "$HOME/verapdf-installer" -name 'verapdf-izpack-installer-*.jar' | head -n1)
+          if [ -z "${INSTALLER_JAR}" ]; then
+            echo "veraPDF installer jar not found"; exit 1
+          fi
+          mkdir -p "$HOME/verapdf"
+          # Auto-install via izpack XML descriptor (headless).
+          cat > "$HOME/verapdf/auto-install.xml" <<XML
+          <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+          <AutomatedInstallation langpack="eng">
+            <com.izforge.izpack.panels.htmlhello.HTMLHelloPanel id="welcome"/>
+            <com.izforge.izpack.panels.target.TargetPanel id="install_dir"><installpath>$HOME/verapdf</installpath></com.izforge.izpack.panels.target.TargetPanel>
+            <com.izforge.izpack.panels.packs.PacksPanel id="sdk_pack_select"><pack index="0" name="veraPDF GUI" selected="true"/><pack index="1" name="veraPDF Mac and *nix Scripts" selected="true"/><pack index="2" name="veraPDF Documentation" selected="false"/><pack index="3" name="veraPDF Sample Plugins" selected="false"/></com.izforge.izpack.panels.packs.PacksPanel>
+            <com.izforge.izpack.panels.install.InstallPanel id="install"/>
+            <com.izforge.izpack.panels.finish.FinishPanel id="finish"/>
+          </AutomatedInstallation>
+          XML
+          java -jar "${INSTALLER_JAR}" "$HOME/verapdf/auto-install.xml"
+          echo "VERAPDF_HOME=$HOME/verapdf" >> "$GITHUB_ENV"
+          echo "$HOME/verapdf" >> "$GITHUB_PATH"
+
+      - name: Generate PDF/A corpus
+        # dist/ is already built by the Build step above.
+        run: npm run corpus:pdfa
+
+      - name: Validate PDF/A corpus (blocking)
+        env:
+          # Fail-closed: a missing / broken veraPDF or Java is an INFRA
+          # failure (exit 3), never a silent skip.
+          VERAPDF_REQUIRED: '1'
+          VERAPDF_REPORT_DIR: test-output/pdfa/reports
+        run: node scripts/validate-pdfa.mjs
 
       - name: Generate SBOM (CycloneDX)
         # Software Bill of Materials for supply-chain transparency. Uses the

@@ -13,12 +13,13 @@ pdfnative-cli — Official CLI for pdfnative
 Usage:
   pdfnative <command> [options]
 
-Commands (17):
+Commands (21):
 
  Create & edit
   render      Render a JSON document definition to PDF
   fill        Fill / flatten / export an AcroForm PDF
   annotate    Attach markup annotations to a PDF
+  metadata    Update PDF /Info + XMP metadata (incremental — keeps signatures)
 
  Page tree
   merge       Concatenate multiple PDFs into one
@@ -26,17 +27,20 @@ Commands (17):
   extract     Extract selected pages into a new PDF
 
  Security
-  sign        Apply a digital signature to a PDF
+  sign        Apply a digital signature to a PDF (RFC 3161 timestamp, multi-sig)
   verify      Verify embedded PDF signatures
+  ltv         PAdES B-LT: collect/embed OCSP+CRL validation data (/DSS)
+  doc-timestamp  PAdES B-LTA: append an RFC 3161 document timestamp
   encrypt     Re-secure a PDF with AES-128/256 encryption
   decrypt     Remove encryption from a PDF (with --password)
 
  Read & extract
   inspect     Analyse a PDF (metadata, conformance, form fields, encryption)
   extract-text  Extract reading-order text (text | json | ndjson)
+  compare     Diff two PDFs by text and structure (CI-friendly exit codes)
 
  Automation & meta
-  batch       Render every JSON file in a directory to PDF (parallel)
+  batch       Render a directory or run a multi-command manifest pipeline
   doctor      Environment / capability preflight (text or --json)
   schema      Print a JSON Schema / capability manifest for agents
   completion  Emit a shell completion script (bash|zsh|fish|powershell)
@@ -55,7 +59,11 @@ Global options (any command):
                     (data stays on stdout). Errors carry a stable code.
   --dry-run         Validate inputs and exit without writing output (render,
                     sign, batch, merge, split, extract, annotate, fill,
-                    encrypt, decrypt).
+                    encrypt, decrypt, metadata, ltv, doc-timestamp). Never
+                    performs network I/O, even when a network flag is present.
+  --max-inflate-size <bytes>
+                    Cap the decompressed size of any single PDF stream while
+                    parsing untrusted input (anti zip-bomb; default 100 MiB).
 
 For autonomous/agent usage see AGENTS.md.
 Run \`pdfnative <command> --help\` for per-command options.
@@ -82,10 +90,17 @@ I/O:
                   materialises. Same constraints as --stream (no TOC, no
                   {pages}); byte-identical output. Mutually exclusive with the
                   other --stream* flags.
+  --chunk-size    Chunk size in bytes for --stream / --stream-true (default
+                  65536). Not applicable to --stream-page-by-page.
   --watch         Re-render on input file change (requires --input and a
                   file --output; logs to stderr; debounce 200 ms).
   --template      Path to JSON template file. Stdin / --input is deep-merged
                   on top (caller wins; arrays replace).
+  --outline       auto (bookmarks from headings) or a JSON outline file
+  --debug-layout  Draw the layout-debug overlay (boxes/baselines) in the PDF
+  --inspect-layout
+                  Emit the block-placement report as JSON on stdout instead
+                  of rendering the PDF
 
 Variant:
   --variant       document (default) or table
@@ -103,21 +118,34 @@ Layout (flags override values from --layout file):
   --page-size     Named (a4|letter|legal|a3|tabloid|a5) or WxH in points
   --margin        Uniform N or "top,right,bottom,left" in points
   --tagged        none|pdfa1b|pdfa2b|pdfa2u|pdfa3b (PDF/A flag)
+  --strict        Escalate PDF/A conformance diagnostics (PDFA_NO_FONT_ENTRIES,
+                  PDFA_UNEMBEDDED_FORM_FONT, PDFA_DEVICE_CMYK_IMAGE) into an
+                  error BEFORE any output byte (exit 1, E_CHECK_FAILED).
+                  Without it, diagnostics are stderr warnings (and a
+                  diagnostics[] array in the --json envelope).
   --conformance   DEPRECATED — alias for --tagged pdfa{1b|2b|3b}
   --compress      Enable Flate compression (initialises Node compression)
   --max-blocks    Max document blocks before pdfnative aborts (default 100000)
   --lang          Comma-separated language packs (e.g. th,ja,ar,te,si,km)
   --font          Register a bundled font shortcut (repeatable). The name
                   doubles as the --lang code. Allowed: latin, emoji,
-                  color-emoji, and the 22 script codes ar, hy, bn, ru, hi, am,
-                  ka, el, he, ja, km, ko, my, pl, zh, si, ta, te, th, bo, tr,
-                  vi.
+                  color-emoji, math, and the 22 script codes ar, hy, bn, ru,
+                  hi, am, ka, el, he, ja, km, ko, my, pl, zh, si, ta, te, th,
+                  bo, tr, vi.
+
+Images (document blocks):
+  { "type": "image", "src": "logo.png" }        path, resolved relative to the
+                                                --input JSON's directory
+  { "type": "image", "dataBase64": "…" }        inline base64 (JPEG/PNG)
+  Print production (bleed/trimBox/marks/userUnit), outputIntent (ICC RGB) and
+  viewerPreferences (duplex, numCopies, printPageRange, pickTrayByPDFSize) are
+  set in the --layout JSON — see \`pdfnative schema render\`.
 
 Header / Footer:
   --header-left, --header-center, --header-right
   --footer-left, --footer-center, --footer-right
-                  Each accepts a template string. {page}, {pages}, {date} are
-                  substituted by pdfnative.
+                  Each accepts a template string. {page}, {pages}, {date} and
+                  {title} are substituted by pdfnative.
 
 Watermark:
   --watermark-text       Text watermark
@@ -162,6 +190,10 @@ Credentials (env wins over file flags):
 
 Algorithm:
   --algorithm     rsa-sha256 (default) or ecdsa-sha256 (P-256 SEC1 keys).
+  --digest        sha256 (default) | sha384 | sha512 — CMS digest. RSA only;
+                  ecdsa is sha256-only.
+  --profile       pkcs7 (default) or pades (ETSI.CAdES.detached, PAdES B-B:
+                  ESS signing-certificate-v2, omits signing-time).
 
 Signing engine:
   --pure-crypto   Force pdfnative's pure-JS RSA/ECDSA signer. By default the CLI
@@ -175,14 +207,26 @@ Signature metadata (optional):
   --contact       Contact info
   --signing-time  ISO 8601 timestamp (default: now)
 
-Long-term validation (LTV):
-  --timestamp <url>  RFC 3161 TSA URL for PAdES-T timestamping. NOT YET
-                     available — embedding a timestamp token at signing time
-                     requires upstream pdfnative support; the flag is reserved
-                     and currently errors. Timestamp VALIDATION already works
-                     via \`pdfnative verify\`.
+Placement & multiple signatures:
+  --allow-multiple      Allow signing an already-signed PDF (appends a second
+                        signature field; default: idempotent single-signature)
+  --field-name <name>   Signature form-field name (default: auto)
+  --signature-rect "x1,y1,x2,y2"
+                        Visible signature widget rectangle (PDF points)
+  --signature-page <n>  1-based page for the signature widget (default: 1)
+  --placeholder-bytes <n>
+                        Explicit /Contents placeholder size (overrides the
+                        automatic estimate)
 
-Security: key material is never written to logs or error messages.
+Trusted timestamp (PAdES B-T — OPT-IN NETWORK, SSRF-guarded):
+  --timestamp <url>       RFC 3161 TSA URL. Embeds a verified timestamp token
+                          in the CMS unsigned attributes at signing time.
+                          Combine with --profile pades for PAdES B-T.
+  --timestamp-digest      sha256 (default) | sha384 | sha512 (TSA imprint)
+  --timestamp-nonce <hex> Request nonce (default: random 8 bytes)
+
+Security: key material is never written to logs or error messages. Without
+--timestamp the CLI performs no network I/O.
 
   --help,    -h   Show this help message
 `;
@@ -211,7 +255,7 @@ Options:
                          strict     a non-"good" status fails the signature
   --format,  -f        json (default) or text
   --summary            Emit only the minimal verdict { valid, signatures, invalid }
-  --fields             Comma-separated dot-paths to keep (e.g. valid,signatures.signatureValid)
+  --fields             Comma-separated dot-paths to keep (e.g. allValid,signatures.signatureValid)
   --pretty             Force indented JSON even under --json (agent mode is compact)
   --help,    -h        Show this help message
 
@@ -224,8 +268,131 @@ Reported per signature:
   - RFC 3161 timestamp token validation (PAdES-T)
   - OCSP (RFC 6960) + CRL (RFC 5280) revocation status
 
-Note: sign-side LTV (embedding timestamps / DSS into signatures) is tracked
-upstream in pdfnative and is out of scope for this CLI.
+Each signature also reports its form-field name, and /DocTimeStamp revisions
+(PAdES B-LTA) are validated as RFC 3161 tokens (isDocTimestamp: true).
+Sign-side LTV lives in \`pdfnative sign --timestamp\`, \`pdfnative ltv\` and
+\`pdfnative doc-timestamp\`.
+`;
+
+const LTV_USAGE = `\
+pdfnative ltv — PAdES B-LT: long-term validation data (/DSS + /VRI)
+
+Usage:
+  pdfnative ltv collect --input signed.pdf --online [--output ltv.json]
+  pdfnative ltv embed   --input signed.pdf --data ltv.json [--output out.pdf]
+  pdfnative ltv add     --input signed.pdf --online [--output out.pdf]
+
+Archives the certificates, OCSP responses and CRLs needed to validate the
+document's signatures long after certificates expire (PAdES B-LT). The two-step
+collect/embed flow supports air-gapped pipelines: collect on a connected
+machine, embed offline.
+
+Subcommands:
+  collect   Fetch validation data (OCSP/CRL) and write a replayable JSON file
+            (schema subject: ltv-data). REQUIRES --online.
+  embed     Embed a previously collected JSON into /DSS + /VRI. NEVER performs
+            network I/O.
+  add       collect + embed in one pass. REQUIRES --online.
+
+Options:
+  --input,   -i    Input PDF path (default: stdin)
+  --output,  -o    Output path (default: stdout)
+  --online         Explicit opt-in for network fetches (SSRF-guarded, no
+                   redirects). Without it, collect/add refuse to run — use
+                   \`ltv embed\` for the offline half.
+  --prefer         ocsp (default) | crl — preferred revocation source
+  --extra-cert     PEM file with extra chain certificates (repeatable)
+  --data           Collected JSON file (embed mode, required)
+  --timeout        Network timeout in ms (default: 10000)
+  --dry-run        Validate inputs; no output, no network
+  --help,    -h    Show this help message
+
+Typical PAdES ladder:
+  sign --timestamp <tsa> --profile pades   →  B-T
+  ltv add --online                         →  B-LT
+  doc-timestamp --url <tsa>                →  B-LTA
+  ltv add --online                         →  LTV for the doc-timestamp itself
+`;
+
+const DOC_TIMESTAMP_USAGE = `\
+pdfnative doc-timestamp — PAdES B-LTA: RFC 3161 document timestamp
+
+Usage:
+  pdfnative doc-timestamp --input signed.pdf --url <tsa-url> [--output out.pdf]
+
+Appends a /DocTimeStamp signature field (SubFilter /ETSI.RFC3161, ISO 32000-2
+§12.8.5) covering every byte of the document as an incremental revision —
+earlier revisions stay byte-identical. Repeat periodically to renew LTA
+protection.
+
+Options:
+  --input,   -i        Input PDF path (default: stdin)
+  --output,  -o        Output PDF path (default: stdout)
+  --url                RFC 3161 TSA URL — REQUIRED (explicit network opt-in;
+                       SSRF-guarded, no redirects)
+  --digest             sha256 (default) | sha384 | sha512
+  --field-name         Timestamp field name (default: DocTimeStamp1, auto-
+                       suffixed on collision)
+  --placeholder-bytes  /Contents placeholder size (default: 12288)
+  --nonce <hex>        Request nonce (default: random)
+  --timeout            Network timeout in ms (default: 10000)
+  --dry-run            Validate inputs; no output, no network
+  --help,    -h        Show this help message
+`;
+
+const METADATA_USAGE = `\
+pdfnative metadata — Update PDF /Info + XMP metadata
+
+Usage:
+  pdfnative metadata --input in.pdf --title "New title" [--output out.pdf]
+  pdfnative metadata --input in.pdf --from-json meta.json --output out.pdf
+
+The update is an INCREMENTAL save: the original bytes are preserved as a
+prefix, so existing digital signatures remain valid for their revision. The
+XMP packet is kept in sync (xmp:ModifyDate, pdf:Keywords, …).
+
+Options:
+  --input,   -i   Input PDF path (default: stdin)
+  --output,  -o   Output PDF path (default: stdout)
+  --title         Document title
+  --author        Author
+  --subject       Subject
+  --keywords      Keywords (single string)
+  --mod-date      ISO 8601 modification date (default: now — pass a fixed
+                  value for reproducible output)
+  --from-json     JSON file { title?, author?, subject?, keywords?, modDate? }
+                  (mutually exclusive with the per-field flags)
+  --password      Password for an encrypted PDF (env: PDFNATIVE_PASSWORD)
+  --dry-run       Validate inputs without writing output
+  --help,    -h   Show this help message
+
+At least one metadata field is required. Reading metadata stays in
+\`pdfnative inspect\`.
+`;
+
+const COMPARE_USAGE = `\
+pdfnative compare — Diff two PDFs by text and structure
+
+Usage:
+  pdfnative compare a.pdf b.pdf [--mode both] [--format text|json] [options]
+
+Compares extracted reading-order text and/or document structure (page count,
+page/print boxes, metadata, form fields, annotations, encryption, signatures).
+Built for CI and agents: identical documents exit 0; any difference exits 1
+with the stable code E_CHECK_FAILED. Visual/rasterised diffing is out of scope
+(pdfnative has no rasteriser).
+
+Options:
+  --mode               text | structure | both (default: both)
+  --format,  -f        text (default) or json (report on stdout)
+  --tolerance <pt>     Geometric tolerance in points for page/box sizes
+                       (default: 0)
+  --ignore-whitespace  Collapse runs of whitespace before the text diff
+  --pages              1-based selector limiting the text diff (e.g. "1,3-5")
+  --password-a         Password for the first PDF
+  --password-b         Password for the second PDF
+  --pretty             Force indented JSON even under --json
+  --help,    -h        Show this help message
 `;
 
 const INSPECT_USAGE = `\
@@ -246,8 +413,11 @@ Options:
   --password      Password for an encrypted PDF (env: PDFNATIVE_PASSWORD)
   --pdfua         Include a PDF/UA (ISO 14289-1) structural validation report
                   (valid + errors + warnings)
+  --signatures    List signature fields (fieldName, subFilter, byteRange,
+                  isDocTimestamp, isPlaceholder — never the signature bytes)
   --check         Assert a property; repeatable; AND semantics; exits 1 on
-                  failure. Values: pdfa | signed | encrypted | pdfua
+                  failure. Values: pdfa | signed | encrypted | pdfua |
+                  "signatures>=N"
   --summary       Emit only the minimal verdict { pages, encrypted, signatures, pdfa }
   --fields        Comma-separated dot-paths to keep (e.g. pageCount,metadata.title)
   --pretty        Force indented JSON even under --json (agent mode is compact)
@@ -255,25 +425,47 @@ Options:
 `;
 
 const BATCH_USAGE = `\
-pdfnative batch — Render every JSON file in a directory to PDF
+pdfnative batch — Render a directory, or run a multi-command manifest pipeline
 
 Usage:
   pdfnative batch --input-dir <dir> --output-dir <dir> [render options]
+  pdfnative batch --manifest tasks.json [--allow-network] [--continue-on-error]
 
-Options:
+Directory mode:
   --input-dir        Directory of *.json document definitions (required)
   --output-dir       Directory for the rendered *.pdf files (created if absent)
   --concurrency      Maximum parallel renders (default: 4)
   --fail-fast        Stop at the first failure (default: render all, then report)
+
+Manifest mode (mutually exclusive with --input-dir):
+  --manifest         Declarative pipeline file (schema subject: batch-manifest):
+                     { "version": 1, "tasks": [ { "id", "command", "flags" } ] }
+                     Flag values "@<id>" reference the output of an EARLIER
+                     task; relative paths resolve against the manifest's
+                     directory. Tasks run sequentially, fail-fast.
+                     Allowed commands: render, sign, verify, inspect, merge,
+                     split, extract, extract-text, fill, encrypt, decrypt,
+                     annotate, metadata, doc-timestamp. (ltv and compare need
+                     positional arguments and are not yet manifest-callable.)
+  --allow-network    Required for any network flag inside the manifest
+                     (--timestamp, --url, --online, --revocation online). An
+                     untrusted manifest can never trigger network I/O on its
+                     own.
+  --continue-on-error
+                     Keep running after a failure; tasks depending (via @) on a
+                     failed task are skipped.
+
+Common:
   --format,  -f      Summary format: text (default) or json
   --summary          Emit only the minimal verdict { total, succeeded, failed }
   --fields           Comma-separated dot-paths to keep (e.g. total,failed)
   --pretty           Force indented JSON even under --json (agent mode is compact)
+  --dry-run          Validate the manifest / inputs without executing
   --help,    -h      Show this help message
 
-All other flags (--variant, --layout, --page-size, --tagged, --compress,
-smart-table flags, …) are forwarded to each render. Per-file --input/--output
-are managed automatically. Exit code 1 if any file fails.
+In directory mode all other flags (--variant, --layout, --page-size, --tagged,
+--compress, smart-table flags, …) are forwarded to each render. Exit code 1 if
+any file or task fails.
 `;
 
 const MERGE_USAGE = `\
@@ -512,11 +704,13 @@ Options:
   --input,   -i         Input PDF path (default: stdin)
   --output,  -o         Output PDF path (default: stdout)
   --annotations         Path to the annotations JSON (required)
+  --password            Password for an encrypted PDF (env: PDFNATIVE_PASSWORD)
   --dry-run             Validate inputs without writing output
   --help,    -h         Show this help message
 
 The document is updated with an incremental save, so the original bytes — and
-any existing signature — are preserved.
+any existing signature — are preserved. Encrypted PDFs are supported via
+--password (appended objects are encrypted under the existing scheme).
 `;
 
 const GOVERN_USAGE = `\
@@ -561,6 +755,10 @@ Subjects:
   verify-summary  Output of \`verify --summary\`
   batch-summary   Output of \`batch --summary\`
   govern-verify   Output of \`govern verify-issue --format json\`
+  metadata        Input for \`metadata --from-json\`
+  ltv-data        Output of \`ltv collect\` / input for \`ltv embed\`
+  compare         Output of \`compare --format json\`
+  batch-manifest  Input for \`batch --manifest\`
   status          Agent success envelope (write commands, --json)
   manifest        Machine-readable capability manifest (commands, flags, codes)
   doctor          Output of \`doctor --format json\`
@@ -634,6 +832,22 @@ async function loadCommand(name: string): Promise<CommandFn> {
             const m = await import('./commands/annotate.js');
             return m.annotate;
         }
+        case 'metadata': {
+            const m = await import('./commands/metadata.js');
+            return m.metadata;
+        }
+        case 'compare': {
+            const m = await import('./commands/compare.js');
+            return m.compare;
+        }
+        case 'ltv': {
+            const m = await import('./commands/ltv.js');
+            return m.ltv;
+        }
+        case 'doc-timestamp': {
+            const m = await import('./commands/docTimestamp.js');
+            return m.docTimestamp;
+        }
         case 'govern': {
             const m = await import('./commands/govern.js');
             return m.govern;
@@ -682,6 +896,19 @@ async function main(): Promise<void> {
         process.env['PDFNATIVE_DRY_RUN'] = '1';
     }
 
+    // Global inflate cap for parsing untrusted PDFs (anti zip-bomb). Applied
+    // before dispatch so every reading command inherits it. Dynamic import
+    // keeps --help / --version startup free of the pdfnative module cost.
+    const maxInflate = getStringFlag(args.flags, 'max-inflate-size');
+    if (maxInflate !== undefined) {
+        const n = Number(maxInflate);
+        if (!Number.isInteger(n) || n <= 0) {
+            throw new CliError('--max-inflate-size expects a positive integer byte count', 2);
+        }
+        const bridge = await import('./core-bridge/index.js');
+        bridge.setMaxInflateOutputSize(n);
+    }
+
     if (hasFlag(args.flags, 'help', 'h') && args.positionals.length === 0) {
         process.stdout.write(USAGE);
         process.exit(0);
@@ -720,6 +947,10 @@ async function main(): Promise<void> {
             case 'encrypt': process.stdout.write(ENCRYPT_USAGE); break;
             case 'decrypt': process.stdout.write(DECRYPT_USAGE); break;
             case 'annotate': process.stdout.write(ANNOTATE_USAGE); break;
+            case 'metadata': process.stdout.write(METADATA_USAGE); break;
+            case 'compare': process.stdout.write(COMPARE_USAGE); break;
+            case 'ltv': process.stdout.write(LTV_USAGE); break;
+            case 'doc-timestamp': process.stdout.write(DOC_TIMESTAMP_USAGE); break;
             case 'govern': process.stdout.write(GOVERN_USAGE); break;
             case 'batch': process.stdout.write(BATCH_USAGE); break;
             case 'schema': process.stdout.write(SCHEMA_USAGE); break;

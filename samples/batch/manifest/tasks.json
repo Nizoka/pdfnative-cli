@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "id": "report",
+      "command": "render",
+      "flags": {
+        "input": "report.json",
+        "output": "out/report.pdf",
+        "compress": true
+      }
+    },
+    {
+      "id": "secured",
+      "command": "encrypt",
+      "flags": {
+        "input": "@report",
+        "output": "out/report-secured.pdf",
+        "owner-password": "owner-secret",
+        "algorithm": "aes-256",
+        "permissions": "print,copy"
+      }
+    },
+    {
+      "id": "check",
+      "command": "inspect",
+      "flags": {
+        "input": "@secured",
+        "password": "owner-secret",
+        "encryption": true
+      }
+    }
+  ]
+}

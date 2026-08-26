@@ -14,25 +14,28 @@ We will acknowledge receipt within 48 hours and aim to provide a fix within 7 da
 
 | Version | Supported |
 |---------|-----------|
+| 1.4.x   | ✅        |
+| 1.3.x   | ✅        |
 | 1.2.x   | ✅        |
-| 1.1.x   | ✅        |
-| 1.0.x   | ✅        |
-| < 1.0   | ❌        |
+| < 1.2   | ❌        |
 
 ## Security Model
 
 pdfnative-cli is a thin dispatch layer over the [`pdfnative`](https://github.com/Nizoka/pdfnative) library. It introduces zero additional runtime dependencies. All PDF cryptographic operations are performed inside `pdfnative` — see the [pdfnative security policy](https://github.com/Nizoka/pdfnative/blob/main/SECURITY.md) for the full cryptographic implementation notes (RSA, ECDSA, AES).
 
-The CLI exposes six commands (`render`, `sign`, `inspect`, `verify`, `batch`, `completion`), plus a `schema` helper. The `sign` and `verify` commands handle key material and certificate chain loading; security invariants for each are described below.
+The CLI exposes 21 commands (run `pdfnative --help` or `pdfnative schema manifest`
+for the authoritative list). The `sign`, `verify`, `ltv` and `doc-timestamp`
+commands handle key material, certificate chains and trusted-timestamp tokens;
+security invariants for each are described below.
 
 ### Agent Mode (`--json`, `--dry-run`)
 
 The agent-native contract is a **pure local presentation/validation layer** and adds **no network surface**:
 
 - `--json` only changes how diagnostics are formatted on **stderr** (a machine-readable envelope). It never opens sockets, never alters what is written to stdout, and never relaxes any security check.
-- `--dry-run` validates inputs and short-circuits **before** producing or writing output. For `sign` it stops after credentials are parsed and the PDF is prepared, before any signature value is computed — and still never logs key material.
-- Stable `E_*` error codes carry only a failure class and a redacted message; internal byte offsets, parser state, and key bytes are never exposed (the `sign` failure message stays the fixed `Failed to sign PDF.`).
-- The CLI remains **offline by default** in every mode; only `verify --revocation online` performs network requests, and only through the SSRF guard.
+- `--dry-run` validates inputs and short-circuits **before** producing or writing output — and **never performs network I/O**, even when a network flag (`--timestamp`, `--url`, `--online`) is present. For `sign` it stops after credentials are parsed and the PDF is prepared, before any signature value is computed — and still never logs key material.
+- Stable `E_*` error codes carry only a failure class and a redacted message; internal byte offsets, parser state, and key bytes are never exposed (the `sign` failure message stays the fixed `Failed to sign PDF.`). TSA / OCSP / CRL response bodies are never echoed into CLI output (`E_NETWORK` messages are generic).
+- The CLI remains **offline by default** in every mode; network I/O happens only behind the explicit opt-in flags listed under *Network Access* below, and only through the SSRF guard.
 
 ### Signing Key Handling
 
@@ -44,28 +47,43 @@ The agent-native contract is a **pure local presentation/validation layer** and 
 
 ### Input Validation
 
-- All file path arguments (`--input`, `--output`, `--output-dir`, `--key`, `--cert`, `--cert-chain`, `--layout`, `--attachment`, `--watermark-image`, `--outline`, `--annotations`, `--trust`, and the positional source paths of `merge`) are validated against path traversal (`../`) sequences before any filesystem access.
-- JSON input size is capped at **50 MB** before `JSON.parse` to prevent memory exhaustion (this also covers the `annotate --annotations` spec and `govern verify-issue` drafts).
+- All file path arguments (`--input`, `--output`, `--output-dir`, `--key`, `--cert`, `--cert-chain`, `--layout`, `--attachment`, `--watermark-image`, `--outline`, `--annotations`, `--trust`, `--data`, `--from-json`, `--manifest`, the positional source paths of `merge` and `compare`, and every path-carrying value inside a `batch --manifest` file) are validated against path traversal (`../`) sequences before any filesystem access.
+- JSON input size is capped at **50 MB** before `JSON.parse` to prevent memory exhaustion (this also covers the `annotate --annotations` spec, `govern verify-issue` drafts, `ltv --data` files and `batch --manifest` files; manifests are additionally capped at 1 000 tasks).
+- A **manifest has the filesystem access of the user who invokes `batch`** — the same trust level as flags typed on the command line. Only *network* access is additionally gated: any network-reaching flag inside a manifest requires `--allow-network` on the invocation itself, so a manifest obtained from elsewhere can never open a socket on its own.
+- The global `--max-inflate-size <bytes>` flag caps the decompressed size of any single PDF stream while parsing untrusted input (anti zip-bomb; engine default 100 MiB).
 - `merge` / `split` / `extract` enforce an optional `--max-output-size` cap and bound the number of source PDFs; `extract` / `annotate` bounds-check every page reference against the document before writing.
 - `annotate` re-keys only the annotation fields pdfnative's builders understand — the raw JSON is never spread into the emitted dictionary, so unknown keys cannot be injected.
 - `inspect` JSON output sanitizes all values — no raw binary blobs are emitted in default mode.
 
 ### Code Safety
 
-- No `eval()`, `Function()`, or dynamic code execution.
-- **Offline by default** — no command opens a socket unless you explicitly pass
-  `verify --revocation online`. The `govern` command (AI-governance / HITL) is fully
-  offline: it never contacts GitHub or the network, and `govern verify-issue` is a pure
-  local validator. See *Network Access* below.
+- No `eval()`, `Function()`, or dynamic code execution (`batch --manifest` dispatches
+  only to a fixed whitelist of CLI command modules — never to arbitrary code).
+- **Offline by default** — no command opens a socket unless you pass one of the
+  explicit opt-in flags listed below. The `govern` command (AI-governance / HITL) is
+  fully offline: it never contacts GitHub or the network, and `govern verify-issue`
+  is a pure local validator. See *Network Access* below.
 - NPM provenance — signed builds via GitHub Actions OIDC.
 
-### Network Access & Revocation Checking
+### Network Access (opt-in only)
 
-The CLI is **offline by default**. The only command that can make a network
-request is `verify`, and only when you opt in with `--revocation online`.
+The CLI is **offline by default**. Exactly four flags can cause a network request,
+each naming the operation it enables:
 
-When online revocation is enabled, every OCSP (AIA) and CRL (CDP) request passes
-through an SSRF guard (`src/utils/fetch-guard.ts`) that enforces:
+| Opt-in | Command | What is fetched |
+|--------|---------|-----------------|
+| `--revocation online` | `verify` | OCSP (AIA) + CRL (CDP) revocation data |
+| `--timestamp <url>` | `sign` | An RFC 3161 timestamp token from the named TSA |
+| `--url <url>` | `doc-timestamp` | An RFC 3161 token for the `/DocTimeStamp` revision |
+| `--online` | `ltv collect` / `ltv add` | OCSP + CRL validation data to archive in `/DSS` |
+
+Inside a `batch --manifest` pipeline these flags are additionally refused unless the
+`batch` invocation itself carries `--allow-network`. `ltv embed` is network-free by
+design (air-gapped embedding of pre-collected data), and `--dry-run` never opens a
+socket in any command.
+
+Every request passes through the same SSRF guard (`src/utils/fetch-guard.ts`) that
+enforces:
 
 - an **http/https-only** scheme allow-list;
 - **DNS resolution followed by address vetting** — requests to private (RFC 1918),
@@ -87,32 +105,52 @@ status, never a `good` one.
 
 The `verify` command verifies, with no network access by default:
 
-- **Byte-range integrity** — SHA-256 of the covered bytes vs the CMS `messageDigest`.
-- **CMS signature value** — RSA-PKCS#1 v1.5 SHA-256 and ECDSA-SHA256 (P-256) over
-  the re-encoded `signedAttrs`.
+- **Byte-range integrity** — the signer's declared digest (SHA-256, SHA-384 or
+  SHA-512) of the covered bytes vs the CMS `messageDigest`.
+- **CMS signature value** — RSA-PKCS#1 v1.5 with SHA-256/384/512, and ECDSA-SHA256
+  (P-256), over the re-encoded `signedAttrs`. ECDSA with SHA-384/512 is detected and
+  labelled but never reported valid (verification is P-256 + SHA-256 only).
 - **Certificate chain & trust** — chain construction and evaluation against
   `--trust` roots (or self-signed acceptance when no roots are supplied).
 - **RFC 3161 timestamp (PAdES-T)** — the TSA SignerInfo signature, the TSTInfo
   eContent digest, and the `messageImprint` binding to the document signature are
   validated, and the TSA chain is built/trust-evaluated. Reported as `timestampValid`.
+- **`/DocTimeStamp` revisions (PAdES B-LTA)** — each document timestamp's token is
+  parsed, its `messageImprint` is checked against the covered byte range, and the TSA
+  token signature is verified; reported with `isDocTimestamp: true`.
 - **OCSP (RFC 6960) + CRL (RFC 5280) revocation** — embedded `/DSS` data (offline)
   and, with `--revocation online`, AIA/CDP fetches via the SSRF-guarded client.
 
+Sign-side LTV is available since v1.4.0: `sign --timestamp` (PAdES B-T),
+`ltv collect|embed|add` (B-LT, `/DSS` + `/VRI`) and `doc-timestamp` (B-LTA). The
+engine (pdfnative 1.7.0) verifies every TSA token before embedding it and never
+opens a socket itself — the CLI injects the SSRF-guarded transport.
+
 **Out of scope** (do not rely on for legal / regulatory non-repudiation):
 
-- **Sign-side LTV** — embedding timestamps, DSS dictionaries, VRI or
-  document-timestamp chains *at signing time* is upstream-blocked in pdfnative; the
-  `sign --timestamp` flag is reserved and currently errors. Tracked in
-  [ROADMAP.md](./ROADMAP.md).
-- **Full PAdES-B-LTA archival validation** — document-timestamp chain evaluation over
-  time is not performed.
+- **Full PAdES-B-LTA archival validation** — evaluation of a document-timestamp
+  *chain over time* (renewal policy, algorithm rollover assessment) is not performed;
+  each timestamp is validated individually.
+- **TSA certificate revocation** — the revocation status of the TSA's own
+  certificate is not checked.
 
 ### Cryptographic algorithm usage
 
 All signature-relevant hashing and verification uses SHA-256 or stronger (see the
-scope above). **SHA-1 appears in exactly one place: the OCSP `CertID`** built by
-`buildOcspRequest` and matched in `ocspCertIdMatches`
-([src/utils/revocation.ts](./src/utils/revocation.ts)). This is **intentional and safe**:
+scope above). SHA-1 appears in two deliberate places:
+
+1. **Verification of legacy timestamp imprints** — an existing RFC 3161 token whose
+   `messageImprint` was computed with SHA-1 is still *checked* (the digest named by
+   the token's own `hashAlgorithm` is used for the comparison). This affects
+   verification of third-party documents only; the CLI always *requests* SHA-256+
+   imprints when it timestamps (`--timestamp-digest` / `--digest`, default sha256),
+   and the token's TSA signature itself must verify with SHA-256+.
+2. **The OCSP `CertID`** built by `buildOcspRequest` and matched in
+   `ocspCertIdMatches` ([src/utils/revocation.ts](./src/utils/revocation.ts)).
+   (SHA-1 of a signature's `/Contents` is also used as the — non-cryptographic —
+   `/VRI` dictionary key, as required by ISO 32000-2.)
+
+The `CertID` usage is **intentional and safe**:
 
 - RFC 6960 §B.1 defines **SHA-1 as the default `CertID` hash algorithm**, and it is
   the only one reliably indexed by deployed OCSP responders; using SHA-256 would make

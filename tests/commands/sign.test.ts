@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { sign } from '../../src/commands/sign.js';
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
-import { CliError } from '../../src/utils/error.js';
+import { CliError, ErrorCode } from '../../src/utils/error.js';
+import { setTimestampProvider, listSignatures, ensureCryptoReady } from '../../src/core-bridge/index.js';
+import { createMockPki, createMockTimestampProvider } from '../helpers/mock-pki.js';
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
 const RSA_KEY = path.join(FIXTURES, 'rsa-key.pem');
@@ -64,6 +66,21 @@ const minimalParams = JSON.stringify({
     blocks: [{ type: 'paragraph', text: 'Hello world' }],
 });
 
+/** DER bytes of id-aa-signatureTimeStampToken (1.2.840.113549.1.9.16.2.14). */
+const OID_SIGNATURE_TIMESTAMP: readonly number[] = [
+    0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x0e,
+];
+
+function containsBytes(haystack: Uint8Array, needle: readonly number[]): boolean {
+    outer: for (let i = 0; i + needle.length <= haystack.length; i++) {
+        for (let j = 0; j < needle.length; j++) {
+            if (haystack[i + j] !== needle[j]) continue outer;
+        }
+        return true;
+    }
+    return false;
+}
+
 describe('sign', () => {
     const tmpFiles: string[] = [];
 
@@ -83,6 +100,25 @@ describe('sign', () => {
         await fs.writeFile(inPath, minimalParams, 'utf8');
         await render(parseArgs(['--input', inPath, '--output', pdfPath]));
         return pdfPath;
+    }
+
+    /** Sign `pdfPath` with the RSA PEM fixtures plus `extra` flags; returns the output path. */
+    async function signFixture(pdfPath: string, extra: readonly string[] = []): Promise<string> {
+        const outPath = path.join(os.tmpdir(), `sign-out-${Date.now()}-${Math.random()}.pdf`);
+        tmpFiles.push(outPath);
+        await sign(parseArgs([
+            '--input', pdfPath,
+            '--output', outPath,
+            '--key', RSA_KEY,
+            '--cert', RSA_CERT,
+            ...extra,
+        ]));
+        return outPath;
+    }
+
+    async function signaturesOf(pdfPath: string): Promise<ReturnType<typeof listSignatures>> {
+        const bytes = await fs.readFile(pdfPath);
+        return listSignatures(new Uint8Array(bytes));
     }
 
     it('throws CliError(2) when no key is provided (no env, no flag)', async () => {
@@ -272,6 +308,285 @@ describe('sign', () => {
                 dryRun: true,
                 algorithm: 'rsa-sha256',
             });
+        });
+    });
+
+    // ──────────────────────────────────────────────────────────────────
+    // v1.4.0 — sign-side RFC 3161 timestamping (PAdES B-T, offline mock TSA)
+    // ──────────────────────────────────────────────────────────────────
+
+    describe('--timestamp (PAdES B-T)', () => {
+        const TSA_URL = 'http://tsa.mock.invalid/tsr';
+
+        beforeAll(async () => {
+            await ensureCryptoReady();
+        });
+
+        beforeEach(() => {
+            // The global provider injected here beats the CLI's HTTP transport
+            // — this is the sanctioned offline test seam. Zero network.
+            setTimestampProvider(createMockTimestampProvider(createMockPki()));
+        });
+
+        afterEach(() => {
+            setTimestampProvider(null);
+        });
+
+        it('signs and embeds an RFC 3161 timestamp token', async () => {
+            const out = await signFixture(await makeTestPdf(), ['--timestamp', TSA_URL]);
+            const bytes = await fs.readFile(out);
+            expect(bytes.slice(0, 4).toString('ascii')).toBe('%PDF');
+
+            const sigs = listSignatures(new Uint8Array(bytes));
+            expect(sigs).toHaveLength(1);
+            expect(sigs[0]!.isPlaceholder).toBe(false);
+            expect(sigs[0]!.byteRange).toHaveLength(4);
+            // The id-aa-signatureTimeStampToken unsigned attribute is inside /Contents.
+            expect(containsBytes(sigs[0]!.contents, OID_SIGNATURE_TIMESTAMP)).toBe(true);
+        });
+
+        it('--json success envelope carries the additive timestamp field', async () => {
+            const pdfPath = await makeTestPdf();
+            process.env['PDFNATIVE_JSON'] = '1';
+            const lines: string[] = [];
+            const spy = vi.spyOn(process.stderr, 'write').mockImplementation((c: unknown) => {
+                lines.push(String(c));
+                return true;
+            });
+            try {
+                await signFixture(pdfPath, ['--timestamp', TSA_URL]);
+            } finally {
+                spy.mockRestore();
+                delete process.env['PDFNATIVE_JSON'];
+            }
+            const envelope = lines.map((l) => l.trim()).filter(Boolean).map((l) => JSON.parse(l)).at(-1);
+            expect(envelope).toMatchObject({
+                ok: true,
+                command: 'sign',
+                dryRun: false,
+                timestamp: { url: TSA_URL, digest: 'sha256' },
+            });
+        });
+
+        it('fails with E_PARSE (exit 1) and writes nothing when the TSA rejects (PKIStatus 2)', async () => {
+            setTimestampProvider(createMockTimestampProvider(createMockPki(), { status: 2 }));
+            const pdfPath = await makeTestPdf();
+            const outPath = path.join(os.tmpdir(), `sign-tsa-rej-${Date.now()}-${Math.random()}.pdf`);
+            tmpFiles.push(outPath);
+            const err = await sign(parseArgs([
+                '--input', pdfPath,
+                '--output', outPath,
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+                '--timestamp', TSA_URL,
+            ])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(1);
+            expect((err as CliError).code).toBe(ErrorCode.PARSE);
+            // No silent fallback to an untimestamped signature: no output written.
+            await expect(fs.stat(outPath)).rejects.toThrow();
+        });
+
+        it('rejects a non-http(s) --timestamp URL with a usage error', async () => {
+            const err = await sign(parseArgs([
+                '--input', await makeTestPdf(),
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+                '--timestamp', 'ftp://tsa.example.com/tsr',
+            ])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(2);
+        });
+
+        it('rejects an invalid --timestamp-digest', async () => {
+            const err = await sign(parseArgs([
+                '--input', await makeTestPdf(),
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+                '--timestamp', TSA_URL,
+                '--timestamp-digest', 'md5',
+            ])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(2);
+        });
+
+        it('rejects an invalid --timestamp-nonce (non-hex)', async () => {
+            const err = await sign(parseArgs([
+                '--input', await makeTestPdf(),
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+                '--timestamp', TSA_URL,
+                '--timestamp-nonce', 'not-hex!',
+            ])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(2);
+        });
+
+        it('honours an explicit --timestamp-nonce and --timestamp-digest sha384', async () => {
+            const out = await signFixture(await makeTestPdf(), [
+                '--timestamp', TSA_URL,
+                '--timestamp-nonce', 'deadbeef',
+                '--timestamp-digest', 'sha384',
+            ]);
+            const sigs = await signaturesOf(out);
+            expect(sigs).toHaveLength(1);
+            expect(sigs[0]!.isPlaceholder).toBe(false);
+            expect(containsBytes(sigs[0]!.contents, OID_SIGNATURE_TIMESTAMP)).toBe(true);
+        });
+
+        it('--dry-run with --timestamp never calls the provider and exits cleanly', async () => {
+            let calls = 0;
+            setTimestampProvider({
+                getTimestamp: () => {
+                    calls++;
+                    return Promise.reject(new Error('network attempted during dry-run'));
+                },
+            });
+            const pdfPath = await makeTestPdf();
+            const outPath = path.join(os.tmpdir(), `sign-ts-dry-${Date.now()}-${Math.random()}.pdf`);
+            tmpFiles.push(outPath);
+            await sign(parseArgs([
+                '--input', pdfPath,
+                '--output', outPath,
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+                '--timestamp', TSA_URL,
+                '--dry-run',
+            ]));
+            expect(calls).toBe(0);
+            await expect(fs.stat(outPath)).rejects.toThrow();
+        });
+    });
+
+    // ──────────────────────────────────────────────────────────────────
+    // v1.4.0 — multi-signature + 1.7.0 signing options
+    // ──────────────────────────────────────────────────────────────────
+
+    describe('multi-signature & 1.7.0 options', () => {
+        beforeAll(async () => {
+            await ensureCryptoReady();
+        });
+
+        it('re-signing without --allow-multiple fails (1.x idempotent short-circuit)', async () => {
+            // addSignaturePlaceholder returns the already-signed PDF unchanged
+            // (1.x idempotence) and signPdfBytes then finds no unsigned
+            // placeholder → CliError E_SIGN, exit 1. The first signature is
+            // never modified.
+            const first = await signFixture(await makeTestPdf());
+            const err = await sign(parseArgs([
+                '--input', first,
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+            ])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(1);
+            expect((err as CliError).code).toBe(ErrorCode.SIGN);
+            const sigs = await signaturesOf(first);
+            expect(sigs).toHaveLength(1);
+            expect(sigs[0]!.isPlaceholder).toBe(false);
+        });
+
+        it('--allow-multiple + --field-name adds a second signature', async () => {
+            const first = await signFixture(await makeTestPdf());
+            const second = await signFixture(first, ['--allow-multiple', '--field-name', 'Signature2']);
+            const sigs = await signaturesOf(second);
+            expect(sigs).toHaveLength(2);
+            expect(sigs.every((s) => !s.isPlaceholder)).toBe(true);
+            const names = sigs.map((s) => s.fieldName);
+            expect(names).toContain('Signature1');
+            expect(names).toContain('Signature2');
+        });
+
+        it('--field-name is reflected in listSignatures', async () => {
+            const out = await signFixture(await makeTestPdf(), ['--field-name', 'ApprovalSig']);
+            const sigs = await signaturesOf(out);
+            expect(sigs).toHaveLength(1);
+            expect(sigs[0]!.fieldName).toBe('ApprovalSig');
+            expect(sigs[0]!.isPlaceholder).toBe(false);
+        });
+
+        it('--digest sha384 produces a signed PDF (native crypto path)', async () => {
+            const out = await signFixture(await makeTestPdf(), ['--digest', 'sha384']);
+            const bytes = await fs.readFile(out);
+            expect(bytes.slice(0, 4).toString('ascii')).toBe('%PDF');
+            const sigs = listSignatures(new Uint8Array(bytes));
+            expect(sigs).toHaveLength(1);
+            expect(sigs[0]!.isPlaceholder).toBe(false);
+        });
+
+        it('rejects an invalid --digest', async () => {
+            const err = await sign(parseArgs([
+                '--input', await makeTestPdf(),
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+                '--digest', 'sha1',
+            ])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(2);
+        });
+
+        it('rejects --digest sha384 with ecdsa-sha256 (P-256 is SHA-256 only)', async () => {
+            const err = await sign(parseArgs([
+                '--input', await makeTestPdf(),
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+                '--algorithm', 'ecdsa-sha256',
+                '--digest', 'sha384',
+            ])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(2);
+        });
+
+        it('--profile pades yields an ETSI.CAdES.detached signature', async () => {
+            const out = await signFixture(await makeTestPdf(), ['--profile', 'pades']);
+            const sigs = await signaturesOf(out);
+            expect(sigs).toHaveLength(1);
+            expect(sigs[0]!.isPlaceholder).toBe(false);
+            expect(sigs[0]!.subFilter).toBe('ETSI.CAdES.detached');
+        });
+
+        it('rejects an invalid --profile', async () => {
+            const err = await sign(parseArgs([
+                '--input', await makeTestPdf(),
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+                '--profile', 'cades-lt',
+            ])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(2);
+        });
+
+        it('accepts --signature-rect, --signature-page and --placeholder-bytes', async () => {
+            const out = await signFixture(await makeTestPdf(), [
+                '--signature-rect', '10,10,200,80',
+                '--signature-page', '1',
+                '--placeholder-bytes', '20000',
+            ]);
+            const sigs = await signaturesOf(out);
+            expect(sigs).toHaveLength(1);
+            expect(sigs[0]!.isPlaceholder).toBe(false);
+        });
+
+        it('rejects a malformed --signature-rect', async () => {
+            const err = await sign(parseArgs([
+                '--input', await makeTestPdf(),
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+                '--signature-rect', '10,20,30',
+            ])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(2);
+        });
+
+        it('rejects --signature-page 0 (pages are 1-based)', async () => {
+            const err = await sign(parseArgs([
+                '--input', await makeTestPdf(),
+                '--key', RSA_KEY,
+                '--cert', RSA_CERT,
+                '--signature-page', '0',
+            ])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(2);
         });
     });
 });

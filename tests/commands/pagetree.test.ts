@@ -131,6 +131,110 @@ describe('extract', () => {
     });
 });
 
+// ──────────────────────────────────────────────────────────────────
+// v1.4.0 — print-production boxes survive page-tree rebuilds
+// (pdfnative 1.7.0 copies /TrimBox /BleedBox /ArtBox /UserUnit — this
+// is the non-regression suite for the dependency bump).
+// ──────────────────────────────────────────────────────────────────
+
+/** Render a PDF whose pages carry print-production geometry (`layout.print`). */
+async function renderPrintPages(pages: number, print: Record<string, unknown>): Promise<string> {
+    const blocks: unknown[] = [{ type: 'heading', text: 'T', level: 1 }];
+    for (let i = 0; i < pages; i++) {
+        if (i > 0) blocks.push({ type: 'pageBreak' });
+        blocks.push({ type: 'paragraph', text: `page ${i + 1}` });
+    }
+    const inPath = tmpPath('print-in.json');
+    const layoutPath = tmpPath('print-layout.json');
+    const outPath = tmpPath('print-doc.pdf');
+    await fs.writeFile(inPath, JSON.stringify({ blocks }), 'utf8');
+    await fs.writeFile(layoutPath, JSON.stringify({ print }), 'utf8');
+    await render(parseArgs(['--input', inPath, '--output', outPath, '--layout', layoutPath]));
+    return outPath;
+}
+
+/** `inspect --pages` page entries (boxes + userUnit) for a PDF. */
+async function inspectPages(pdfPath: string): Promise<Array<Record<string, unknown>>> {
+    const chunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((c: unknown) => { chunks.push(String(c)); return true; });
+    await inspect(parseArgs(['--input', pdfPath, '--format', 'json', '--pages']));
+    return JSON.parse(chunks.join('')).pages as Array<Record<string, unknown>>;
+}
+
+/** Assert a page entry carries a TrimBox = MediaBox inset by `bleed` on every side. */
+function expectTrimFromBleed(p: Record<string, unknown>, bleed: number): void {
+    const w = p['width'] as number;
+    const h = p['height'] as number;
+    const trim = p['trimBox'] as number[];
+    expect(Array.isArray(trim)).toBe(true);
+    expect(trim).toHaveLength(4);
+    expect(trim[0]).toBeCloseTo(bleed, 2);
+    expect(trim[1]).toBeCloseTo(bleed, 2);
+    expect(trim[2]).toBeCloseTo(w - bleed, 2);
+    expect(trim[3]).toBeCloseTo(h - bleed, 2);
+}
+
+describe('page-tree print-box preservation (pdfnative 1.7.0)', () => {
+    it('merge preserves /TrimBox and /BleedBox on every page (bytes + parsed)', async () => {
+        const a = await renderPrintPages(1, { bleed: 8.5 });
+        const b = await renderPrintPages(1, { bleed: 8.5 });
+        const out = tmpPath('merged-print.pdf');
+        await merge(parseArgs([a, b, '--output', out]));
+        const bytes = await fs.readFile(out);
+        expect(bytes.includes(Buffer.from('/TrimBox'))).toBe(true);
+        const pages = inspectPagesResult(await inspectPages(out), 2);
+        for (const p of pages) {
+            expectTrimFromBleed(p, 8.5);
+            expect(p['bleedBox']).toEqual([0, 0, p['width'], p['height']]);
+        }
+    });
+
+    it('split preserves /TrimBox in each output file', async () => {
+        const doc = await renderPrintPages(2, { bleed: 8.5 });
+        const outDir = tmpPath('splitdir-print');
+        await split(parseArgs(['--input', doc, '--output-dir', outDir]));
+        const files = (await fs.readdir(outDir)).filter((f) => f.endsWith('.pdf'));
+        expect(files).toHaveLength(2);
+        for (const f of files) {
+            const pages = inspectPagesResult(await inspectPages(path.join(outDir, f)), 1);
+            expectTrimFromBleed(pages[0] as Record<string, unknown>, 8.5);
+        }
+    });
+
+    it('extract preserves /TrimBox on the extracted page', async () => {
+        const doc = await renderPrintPages(3, { bleed: 8.5 });
+        const out = tmpPath('extracted-print.pdf');
+        await extract(parseArgs(['--input', doc, '--pages', '2', '--output', out]));
+        expect((await fs.readFile(out)).includes(Buffer.from('/TrimBox'))).toBe(true);
+        const pages = inspectPagesResult(await inspectPages(out), 1);
+        expectTrimFromBleed(pages[0] as Record<string, unknown>, 8.5);
+    });
+
+    it('extract preserves /UserUnit', async () => {
+        const doc = await renderPrintPages(2, { userUnit: 2 });
+        const out = tmpPath('extracted-uu.pdf');
+        await extract(parseArgs(['--input', doc, '--pages', '1', '--output', out]));
+        const pages = inspectPagesResult(await inspectPages(out), 1);
+        expect(pages[0]?.['userUnit']).toBe(2);
+    });
+
+    it('merge preserves /UserUnit on every page', async () => {
+        const a = await renderPrintPages(1, { userUnit: 3 });
+        const b = await renderPrintPages(1, { userUnit: 3 });
+        const out = tmpPath('merged-uu.pdf');
+        await merge(parseArgs([a, b, '--output', out]));
+        const pages = inspectPagesResult(await inspectPages(out), 2);
+        for (const p of pages) expect(p['userUnit']).toBe(3);
+    });
+});
+
+/** Assert the inspect --pages payload has the expected page count, then return it. */
+function inspectPagesResult(pages: Array<Record<string, unknown>>, expected: number): Array<Record<string, unknown>> {
+    expect(Array.isArray(pages)).toBe(true);
+    expect(pages).toHaveLength(expected);
+    return pages;
+}
+
 describe('page-tree drop-annotations', () => {
     it('merge --drop-annotations still produces a valid PDF', async () => {
         const a = await renderPages(1);

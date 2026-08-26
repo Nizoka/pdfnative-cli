@@ -18,6 +18,7 @@ import type {
     X509Certificate,
     Asn1Node,
     CryptoProvider,
+    SignatureAlgorithm,
 } from '../core-bridge/index.js';
 import { validatePath } from './io.js';
 import { CliError, ErrorCode } from './error.js';
@@ -109,8 +110,10 @@ export async function loadPemChain(
  * math instead of the pure-JS bignum path.
  *
  * The provider signs the DER-encoded CMS `SignedAttributes`: `createSign`
- * hashes them with SHA-256 internally and returns the correct encoding for the
- * key type (RSASSA-PKCS1-v1_5 for RSA, DER-encoded ECDSA for EC keys).
+ * hashes them internally with the digest implied by the requested
+ * `SignatureAlgorithm` (SHA-256 by default; SHA-384/512 for `rsa-sha384` /
+ * `rsa-sha512`) and returns the correct encoding for the key type
+ * (RSASSA-PKCS1-v1_5 for RSA, DER-encoded ECDSA for EC keys).
  *
  * Security: the `KeyObject` is created once and captured in the closure; the
  * PEM string is never referenced again and never appears in error messages.
@@ -127,9 +130,12 @@ export function createNativeCryptoProvider(pem: string): CryptoProvider {
         );
     }
     return {
-        sign(tbs: Uint8Array): Uint8Array {
+        sign(tbs: Uint8Array, algorithm?: SignatureAlgorithm): Uint8Array {
+            const hash = algorithm === 'rsa-sha384' ? 'sha384'
+                : algorithm === 'rsa-sha512' ? 'sha512'
+                : 'sha256';
             try {
-                return new Uint8Array(createSign('sha256').update(tbs).sign(keyObject));
+                return new Uint8Array(createSign(hash).update(tbs).sign(keyObject));
             } catch {
                 // Never surface the underlying message — it may reference key bytes.
                 throw new CliError('Failed to sign PDF.', 1, ErrorCode.SIGN);

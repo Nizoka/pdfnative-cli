@@ -1,0 +1,19 @@
+{
+  "title": "Manifest Pipeline Demo",
+  "blocks": [
+    { "type": "heading", "text": "Manifest Pipeline Demo", "level": 1 },
+    { "type": "paragraph", "text": "This PDF was produced by `pdfnative batch --manifest`: rendered from JSON, then re-secured with AES-256 encryption, then inspected — all in one declarative pipeline." },
+    { "type": "spacer", "height": 12 },
+    { "type": "heading", "text": "How it works", "level": 2 },
+    { "type": "list", "style": "bullet", "items": [
+        "Task \"report\" renders this document to a PDF.",
+        "Task \"secured\" encrypts \"@report\" (the previous task's output).",
+        "Task \"check\" inspects \"@secured\" and reports the encryption scheme."
+    ]}
+  ],
+  "footerText": "pdfnative batch --manifest",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "batch manifest pipeline"
+  }
+}

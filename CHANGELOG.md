@@ -7,6 +7,203 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] – 2026-08-26
+
+Built on **pdfnative 1.7.0**. Completes the PAdES ladder promised on the roadmap — trusted
+timestamps at signing time (B-T), long-term validation data (B-LT) and document timestamps
+(B-LTA) — as `sign --timestamp` plus two new commands (`ltv`, `doc-timestamp`), and adds two
+more (`metadata`, `compare`), multi-signature support, declarative `batch --manifest`
+pipelines, print production, PDF/A strict diagnostics, charts v2, and CLI-resolvable image
+blocks. 17 → **21 commands**, one new stable error code (`E_NETWORK`), four new `schema`
+subjects. Network I/O remains strictly opt-in and SSRF-guarded. 100% backward-compatible
+command surface; the support policy moves to Node.js ≥ 22 (see *Changed*).
+
+### Added
+
+#### New commands
+
+- **`ltv`** — PAdES **B-LT** long-term validation: archive certificates, OCSP responses and
+  CRLs into `/DSS` + `/VRI` via pdfnative 1.7.0 `collectValidationInfo` /
+  `embedValidationInfo` / `addValidationInfo`. `ltv collect --online` fetches revocation data
+  (SSRF-guarded, no redirects) and emits a **replayable JSON file** (schema subject
+  `ltv-data`); `ltv embed --data` embeds it **fully offline** (air-gapped pipelines);
+  `ltv add --online` does both in one pass. `--prefer ocsp|crl`, `--extra-cert` (repeatable),
+  `--timeout`, `--dry-run`. Without `--online`, collect/add refuse to run (exit 2).
+- **`doc-timestamp`** — PAdES **B-LTA** document timestamps: append a `/DocTimeStamp`
+  signature field (`/SubFilter /ETSI.RFC3161`, ISO 32000-2 §12.8.5) covering every byte as an
+  incremental revision via `addDocumentTimestamp`; earlier revisions stay byte-identical, and
+  the command can be repeated to renew LTA protection. `--url <tsa>` (required — the explicit
+  network opt-in), `--digest sha256|sha384|sha512`, `--field-name`, `--placeholder-bytes`,
+  `--nonce`, `--timeout`, `--dry-run`.
+- **`metadata`** — update `/Info` + XMP metadata (`title`, `author`, `subject`, `keywords`,
+  `--mod-date`, or a `--from-json` object) via pdfnative 1.7.0 `PdfModifier.updateMetadata`.
+  The save is **incremental**: the original bytes are preserved as a prefix, so existing
+  digital signatures remain valid for their revision. `--password`, `--dry-run`.
+- **`compare`** — diff two PDFs by extracted **text** and/or **structure** (page count,
+  page/print boxes with `--tolerance`, metadata, form fields, annotations, encryption,
+  signatures via `listSignatures`). Identical documents exit 0; any difference exits 1 with
+  the stable code `E_CHECK_FAILED` after printing the report — built for CI gates and agents.
+  `--mode text|structure|both`, `--format text|json` (schema subject `compare`),
+  `--ignore-whitespace`, `--pages`, `--password-a`/`--password-b`. Visual/rasterised diffing
+  stays out of scope (no rasteriser upstream).
+
+#### `sign`
+
+- **`--timestamp <tsa-url>` is now functional** (PAdES **B-T**) — the flag was reserved since
+  v1.1.0 and errored with `E_UNSUPPORTED`, as its own message announced. The CLI builds the
+  RFC 3161 request, POSTs it through the same SSRF guard as `verify --revocation online`, and
+  pdfnative 1.7.0 `signPdfBytesWithTimestamp` verifies and embeds the token in the CMS
+  unsigned attributes. `--timestamp-digest sha256|sha384|sha512`, `--timestamp-nonce <hex>`.
+  TSA transport failures are `E_NETWORK`; malformed responses are `E_PARSE`; there is **no
+  silent fallback** to an untimestamped signature, and `--dry-run` never touches the network.
+  The `--json` envelope gains `timestamp: { url, digest }`.
+- **Multiple signatures** — `--allow-multiple` (default off: the 1.x idempotent
+  single-signature behaviour is preserved), `--field-name` for named signature fields.
+- **`--profile pkcs7|pades`** (`pades` = `ETSI.CAdES.detached` with ESS
+  signing-certificate-v2) and **`--digest sha256|sha384|sha512`** (RSA; ECDSA stays
+  sha256-only).
+- **Visible signature placement** — `--signature-rect "x1,y1,x2,y2"`, `--signature-page <n>`,
+  and `--placeholder-bytes <n>` for oversized chains/tokens.
+
+#### `verify`
+
+- **SHA-384/512 CMS signatures verify** (`rsa-sha384` / `rsa-sha512` reported in
+  `signatureAlgorithm`) — matching what `sign --digest` can now produce.
+- **`/DocTimeStamp` revisions are validated** as RFC 3161 tokens (imprint check against the
+  byte range) and reported with `isDocTimestamp: true`; each signature also reports its
+  `fieldName`. Both fields are additive.
+
+#### `inspect`
+
+- **`--signatures`** — structural signature inventory via pdfnative 1.7.0 `listSignatures`:
+  `fieldName`, `subFilter`, `byteRange`, `isDocTimestamp`, `isPlaceholder`, `sigObjNum`,
+  `contentsLength` (never the signature bytes). Without the flag the output is unchanged.
+- **Print-production reads** — `--pages` now reports `cropBox` / `trimBox` / `bleedBox` /
+  `artBox` and `userUnit` when present; `metadata` gains `trapped`.
+- **`--check "signatures>=N"`** — assert a minimum count of real (non-placeholder,
+  non-timestamp) signatures. The existing `signed` check now counts on the same basis
+  (unsigned placeholders and `/DocTimeStamp` revisions no longer count) — a correctness
+  fix: a placeholder-only PDF passed `--check signed` in 1.3.0 and now fails.
+
+#### `render`
+
+- **`--strict`** — escalate PDF/A conformance diagnostics (`PDFA_NO_FONT_ENTRIES`,
+  `PDFA_UNEMBEDDED_FORM_FONT`, `PDFA_DEVICE_CMYK_IMAGE`) into an error **before any output
+  byte** (exit 1, `E_CHECK_FAILED`). Without it, diagnostics surface as `warning:` lines on
+  stderr (suppressed by `--quiet`) and as an additive `diagnostics[]` array in the `--json`
+  envelope.
+- **Image blocks are now usable from JSON** — `{ "type": "image", "src": "logo.png" }` (path
+  resolved against the input JSON's directory, same validation as `--attachment`) or
+  `{ "dataBase64": "…" }` (inline JPEG/PNG); the CLI resolves both to bytes before rendering.
+- **Print production** (pdfnative 1.7.0, via `--layout` JSON) — `print.bleed` /
+  `trimBox` / `bleedBox` / `artBox` / `cropBox`, vector printer marks (`print.marks`),
+  `userUnit` (1–75 000), and a custom RGB ICC `outputIntent`.
+- **Viewer print preferences** — `viewerPreferences.duplex`, `pickTrayByPDFSize`,
+  `printPageRange`, `numCopies`.
+- **Charts v2** — 9 chart kinds (+`stackedBar`, `stackedBarH`, `area`, `scatter`), secondary
+  Y axis (`series.yAxis: "right"` + `axis2`), `xAxis` with `category|linear|time` types,
+  logarithmic scale, `dataLabels`, `labelStride`, `labelRotation`.
+- **Document metadata** — `params.metadata` (`author`, `subject`, `keywords`,
+  `trapped: True|False|Unknown`) → `/Info` + XMP.
+- **`--chunk-size <n>`** for `--stream` / `--stream-true` (parity with the page-tree
+  commands).
+
+#### `annotate`
+
+- **`--password`** (or `$PDFNATIVE_PASSWORD`) — annotate encrypted PDFs; appended objects are
+  encrypted under the document's existing scheme.
+
+#### `batch`
+
+- **`--manifest tasks.json`** — declarative multi-command pipelines
+  (`{ "version": 1, "tasks": [{ "id", "command", "flags" }] }`, schema subject
+  `batch-manifest`): flag values `"@<id>"` reference the output of an earlier task, relative
+  paths resolve against the manifest's directory, tasks run sequentially fail-fast
+  (`--continue-on-error` to keep going), and the whole manifest is validated before anything
+  executes (manifests are size-capped like every other JSON input, bounded to 1 000
+  tasks, and path values get the same traversal check as direct CLI flags — a manifest
+  has the filesystem access of its invoker, no more). 14 commands are whitelisted
+  (never `batch`/`govern`/`schema`/`completion`/`doctor`; `ltv` and `compare` need
+  positional arguments and are not manifest-callable yet). **`--allow-network` is
+  required** for any network flag inside a manifest — a manifest obtained from
+  elsewhere can never trigger network I/O on its own. `--dry-run` prints the plan.
+
+#### Agent surface
+
+- **New stable error code `E_NETWORK`** — an explicitly requested TSA / OCSP / CRL fetch
+  failed. Published automatically in `schema manifest`.
+- **Four new `schema` subjects** — `ltv-data`, `compare`, `batch-manifest`, `metadata`
+  (15 → 19); the `render`, `inspect`, `verify`, `batch` and `status` schemas were
+  extended with all the additive fields above.
+- **Global `--max-inflate-size <bytes>`** — cap the decompressed size of any single PDF
+  stream while parsing untrusted input (anti zip-bomb; default 100 MiB), via pdfnative's
+  `setMaxInflateOutputSize`.
+
+#### Tooling & tests
+
+- **Offline mock PKI** (`tests/helpers/mock-pki.ts`) — a deterministic root CA + signer + TSA
+  + OCSP responder issuing *genuine* RFC 3161 tokens, OCSP responses and CRLs entirely
+  in-process, so the whole PAdES ladder is tested with **zero network** and zero binary
+  fixtures. 600 tests total (up from 452).
+- **veraPDF PDF/A validation gate** — the CLI's PDF/A claims are now validated against the
+  [veraPDF](https://verapdf.org) reference validator. `npm run corpus:pdfa` drives the built
+  CLI to generate a 12-file corpus (10 positive entries across 1b/2b/2u/3b — including an
+  incremental PAdES signature and a `metadata` update over claiming files — plus 2 **negative
+  canaries** veraPDF must reject: a no-fonts render violating ISO 19005-2 §6.2.11.4.1 and a
+  `--variant table` render violating ISO 19005-1 §6.3.4, since that path cannot embed fonts
+  from the CLI); `npm run validate:pdfa` checks each file against the profile it claims in XMP
+  (exit 0 ok/skip · 1 conformance · 2 no corpus · 3 infra; an unexpected canary pass — XPASS —
+  is fatal). Without veraPDF installed the run **skips with exit 0** (not a pass);
+  `VERAPDF_REQUIRED=1` fails closed. **Blocking in CI** (`.github/workflows/verapdf.yml`,
+  pinned veraPDF 1.30.2 installer with SHA-256 verification before `java -jar`) and repeated
+  as a pre-publish gate in `publish.yml`. veraPDF is an external CI tool, never bundled — zero
+  extra runtime dependencies unchanged.
+
+### Changed
+
+- **`pdfnative` bumped** to `^1.7.0` (was `^1.6.0`). Inherited engine improvements the CLI
+  surfaces without code changes: **merge/split/extract now preserve BleedBox / TrimBox /
+  ArtBox and `/UserUnit`** (previously stripped), corrected RTL shaping (UAX #9 L4 mirroring,
+  Arabic ALEF joining), searchable text in form-bearing documents (full base-14 `/ToUnicode`),
+  and colour-emoji flag/ZWJ sequences. Form-bearing and RTL documents therefore change bytes
+  versus 1.3.0 output — outputs remain spec-valid; no CLI contract changes.
+- **Support policy: Node.js ≥ 22** (was ≥ 20) and CI now tests Node 22 + 24. Node 20 reached
+  end-of-life on 2026-04-30, and pdfnative 1.7.0 — the CLI's only runtime dependency —
+  declares `engines.node >= 22`. This is a support-policy change, not an API change: the
+  command surface, exit codes, error codes and envelopes are 100% backward-compatible.
+- **PDF/A diagnostics routing** — pdfnative 1.7.0's conformance diagnostics (previously
+  `console.warn` inside the engine) are now routed through the CLI: `warning:` lines on
+  stderr, `diagnostics[]` under `--json`, or a hard error under `render --strict`.
+- Dev-dependency security overrides refreshed (`js-yaml ^4.3.1`, `nanoid ^3.3.18`);
+  `npm audit` clean.
+
+### Fixed
+
+- **`inspect` signature/form-field counters were always 0** — the legacy counters compared
+  parsed PDF name objects against raw strings (`'/Sig'`, `'/Widget'`), which never matched,
+  so `signatures` and per-page `formFields` under-reported on every signed PDF. Both now go
+  through the parser's `nameValue`.
+- **PDF/A samples now render actually-conformant outputs** — `samples/run-all.js` renders the
+  `render/pdfa/` and `render/attachments/` samples with `--font latin --lang latin`, embedding
+  the bundled Latin font. Previously those samples rendered without embedded fonts, so their
+  outputs claimed PDF/A in XMP but violated the ISO 19005 font-embedding requirements
+  (non-embedded base-14 Helvetica) and did not pass the reference validator. The blocking
+  veraPDF CI gate now guards this recipe (see *Tooling & tests*).
+
+### Documentation
+
+- README, `docs/KNOWLEDGE_BASE.md`, `AGENTS.md`, `llms.txt`, `ROADMAP.md`, `samples/README.md`
+  and `CITATION.cff` updated for the 21-command surface; `CITATION.cff` re-synchronised
+  (was still 1.2.0 / "six composable commands").
+- Corrected a false claim that `svg` blocks were not usable from JSON (`SvgBlock.data` is a
+  string and has worked since pdfnative 1.5.0), and documented the previously missing `math`
+  entry in `render --font`.
+- New runnable samples: `sign/06-timestamp` (replaces `06-timestamp-reserved`), `sign/08-ltv`
+  (the full PAdES ladder), `sign/09-multiple-signatures`, `inspect/08-list-signatures`,
+  `metadata/01-update-metadata`, `compare/01-compare`, `batch/03-manifest`, plus print
+  production and charts-v2 render JSONs — every pair ships as `.sh` **and** `.ps1`, all
+  offline by default (network steps opt-in via `PDFNATIVE_TSA_URL`).
+
 ## [1.3.0] – 2026-07-24
 
 Built on **pdfnative 1.6.0**. Surfaces the engine's 1.6.0 additions on the CLI as five new

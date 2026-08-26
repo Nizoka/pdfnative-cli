@@ -47,6 +47,14 @@ const OID_SHA384_RSA = '1.2.840.113549.1.1.12';
 const OID_SHA512_RSA = '1.2.840.113549.1.1.13';
 /** ECDSA with SHA-256 — ecdsa-with-SHA256. */
 const OID_ECDSA_SHA256 = '1.2.840.10045.4.3.2';
+/** ECDSA with SHA-384 / SHA-512 (recognised; verification is P-256+SHA-256 only). */
+const OID_ECDSA_SHA384 = '1.2.840.10045.4.3.3';
+const OID_ECDSA_SHA512 = '1.2.840.10045.4.3.4';
+/** NIST digest-algorithm OIDs (SignerInfo digestAlgorithm) + legacy SHA-1. */
+const OID_DIGEST_SHA256 = '2.16.840.1.101.3.4.2.1';
+const OID_DIGEST_SHA384 = '2.16.840.1.101.3.4.2.2';
+const OID_DIGEST_SHA512 = '2.16.840.1.101.3.4.2.3';
+const OID_DIGEST_SHA1 = '1.3.14.3.2.26';
 /** id-data — ContentInfo content type. */
 const OID_DATA = '1.2.840.113549.1.7.1';
 /** PKCS#9 message-digest signed attribute. */
@@ -171,6 +179,7 @@ function findSignerInfo(buf: Uint8Array, root: AbsNode): AbsNode | null {
 
 interface ParsedSignerInfo {
     readonly signedAttrsRaw: Uint8Array | null; // includes [0] IMPLICIT tag header
+    readonly digestAlgorithmOid: string | null;
     readonly signatureAlgorithmOid: string | null;
     readonly signatureValue: Uint8Array | null;
     readonly unsignedAttrsRaw: Uint8Array | null;
@@ -191,12 +200,14 @@ function parseSignerInfo(cmsBytes: Uint8Array, signerInfo: AbsNode): ParsedSigne
     if (signerInfo.tag !== 0x30) {
         return {
             signedAttrsRaw: null,
+            digestAlgorithmOid: null,
             signatureAlgorithmOid: null,
             signatureValue: null,
             unsignedAttrsRaw: null,
         };
     }
     let signedAttrsRaw: Uint8Array | null = null;
+    let digestAlgorithmOid: string | null = null;
     let signatureAlgorithmOid: string | null = null;
     let signatureValue: Uint8Array | null = null;
     let unsignedAttrsRaw: Uint8Array | null = null;
@@ -210,17 +221,23 @@ function parseSignerInfo(cmsBytes: Uint8Array, signerInfo: AbsNode): ParsedSigne
         } else if (child.tag === 0xa1) {
             unsignedAttrsRaw = sliceNode(cmsBytes, child);
         } else if (child.tag === 0x30 && !sigAlgSeen) {
-            // First plain SEQUENCE we encounter AFTER signedAttrs must be the
-            // signatureAlgorithm. (digestAlgorithm appears before signedAttrs.)
             if (signedAttrsRaw !== null) {
+                // First plain SEQUENCE we encounter AFTER signedAttrs must be
+                // the signatureAlgorithm.
                 signatureAlgorithmOid = oidFromAbs(cmsBytes, child.children[0] as AbsNode);
                 sigAlgSeen = true;
+            } else if (child.children.length > 0) {
+                // Before signedAttrs the only SEQUENCE whose first child is an
+                // OID is the digestAlgorithm AlgorithmIdentifier (the sid
+                // SEQUENCE starts with a Name SEQUENCE, never an OID).
+                const oid = oidFromAbs(cmsBytes, child.children[0] as AbsNode);
+                if (oid !== null) digestAlgorithmOid = oid;
             }
         } else if (child.tag === 0x04 && sigAlgSeen) {
             signatureValue = sliceContent(cmsBytes, child);
         }
     }
-    return { signedAttrsRaw, signatureAlgorithmOid, signatureValue, unsignedAttrsRaw };
+    return { signedAttrsRaw, digestAlgorithmOid, signatureAlgorithmOid, signatureValue, unsignedAttrsRaw };
 }
 
 // ── signedAttrs DER re-encoding for hashing (RFC 5652 §5.4) ───────────
@@ -284,15 +301,67 @@ export function hasTimestampToken(unsignedAttrsRaw: Uint8Array | null): boolean 
 
 // ── Signature-value verification ──────────────────────────────────────
 
+/** Digest names recognised in CMS `digestAlgorithms` / SignerInfo digestAlgorithm. */
+export type CmsDigestName = 'sha1' | 'sha256' | 'sha384' | 'sha512';
+
+/** Signature-algorithm labels the verifier can detect and report. */
+export type CmsSignatureAlgorithm =
+    | 'rsa-sha256'
+    | 'rsa-sha384'
+    | 'rsa-sha512'
+    | 'ecdsa-sha256'
+    | 'ecdsa-sha384'
+    | 'ecdsa-sha512';
+
+const DIGEST_NAME_BY_OID: Readonly<Record<string, CmsDigestName>> = {
+    [OID_DIGEST_SHA256]: 'sha256',
+    [OID_DIGEST_SHA384]: 'sha384',
+    [OID_DIGEST_SHA512]: 'sha512',
+    [OID_DIGEST_SHA1]: 'sha1',
+};
+
+/** RSA signatureAlgorithm OIDs whose digest is implied by the OID itself. */
+const RSA_SIG_DIGEST_BY_OID: Readonly<Record<string, 'sha256' | 'sha384' | 'sha512'>> = {
+    [OID_SHA256_RSA]: 'sha256',
+    [OID_SHA384_RSA]: 'sha384',
+    [OID_SHA512_RSA]: 'sha512',
+};
+
+/** ECDSA signatureAlgorithm OIDs → digest label (only SHA-256 is verifiable). */
+const ECDSA_SIG_DIGEST_BY_OID: Readonly<Record<string, 'sha256' | 'sha384' | 'sha512'>> = {
+    [OID_ECDSA_SHA256]: 'sha256',
+    [OID_ECDSA_SHA384]: 'sha384',
+    [OID_ECDSA_SHA512]: 'sha512',
+};
+
 export interface CmsVerifyResult {
     /** True iff the signature value verifies against the signed attributes. */
     readonly signatureValid: boolean;
     /** Detected algorithm. `null` when unknown / unsupported. */
-    readonly algorithm: 'rsa-sha256' | 'ecdsa-sha256' | null;
+    readonly algorithm: CmsSignatureAlgorithm | null;
     /** True when an RFC 3161 timestamp token is present (NOT validated). */
     readonly timestampPresent: boolean;
     /** Human-readable diagnostic for failures or unsupported flows. */
     readonly note: string | null;
+}
+
+/**
+ * Extract the SignerInfo `digestAlgorithm` of a CMS SignedData as a
+ * node:crypto digest name (`sha1 | sha256 | sha384 | sha512`), or `null`
+ * when absent/unknown. The `verify` command uses this to hash the PDF
+ * /ByteRange with the same digest the signer used for `messageDigest`.
+ */
+export function extractSignerDigestAlgorithm(cmsBytes: Uint8Array): CmsDigestName | null {
+    let root: AbsNode;
+    try {
+        root = walkAbs(cmsBytes);
+    } catch {
+        return null;
+    }
+    const signerInfo = findSignerInfo(cmsBytes, root);
+    if (signerInfo === null) return null;
+    const oid = parseSignerInfo(cmsBytes, signerInfo).digestAlgorithmOid;
+    return oid !== null ? DIGEST_NAME_BY_OID[oid] ?? null : null;
 }
 
 /**
@@ -361,35 +430,59 @@ export function verifyCmsSignatureValue(
     }
 
     const oid = parsed.signatureAlgorithmOid;
-    if (oid === OID_SHA256_RSA || oid === OID_RSA_ENCRYPTION) {
+    const impliedRsaDigest = oid !== null ? RSA_SIG_DIGEST_BY_OID[oid] : undefined;
+    if (impliedRsaDigest !== undefined || oid === OID_RSA_ENCRYPTION) {
+        // With a bare rsaEncryption signatureAlgorithm the digest comes from
+        // the SignerInfo digestAlgorithm (default SHA-256). SHA-1 is not a
+        // supported RSASSA digest here — fall back to SHA-256 (which then
+        // fails verification, as it should for a legacy algorithm).
+        const signerDigest = parsed.digestAlgorithmOid !== null
+            ? DIGEST_NAME_BY_OID[parsed.digestAlgorithmOid]
+            : undefined;
+        const rsaDigest: 'sha256' | 'sha384' | 'sha512' = impliedRsaDigest
+            ?? (signerDigest === 'sha384' || signerDigest === 'sha512' ? signerDigest : 'sha256');
+        const algorithm: CmsSignatureAlgorithm = `rsa-${rsaDigest}`;
         let pubKey: RsaPublicKey;
         try {
             pubKey = rsaPubKeyFromCert(leafCert);
         } catch (e) {
             return {
                 signatureValid: false,
-                algorithm: 'rsa-sha256',
+                algorithm,
                 timestampPresent,
                 note: e instanceof Error ? e.message : 'RSA public key extraction failed',
             };
         }
-        const hash = createHash('sha256').update(signedAttrsForHash).digest();
+        const hash = createHash(rsaDigest).update(signedAttrsForHash).digest();
         let valid = false;
         try {
-            valid = rsaVerifyHash(new Uint8Array(hash), parsed.signatureValue, pubKey);
+            valid = rsaVerifyHash(new Uint8Array(hash), parsed.signatureValue, pubKey, rsaDigest);
         } catch (e) {
             return {
                 signatureValid: false,
-                algorithm: 'rsa-sha256',
+                algorithm,
                 timestampPresent,
                 note: e instanceof Error ? e.message : 'RSA verification threw',
             };
         }
         return {
             signatureValid: valid,
-            algorithm: 'rsa-sha256',
+            algorithm,
             timestampPresent,
             note: valid ? null : 'RSA signature value mismatch',
+        };
+    }
+
+    if (oid === OID_ECDSA_SHA384 || oid === OID_ECDSA_SHA512) {
+        // Recognised but NOT verifiable: pdfnative's ecdsaVerify is P-256 +
+        // SHA-256 only (the sign side enforces the same limit). Report the
+        // detected algorithm so the caller can surface an actionable note.
+        const digestLabel = ECDSA_SIG_DIGEST_BY_OID[oid] as 'sha384' | 'sha512';
+        return {
+            signatureValid: false,
+            algorithm: `ecdsa-${digestLabel}`,
+            timestampPresent,
+            note: `ECDSA with ${digestLabel.toUpperCase()} is not supported (verification is P-256 + SHA-256 only)`,
         };
     }
 

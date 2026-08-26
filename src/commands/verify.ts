@@ -3,6 +3,7 @@ import {
     openPdf,
     ensureCryptoReady,
     parseCertificate,
+    listSignatures,
     isRef,
     isName,
     isDict,
@@ -13,6 +14,7 @@ import type {
     PdfReader,
     PdfDict,
     PdfValue,
+    PdfSignatureInfo,
     X509Certificate,
     X509Name,
 } from '../core-bridge/index.js';
@@ -23,9 +25,16 @@ import { isJsonMode } from '../utils/agent.js';
 import { selectFields, serializeJson, parseFieldList } from '../utils/projection.js';
 import { walkAbs, sliceNode, sliceContent, type AbsNode } from '../utils/asn1-walk.js';
 import { loadPemChain, parseCertificateChain } from '../utils/keys.js';
-import { verifyCmsSignatureValue, extractUnsignedAttrs, extractSignerSignatureValue } from '../utils/cms-verify.js';
+import {
+    verifyCmsSignatureValue,
+    extractUnsignedAttrs,
+    extractSignerSignatureValue,
+    extractSignerDigestAlgorithm,
+    type CmsSignatureAlgorithm,
+    type CmsDigestName,
+} from '../utils/cms-verify.js';
 import { buildChain, isTrustedRoot } from '../utils/cert-chain.js';
-import { verifyTimestamp } from '../utils/timestamp-verify.js';
+import { verifyTimestamp, verifyDocTimestamp } from '../utils/timestamp-verify.js';
 import {
     checkRevocation,
     type RevocationMode,
@@ -47,6 +56,8 @@ import {
  *   ✔ RFC 3161 signature-time-stamp-token validation (PAdES-T)
  *   ✔ OCSP (RFC 6960) + CRL (RFC 5280) revocation — embedded DSS (offline,
  *     default) and opt-in online fetching (--revocation online, SSRF-guarded)
+ *   ✔ RSA-SHA-384/512 signatures + /DocTimeStamp (PAdES B-LTA) revision
+ *     validation via listSignatures pairing (v1.4.0)
  *
  * Out of scope:
  *   ✘ Sign-side LTV (embedding timestamps / DSS) — tracked upstream in pdfnative
@@ -56,6 +67,8 @@ interface SignatureReport {
     readonly index: number;
     readonly fieldName: string | null;
     readonly subFilter: string | null;
+    /** True for /DocTimeStamp entries (ETSI.RFC3161 document timestamps). */
+    readonly isDocTimestamp: boolean;
     readonly signerSubject: string | null;
     readonly signerIssuer: string | null;
     readonly signingTime: string | null;
@@ -66,7 +79,7 @@ interface SignatureReport {
     readonly chainValid: boolean;
     readonly trustedRoot: boolean;
     readonly signatureValid: boolean;
-    readonly signatureAlgorithm: 'rsa-sha256' | 'ecdsa-sha256' | null;
+    readonly signatureAlgorithm: CmsSignatureAlgorithm | null;
     readonly timestampPresent: boolean;
     readonly timestampValid: boolean;
     readonly timestampTime: string | null;
@@ -111,9 +124,10 @@ function bytesToHex(bytes: Uint8Array): string {
 function digestByteRange(
     pdfBytes: Uint8Array,
     byteRange: readonly [number, number, number, number],
+    algorithm: CmsDigestName = 'sha256',
 ): string {
     const [a, b, c, d] = byteRange;
-    const hash = createHash('sha256');
+    const hash = createHash(algorithm);
     hash.update(pdfBytes.subarray(a, a + b));
     hash.update(pdfBytes.subarray(c, c + d));
     return hash.digest('hex');
@@ -407,10 +421,44 @@ export async function verify(args: ParsedArgs): Promise<void> {
     const fields = findSignatureFields(reader);
     const reports: SignatureReport[] = [];
 
+    // Signature inventory from pdfnative — the authority on /DocTimeStamp
+    // detection (/Type /DocTimeStamp) and a fieldName fallback. Entries are
+    // paired with the AcroForm walk above by /ByteRange (or ordinal position).
+    let sigInfos: readonly PdfSignatureInfo[] = [];
+    try {
+        sigInfos = listSignatures(pdfBytes);
+    } catch {
+        sigInfos = [];
+    }
+    const usedInfos = new Set<number>();
+    const pairSignatureInfo = (
+        byteRange: readonly [number, number, number, number] | null,
+        ordinal: number,
+    ): PdfSignatureInfo | null => {
+        if (byteRange !== null) {
+            for (let i = 0; i < sigInfos.length; i++) {
+                const info = sigInfos[i] as PdfSignatureInfo;
+                if (usedInfos.has(i)) continue;
+                if (info.byteRange.length === 4 && info.byteRange.every((v, j) => v === byteRange[j])) {
+                    usedInfos.add(i);
+                    return info;
+                }
+            }
+        }
+        if (ordinal < sigInfos.length && !usedInfos.has(ordinal)) {
+            usedInfos.add(ordinal);
+            return sigInfos[ordinal] as PdfSignatureInfo;
+        }
+        return null;
+    };
+
     for (let idx = 0; idx < fields.length; idx++) {
         const field = fields[idx] as (typeof fields)[number];
         const notes: string[] = [];
         const sig = parseSignatureDict(field.sigDict);
+        const info = pairSignatureInfo(sig.byteRange, idx);
+        const isDocTimestamp = info?.isDocTimestamp ?? sig.subFilter === 'ETSI.RFC3161';
+        const fieldName = field.fieldName ?? info?.fieldName ?? null;
         let digest: string | null = null;
         let integrity = false;
         let signerSubject: string | null = null;
@@ -418,7 +466,7 @@ export async function verify(args: ParsedArgs): Promise<void> {
         let chainValid = false;
         let trustedRoot = false;
         let signatureValid = false;
-        let signatureAlgorithm: 'rsa-sha256' | 'ecdsa-sha256' | null = null;
+        let signatureAlgorithm: CmsSignatureAlgorithm | null = null;
         let timestampPresent = false;
         let timestampValid = false;
         let timestampTime: string | null = null;
@@ -429,13 +477,43 @@ export async function verify(args: ParsedArgs): Promise<void> {
         let revocationMethod: 'ocsp' | 'crl' | null = null;
         let revocationRevokedAt: string | null = null;
 
-        if (sig.byteRange !== null) {
-            digest = digestByteRange(pdfBytes, sig.byteRange);
-        } else {
+        if (sig.byteRange === null) {
             notes.push('missing /ByteRange');
         }
 
-        if (sig.contents !== null) {
+        if (isDocTimestamp) {
+            // /DocTimeStamp revision (PAdES B-LTA): /Contents is a bare RFC
+            // 3161 TimeStampToken over the /ByteRange, not a document CMS.
+            if (sig.contents === null) {
+                notes.push('missing /Contents');
+            } else if (sig.byteRange !== null) {
+                const dts = verifyDocTimestamp(sig.contents, pdfBytes, sig.byteRange, trustRoots);
+                digest = dts.imprintHex;
+                integrity = dts.imprintValid;
+                signatureValid = dts.signatureValid;
+                signatureAlgorithm = dts.algorithm;
+                timestampPresent = true;
+                timestampValid = dts.valid;
+                timestampTime = dts.genTime;
+                tsaSubject = dts.tsaSubject;
+                chainValid = dts.chainValid;
+                trustedRoot = dts.trusted;
+                if (dts.valid) {
+                    notes.push(
+                        `document timestamp valid (genTime ${dts.genTime ?? 'unknown'}`
+                        + `${dts.trusted ? ', TSA trusted' : ', TSA untrusted'})`,
+                    );
+                } else {
+                    notes.push(`document timestamp invalid${dts.note !== null ? `: ${dts.note}` : ''}`);
+                }
+            }
+        } else if (sig.contents !== null) {
+            // messageDigest is computed with the SignerInfo digestAlgorithm
+            // (SHA-256/384/512) — hash the /ByteRange with the same digest.
+            if (sig.byteRange !== null) {
+                const digestName = extractSignerDigestAlgorithm(sig.contents) ?? 'sha256';
+                digest = digestByteRange(pdfBytes, sig.byteRange, digestName);
+            }
             try {
                 const root = walkAbs(sig.contents);
                 const certDers = extractCertsFromCms(sig.contents, root);
@@ -524,13 +602,17 @@ export async function verify(args: ParsedArgs): Promise<void> {
                 notes.push('failed to parse CMS (malformed or unsupported structure)');
             }
         } else {
+            if (sig.byteRange !== null) {
+                digest = digestByteRange(pdfBytes, sig.byteRange);
+            }
             notes.push('missing /Contents');
         }
 
         reports.push({
             index: idx,
-            fieldName: field.fieldName,
+            fieldName,
             subFilter: sig.subFilter,
+            isDocTimestamp,
             signerSubject,
             signerIssuer,
             signingTime: sig.signingTime,
@@ -564,11 +646,17 @@ export async function verify(args: ParsedArgs): Promise<void> {
         return true;
     };
 
-    const allValid =
-        reports.length > 0
-        && reports.every(
-            (r) => r.integrity && r.chainValid && r.trustedRoot && r.signatureValid && revocationOk(r),
-        );
+    // /DocTimeStamp entries gate on the RFC 3161 checks only: imprint match
+    // (integrity) + TSA token signature. TSA chain/trust and revocation are
+    // reported but — as with PAdES-T signature timestamps — never block, so
+    // a valid B-LTA document passes --strict while a tampered byte range
+    // (imprint mismatch) fails it.
+    const reportOk = (r: SignatureReport): boolean =>
+        r.isDocTimestamp
+            ? r.integrity && r.signatureValid && r.timestampValid
+            : r.integrity && r.chainValid && r.trustedRoot && r.signatureValid && revocationOk(r);
+
+    const allValid = reports.length > 0 && reports.every(reportOk);
 
     const result: VerifyResult = { signatures: reports, allValid };
 
@@ -592,7 +680,8 @@ export async function verify(args: ParsedArgs): Promise<void> {
         process.stdout.write(`Signatures: ${reports.length}\n`);
         for (const r of reports) {
             process.stdout.write(
-                `\n[${r.index}] field=${r.fieldName ?? '—'} subFilter=${r.subFilter ?? '—'}\n`
+                `\n[${r.index}] field=${r.fieldName ?? '—'} subFilter=${r.subFilter ?? '—'}`
+                + `${r.isDocTimestamp ? ' docTimestamp=yes' : ''}\n`
                 + `    signer:    ${r.signerSubject ?? '—'}\n`
                 + `    issuer:    ${r.signerIssuer ?? '—'}\n`
                 + `    signed at: ${r.signingTime ?? '—'}\n`

@@ -156,3 +156,57 @@ export type {
 export type { PdfReader, PdfValue, PdfName, PdfRef, PdfStream } from 'pdfnative';
 export type { ParsedDict as PdfDict, ParsedArray as PdfArray } from 'pdfnative';
 export type { PdfUAValidationResult } from 'pdfnative';
+
+// ── PAdES B-T — RFC 3161 timestamped signing (pdfnative 1.7.0) ───────
+// The engine never opens a socket: the CLI injects a TimestampProvider
+// built on the SSRF-guarded fetch (src/utils/tsa.ts).
+export { signPdfBytesWithTimestamp, estimateContentsSize } from 'pdfnative';
+export { setTimestampProvider, getTimestampProvider } from 'pdfnative';
+export type { PdfSignTimestampOptions, TimestampProvider } from 'pdfnative';
+
+// ── PAdES B-LT — /DSS + /VRI long-term validation (pdfnative 1.7.0) ──
+// collectValidationInfo needs a RevocationProvider (network, injected by
+// the CLI); embedValidationInfo is synchronous and offline by design.
+export { collectValidationInfo, embedValidationInfo, addValidationInfo, vriKeyForContents } from 'pdfnative';
+export { setRevocationProvider, getRevocationProvider } from 'pdfnative';
+export type { LtvData, CollectLtvOptions, RevocationProvider } from 'pdfnative';
+
+// ── PAdES B-LTA — document timestamps (pdfnative 1.7.0) ──────────────
+export { addDocumentTimestamp } from 'pdfnative';
+export type { AddDocumentTimestampOptions } from 'pdfnative';
+
+// ── Signature inventory + multi-signature options (pdfnative 1.7.0) ──
+export { listSignatures } from 'pdfnative';
+export type { PdfSignatureInfo, CmsDigestAlgorithm, CmsProfile, RsaDigest } from 'pdfnative';
+
+// ── RFC 3161 token parsing — /DocTimeStamp validation in verify ──────
+export { buildTimestampRequest, parseTimestampResponse, parseTimestampToken, verifyTimestampImprint } from 'pdfnative';
+export type { TimestampResponse, TstInfo } from 'pdfnative';
+
+// ── Incremental metadata update (pdfnative 1.7.0) ────────────────────
+export type { PdfMetadataUpdate } from 'pdfnative';
+
+// ── Print production + PDF/A diagnostics + viewer prefs (1.7.0) ──────
+export type {
+    PrintOptions,
+    PrinterMarksOptions,
+    PageBox,
+    CustomOutputIntent,
+    ViewerPreferences,
+    DocumentMetadata,
+    PdfDiagnostic,
+    PdfDiagnosticCode,
+    PdfDiagnosticHandler,
+} from 'pdfnative';
+
+// ── Document image blocks — CLI resolves src / dataBase64 to bytes ───
+export type { ImageBlock, DocumentBlock } from 'pdfnative';
+
+// ── Untrusted-input inflate cap (anti zip-bomb, --max-inflate-size) ──
+export { setMaxInflateOutputSize, getMaxInflateOutputSize, DEFAULT_MAX_INFLATE_OUTPUT } from 'pdfnative';
+
+// ── DER / hash / RSA primitives — consumed by tests/helpers/mock-pki
+// (offline TSA + OCSP/CRL responders) and the LTV plumbing. Kept in the
+// bridge so tests never import 'pdfnative' directly.
+export { derSequence, derSetOf, derOid, derInteger, derBitString, derOctetString, derGeneralizedTime } from 'pdfnative';
+export { sha1, rsaSignHash } from 'pdfnative';

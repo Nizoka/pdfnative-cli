@@ -1,7 +1,7 @@
 {
   "name": "pdfnative-cli",
-  "version": "1.3.0",
-  "description": "Official CLI for pdfnative — render JSON to PDF (22 Unicode scripts, math, COLRv1 colour emoji, native vector charts, bookmarks, streaming), extract text (RAG/agents), fill & flatten AcroForms, encrypt/decrypt (AES-128/256), merge/split/extract pages, annotate, sign (RSA + ECDSA, native constant-time crypto), inspect, validate PDF/UA, verify CMS signatures with LTV (RFC 3161, OCSP, CRL), and drive it all from AI agents under a human-in-the-loop governance contract. Zero extra runtime dependencies.",
+  "version": "1.4.0",
+  "description": "Official CLI for pdfnative — render JSON to PDF (22 Unicode scripts, math, COLRv1 colour emoji, 9 native vector chart types, print production with bleed/printer marks, bookmarks, streaming), extract text (RAG/agents), fill & flatten AcroForms, encrypt/decrypt (AES-128/256), merge/split/extract pages, annotate, edit metadata, compare PDFs, sign (RSA + ECDSA, native constant-time crypto, multiple signatures), timestamp (RFC 3161, PAdES B-T), embed LTV validation info (/DSS, PAdES B-LT), add document timestamps (PAdES B-LTA), inspect, validate PDF/UA, verify CMS signatures with LTV (RFC 3161, OCSP, CRL), orchestrate multi-step pipelines, and drive it all from AI agents under a human-in-the-loop governance contract. Zero extra runtime dependencies.",
   "type": "module",
   "bin": {
     "pdfnative": "./dist/cli.cjs"
@@ -26,6 +26,8 @@
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc --project tsconfig.test.json --noEmit",
     "typecheck:all": "npm run typecheck && npm run typecheck:tests",
+    "corpus:pdfa": "node scripts/generate-pdfa-corpus.mjs",
+    "validate:pdfa": "npm run build && npm run corpus:pdfa && node scripts/validate-pdfa.mjs",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -114,7 +116,23 @@
     "llm",
     "llms-txt",
     "mcp",
-    "powershell-completion"
+    "powershell-completion",
+    "pdf-compare",
+    "pdf-diff",
+    "document-timestamp",
+    "timestamping",
+    "tsa",
+    "dss",
+    "pades-lt",
+    "pades-lta",
+    "pdf-metadata",
+    "xmp",
+    "print-production",
+    "bleed",
+    "printer-marks",
+    "output-intent",
+    "pdf-manifest",
+    "pipeline"
   ],
   "author": "Nizoka <hello@pdfnative.dev> (https://pdfnative.dev)",
   "license": "MIT",
@@ -131,14 +149,14 @@
     "url": "https://plika.app"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "publishConfig": {
     "access": "public",
     "provenance": true
   },
   "dependencies": {
-    "pdfnative": "^1.6.0"
+    "pdfnative": "^1.7.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -151,7 +169,8 @@
   },
   "overrides": {
     "esbuild": "^0.28.1",
-    "js-yaml": "^4.3.0",
+    "js-yaml": "^4.3.1",
+    "nanoid": "^3.3.18",
     "vite": "^8.0.16"
   }
 }

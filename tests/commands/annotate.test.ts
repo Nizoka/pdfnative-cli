@@ -4,14 +4,16 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { render } from '../../src/commands/render.js';
 import { annotate } from '../../src/commands/annotate.js';
+import { encrypt } from '../../src/commands/encrypt.js';
 import { inspect } from '../../src/commands/inspect.js';
 import { parseArgs } from '../../src/utils/args.js';
-import { CliError } from '../../src/utils/error.js';
+import { CliError, ErrorCode } from '../../src/utils/error.js';
 
 const tmp: string[] = [];
 
 afterEach(async () => {
     vi.restoreAllMocks();
+    delete process.env['PDFNATIVE_PASSWORD'];
     for (const f of tmp.splice(0)) {
         await fs.rm(f, { recursive: true, force: true }).catch(() => undefined);
     }
@@ -39,12 +41,22 @@ async function writeAnnots(value: unknown): Promise<string> {
     return p;
 }
 
-async function annotationSubtypes(pdfPath: string): Promise<string[]> {
+async function annotationSubtypes(pdfPath: string, password?: string): Promise<string[]> {
     const chunks: string[] = [];
     vi.spyOn(process.stdout, 'write').mockImplementation((c: unknown) => { chunks.push(String(c)); return true; });
-    await inspect(parseArgs(['--input', pdfPath, '--format', 'json', '--annotations']));
+    const argv = ['--input', pdfPath, '--format', 'json', '--annotations'];
+    if (password !== undefined) argv.push('--password', password);
+    await inspect(parseArgs(argv));
     const res = JSON.parse(chunks.join(''));
     return (res.annotations ?? []).map((a: { subtype: string }) => a.subtype);
+}
+
+/** Render a doc, then AES-encrypt it (owner 'o', user 'u') via the encrypt command. */
+async function renderEncryptedDoc(): Promise<string> {
+    const plain = await renderDoc();
+    const enc = tmpPath('doc-enc.pdf');
+    await encrypt(parseArgs(['--input', plain, '--output', enc, '--owner-password', 'o', '--user-password', 'u']));
+    return enc;
 }
 
 describe('annotate', () => {
@@ -148,5 +160,57 @@ describe('annotate', () => {
         await expect(
             annotate(parseArgs(['--input', doc, '--annotations', notes, '--output', tmpPath('x.pdf')])),
         ).rejects.toBeInstanceOf(CliError);
+    });
+
+    // ──────────────────────────────────────────────────────────────────
+    // v1.4.0 — encrypted sources via --password / $PDFNATIVE_PASSWORD
+    // ──────────────────────────────────────────────────────────────────
+
+    describe('encrypted documents (--password)', () => {
+        it('annotates an encrypted PDF with --password', async () => {
+            const enc = await renderEncryptedDoc();
+            const notes = await writeAnnots([
+                { page: 1, type: 'highlight', rect: [72, 700, 520, 716], contents: 'secret note' },
+            ]);
+            const out = tmpPath('annotated-enc.pdf');
+            await annotate(parseArgs(['--input', enc, '--annotations', notes, '--output', out, '--password', 'u']));
+            const bytes = await fs.readFile(out);
+            expect(bytes.subarray(0, 4).toString('ascii')).toBe('%PDF');
+            expect(await annotationSubtypes(out, 'u')).toContain('Highlight');
+        });
+
+        it('reads the password from $PDFNATIVE_PASSWORD when the flag is absent', async () => {
+            const enc = await renderEncryptedDoc();
+            const notes = await writeAnnots([{ page: 1, type: 'square', rect: [10, 10, 50, 50] }]);
+            const out = tmpPath('annotated-env.pdf');
+            process.env['PDFNATIVE_PASSWORD'] = 'u';
+            try {
+                await annotate(parseArgs(['--input', enc, '--annotations', notes, '--output', out]));
+            } finally {
+                delete process.env['PDFNATIVE_PASSWORD'];
+            }
+            expect(await annotationSubtypes(out, 'u')).toContain('Square');
+        });
+
+        it('fails with E_PASSWORD when the password is missing', async () => {
+            const enc = await renderEncryptedDoc();
+            const notes = await writeAnnots([{ page: 1, type: 'text', rect: [0, 0, 1, 1] }]);
+            const err = await annotate(
+                parseArgs(['--input', enc, '--annotations', notes, '--output', tmpPath('x.pdf')]),
+            ).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(1);
+            expect((err as CliError).code).toBe(ErrorCode.PASSWORD);
+        });
+
+        it('fails with E_PASSWORD on a wrong password', async () => {
+            const enc = await renderEncryptedDoc();
+            const notes = await writeAnnots([{ page: 1, type: 'text', rect: [0, 0, 1, 1] }]);
+            const err = await annotate(
+                parseArgs(['--input', enc, '--annotations', notes, '--output', tmpPath('x.pdf'), '--password', 'nope']),
+            ).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).code).toBe(ErrorCode.PASSWORD);
+        });
     });
 });

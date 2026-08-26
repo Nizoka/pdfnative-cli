@@ -48,6 +48,7 @@ const DEFAULT_MESSAGE: Readonly<Record<ErrorCodeValue, string>> = {
     [ErrorCode.POLICY]: 'AI-governance policy violation',
     [ErrorCode.UNSUPPORTED]: 'unsupported operation',
     [ErrorCode.PASSWORD]: 'missing or incorrect password',
+    [ErrorCode.NETWORK]: 'opt-in network operation failed',
     [ErrorCode.RUNTIME]: 'runtime error',
 };
 

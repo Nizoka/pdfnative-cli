@@ -1,0 +1,7 @@
+{
+  "blocks": [
+    { "type": "heading", "text": "Quarterly Report", "level": 1 },
+    { "type": "paragraph", "text": "This document is rendered once, then its metadata is updated with an INCREMENTAL save: the original bytes are preserved, so existing signatures stay intact." },
+    { "type": "paragraph", "text": "Compare the inspect output before and after to see the /Info change." }
+  ]
+}

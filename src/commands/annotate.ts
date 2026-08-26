@@ -3,6 +3,10 @@
 // described by a JSON array (`--annotations <file>`), each entry being a markup
 // annotation plus a 1-based `page`. The document is updated with an incremental
 // save, so the original bytes are preserved (existing signatures stay intact).
+// Encrypted documents are supported via --password / $PDFNATIVE_PASSWORD: the
+// reader decrypts transparently and the modifier re-encrypts the appended
+// annotation objects under the source's existing scheme (createModifier itself
+// takes no password — the { password } option rides on openPdf).
 
 import {
     openPdf,
@@ -14,6 +18,7 @@ import { type ParsedArgs, getStringFlag, hasFlag } from '../utils/args.js';
 import { readFileOrStdin, readBinaryFile, writeOutput, assertJsonSizeLimit } from '../utils/io.js';
 import { CliError, ErrorCode } from '../utils/error.js';
 import { emitStatus, isDryRun } from '../utils/agent.js';
+import { resolveSourcePassword, mapPdfError } from '../utils/pdfops.js';
 
 const ANNOTATION_TYPES = new Set([
     'text', 'highlight', 'underline', 'strikeout', 'squiggly',
@@ -126,6 +131,7 @@ export async function annotate(args: ParsedArgs): Promise<void> {
     const inputPath = getStringFlag(args.flags, 'input', 'i');
     const outputPath = getStringFlag(args.flags, 'output', 'o');
     const annotationsPath = getStringFlag(args.flags, 'annotations');
+    const password = resolveSourcePassword(args.flags);
     const dryRun = hasFlag(args.flags, 'dry-run') || isDryRun();
 
     if (annotationsPath === undefined) {
@@ -141,10 +147,11 @@ export async function annotate(args: ParsedArgs): Promise<void> {
 
     const reader = (() => {
         try {
-            return openPdf(pdfBytes);
+            return openPdf(pdfBytes, password !== undefined ? { password } : undefined);
         } catch (e) {
-            const message = e instanceof Error ? e.message : String(e);
-            throw new CliError(`Failed to read PDF: ${message}`, 1, ErrorCode.PARSE);
+            // Wrong/missing password → E_PASSWORD; unsupported scheme →
+            // E_UNSUPPORTED; anything else → E_PARSE. Never echoes the password.
+            throw mapPdfError(e, 'Failed to read PDF');
         }
     })();
 

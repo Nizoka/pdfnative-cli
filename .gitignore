@@ -12,6 +12,7 @@ test-output/
 
 # Sample output (generated PDFs — not committed)
 samples/output/
+samples/batch/manifest/out/
 output.pdf
 
 # Environment files — never commit secrets

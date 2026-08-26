@@ -26,8 +26,10 @@ this file wins on Claude-Code workflow specifics.
 3. **Agent-first.** stdout = artifact, stderr = diagnostics/envelopes, stable
    exit codes (0/1/2) and stable `E_*` error codes. Keep the machine contract
    deterministic; agent mode is a thin presentation layer, never a second runtime.
-4. **Offline by default.** Only `verify --revocation online` makes network
-   requests, always through the SSRF guard.
+4. **Offline by default.** Network I/O happens only behind explicit opt-in
+   flags (`verify --revocation online`, `sign --timestamp`, `doc-timestamp
+   --url`, `ltv --online`, `batch --allow-network`), always through the SSRF
+   guard. `--dry-run` never touches the network.
 5. **Native constant-time crypto** for signing by default (`node:crypto`);
    `--pure-crypto` opts into pdfnative's portable path. Never log key material or
    passwords.
@@ -71,6 +73,9 @@ npm run typecheck:all   # tsc for src + tests — must be clean
 npm run lint            # eslint src/ — 0 errors
 npm run test            # vitest run — all pass; keep coverage ≥ thresholds
 npm run build           # tsup → dist/cli.cjs (the bin)
+npm run validate:pdfa   # veraPDF gate for PDF/A changes (external veraPDF
+                        # required; absent → exit 0 = SKIP, not a pass —
+                        # VERAPDF_REQUIRED=1 fails closed; blocking in CI)
 ```
 
 Coverage thresholds live in `vitest.config.ts` (statements/branches/functions/
