@@ -30,7 +30,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: '22.x'
+          # A range resolves to the NEWEST available Node (currently 24.x),
+          # whose bundled npm >= 11.5.1 is required by npm Trusted Publishing
+          # (token-less OIDC). A '22.x' pin would ship npm 10.9 and break the
+          # publish. The floor mirrors the engines >= 22 support policy and
+          # the sibling pdfnative workflow.
+          node-version: '>=22.14.0'
           registry-url: https://registry.npmjs.org
           cache: npm
 

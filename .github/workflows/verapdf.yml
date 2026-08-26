@@ -38,6 +38,8 @@ on:
       - 'scripts/**'
       - 'package.json'
       - 'package-lock.json'
+      - 'tsup.config.ts'
+      - 'tsconfig.json'
       - '.github/workflows/verapdf.yml'
   pull_request:
     branches: [main, master]
@@ -47,6 +49,8 @@ on:
       - 'scripts/**'
       - 'package.json'
       - 'package-lock.json'
+      - 'tsup.config.ts'
+      - 'tsconfig.json'
       - '.github/workflows/verapdf.yml'
   # Manual runs against any branch from the Actions UI.
   workflow_dispatch:

@@ -210,5 +210,3 @@
 - [x] No new runtime dependency (`pdfnative` remains the only one)
 - [x] Docs + samples + completions + schemas cover the whole 21-command surface
 - [x] No autonomous GitHub writes — this draft is committed for human review (HITL)
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)

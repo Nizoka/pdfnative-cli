@@ -1084,7 +1084,7 @@ npm test
 npm run test:coverage
 
 # PDF/A validation (veraPDF — external tool; without it the run SKIPs with exit 0)
-npm run corpus:pdfa     # build + generate the 12-file PDF/A corpus (test-output/pdfa/)
+npm run corpus:pdfa     # generate the 12-file PDF/A corpus (needs a prior npm run build)
 npm run validate:pdfa   # build + corpus + veraPDF validation (see CONTRIBUTING.md)
 
 # Typecheck

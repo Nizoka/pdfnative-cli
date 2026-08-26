@@ -81,7 +81,9 @@ command surface; the support policy moves to Node.js ≥ 22 (see *Changed*).
 - **Print-production reads** — `--pages` now reports `cropBox` / `trimBox` / `bleedBox` /
   `artBox` and `userUnit` when present; `metadata` gains `trapped`.
 - **`--check "signatures>=N"`** — assert a minimum count of real (non-placeholder,
-  non-timestamp) signatures, alongside the existing `signed` check.
+  non-timestamp) signatures. The existing `signed` check now counts on the same basis
+  (unsigned placeholders and `/DocTimeStamp` revisions no longer count) — a correctness
+  fix: a placeholder-only PDF passed `--check signed` in 1.3.0 and now fails.
 
 #### `render`
 

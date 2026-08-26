@@ -28,7 +28,7 @@ npm run dev            # tsup --watch
 npm run test           # vitest run
 npm run test:watch     # vitest (watch mode)
 npm run test:coverage  # vitest with v8 coverage
-npm run corpus:pdfa    # build the CLI + generate the PDF/A validation corpus
+npm run corpus:pdfa    # generate the PDF/A validation corpus (needs a prior npm run build)
 npm run validate:pdfa  # build + corpus + veraPDF validation (see below)
 ```
 
@@ -72,7 +72,7 @@ Per file the validator reports `PASS` / `FAIL` / `XFAIL` / `XPASS` / `INFRA` /
 | 0 | Every expectation met — **or** veraPDF is absent and `VERAPDF_REQUIRED` is unset: install hints are printed and validation is **SKIPPED** (exit 0 is a skip, not a pass) |
 | 1 | Conformance expectation not met (`FAIL` or `XPASS`), no negative canary in the corpus, or the coverage canary tripped |
 | 2 | Corpus directory / manifest absent — run `npm run corpus:pdfa` first |
-| 3 | `INFRA`: veraPDF/Java unusable or produced no report (only fatal with `VERAPDF_REQUIRED=1`) — not a conformance verdict |
+| 3 | `INFRA`: veraPDF/Java unusable (fatal only with `VERAPDF_REQUIRED=1` — otherwise a skip), or at least one file produced an INFRA outcome (always fatal) — not a conformance verdict |
 
 Environment: `VERAPDF_HOME=<dir>` points at a veraPDF install (`verapdf` /
 `verapdf.bat` at the root or under `bin/`); `VERAPDF_REQUIRED=1` fails closed

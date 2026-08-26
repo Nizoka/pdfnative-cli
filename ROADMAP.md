@@ -196,6 +196,10 @@ This document outlines the planned development direction for pdfnative-cli. Prio
 - [x] **Offline mock-PKI test infrastructure** — `tests/helpers/mock-pki.ts` runs a real
   RFC 3161 TSA + OCSP/CRL responder in-process, so the network paths are tested without
   touching the network (600 tests).
+- [x] **Blocking veraPDF PDF/A gate** — `npm run validate:pdfa` over a 12-file manifested
+  corpus (10 positives + 2 negative canaries with expected ISO 19005 clauses), blocking in
+  CI (`verapdf.yml`, pinned installer with verified SHA-256) and again before every
+  `npm publish`.
 
 ## Future Considerations
 
@@ -244,3 +248,12 @@ Feasibility is called out honestly: some ideas need pdfnative to expose a primit
   workaround: place `--json` after the sub-command).
 - **CHANGELOG compare-link retrofit** — add `[x.y.z]: …/compare/…` reference links across the
   full historical release list.
+- **`--variant table` cannot embed fonts** — the `--lang` → `fontEntries` merge only exists on
+  the document path, and `PdfParams.fontEntries` needs binary data JSON cannot carry, so a
+  table-variant render under a PDF/A claim is structurally non-conformant (it serves as a
+  negative canary in the veraPDF corpus). Needs a CLI-side embedding path for the table
+  variant.
+- **veraPDF setup as a composite action** — the pinned installer block is duplicated between
+  `verapdf.yml` and `publish.yml`; extract `.github/actions/setup-verapdf` (validate with a
+  real CI run) so the URL/SHA-256 bump happens in one place. Also revisit the failed-rule
+  display regex (attribute-order-dependent, cosmetic) at the next veraPDF version bump.
