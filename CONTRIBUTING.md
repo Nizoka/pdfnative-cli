@@ -189,6 +189,25 @@ tests/                 # vitest test suite (mirrors src/)
 - A CycloneDX **SBOM** (`sbom.cdx.json`) is generated in CI and attached to each release; the
   generator is build-time only — do not add it as a runtime dependency.
 
+## Pull Request Checklist
+
+The items below are mirrored word for word in `.github/pull_request_template.md`
+(`verify:docs` rule `pr-template-parity` and `tests/tools/workflows.test.ts`
+both check the two stay in step):
+
+- [ ] `npm run gate` passes — the CI profile in one command (`npm run gate:fast` for a quick loop while iterating; PowerShell swallows a bare `--`, so call `npx tsx scripts/gate.ts --fast` there)
+- [ ] All tests pass (`npm run test`)
+- [ ] Type check passes (`npm run typecheck:all`)
+- [ ] Lint passes (`npm run lint`)
+- [ ] New code has tests (coverage thresholds in `vitest.config.ts` must not regress)
+- [ ] No `any` types introduced
+- [ ] No new runtime dependencies added (`pdfnative` stays the only one)
+- [ ] A new or changed command touches every wiring point: `src/index.ts` usage + dispatch, `src/commands/completion.ts`, `src/commands/schema.ts`, `samples/<command>/`, README, `docs/KNOWLEDGE_BASE.md`
+- [ ] If samples, PDF/A or PDF/X behaviour changed: `npm run build && npm run test:generate && npm run verify:samples && npm run corpus:pdfa && npm run validate:pdfx && npm run validate:pdfa` passes locally (veraPDF installed — see [PDF/A validation](#pdfa-validation-verapdf); new claiming corpus entries bump `declared.pdfaSamples` / `declared.pdfxSamples`; an intended output change is rebaselined with `npx tsx scripts/verify-samples.ts --update` and declared in the release note)
+- [ ] If docs, README, llms.txt, AGENTS.md, CLAUDE.md or `.claude/` changed: `npm run verify:docs` passes
+- [ ] CHANGELOG.md updated if user-facing changes
+- [ ] For releases: follow [Release](#release) — `release-notes/vX.Y.Z.md` and `release-notes/draft/PR-vX.Y.Z.md` written, and `npx tsx scripts/gate.ts --publish --require-all` passes locally, which runs every individual gate: `typecheck:all`, `lint`, `test:coverage`, `build`, `dist-check`, `smoke`, `bundle-size`, `verify:docs`, `test:generate`, `verify:samples`, `corpus:pdfa`, `validate:pdfx`, `validate:pdfa`
+
 ## Commit Convention
 
 Use [Conventional Commits](https://www.conventionalcommits.org/):

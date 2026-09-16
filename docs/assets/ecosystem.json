@@ -1,0 +1,85 @@
+{
+  "$comment": "Single source of every count and version quoted in the docs, the agent files and the release notes. `npm run verify:docs` holds every document to it; `npm run release:prepare` bumps `packages.pdfnative-cli.version` and `verifiedOn`. `declared` holds figures no filesystem walk can derive (measured at release); `derived` holds figures verify:docs recomputes from the source constants (COMMANDS, SUBJECTS, ErrorCode, GLOBAL_FLAGS, MANIFEST_COMMANDS, the corpus table, the samples tree) and fails when they drift. `assertions` are the prose tokens each listed file must carry verbatim.",
+  "verifiedOn": "2026-09-16",
+  "packages": {
+    "pdfnative-cli": {
+      "version": "1.5.0",
+      "pinField": null,
+      "pin": null,
+      "repo": "https://github.com/Nizoka/pdfnative-cli",
+      "binary": "pdfnative"
+    },
+    "pdfnative": {
+      "version": "1.8.0",
+      "pinField": "dependencies",
+      "pin": "^1.8.0",
+      "repo": "https://github.com/Nizoka/pdfnative"
+    },
+    "pdfnative-mcp": {
+      "version": "1.6.0",
+      "pinField": null,
+      "pin": null,
+      "repo": "https://github.com/Nizoka/pdfnative-mcp"
+    }
+  },
+  "declared": {
+    "tests": 600,
+    "coverageStatements": 79,
+    "coverageMeasured": 83.6,
+    "bundleBudgetBytes": 458752,
+    "pdfaSamples": 13,
+    "pdfxSamples": 3,
+    "unicodeScripts": 27,
+    "bundledFontModules": 31,
+    "chartTypes": 9,
+    "diagnosticCodes": 9
+  },
+  "derived": {
+    "commands": 21,
+    "commandGroups": {
+      "Create & edit": ["render", "fill", "annotate", "metadata"],
+      "Page tree": ["merge", "split", "extract"],
+      "Security": ["sign", "verify", "ltv", "doc-timestamp", "encrypt", "decrypt"],
+      "Read & extract": ["inspect", "extract-text", "compare"],
+      "Automation & meta": ["batch", "doctor", "schema", "completion", "govern"]
+    },
+    "schemaSubjects": 19,
+    "errorCodes": 12,
+    "globalFlags": 10,
+    "manifestCommands": 14,
+    "pdfaCorpus": 16,
+    "testFiles": 40,
+    "renderSamples": 50,
+    "sampleScripts": 63
+  },
+  "assertions": [
+    {
+      "id": "cli-command-count",
+      "canonical": "{derived.commands} commands",
+      "match": "\\b(\\d+)\\s+commands\\b",
+      "expectFrom": "derived.commands",
+      "requireIn": ["README.md", "docs/KNOWLEDGE_BASE.md", "llms.txt", "AGENTS.md"]
+    },
+    {
+      "id": "schema-subject-count",
+      "canonical": "{derived.schemaSubjects} subjects",
+      "match": "\\b(\\d+)\\s+subjects\\b",
+      "expectFrom": "derived.schemaSubjects",
+      "requireIn": ["llms.txt", "docs/KNOWLEDGE_BASE.md"]
+    },
+    {
+      "id": "error-code-count",
+      "canonical": "{derived.errorCodes} stable error codes",
+      "match": "\\b(\\d+)\\s+stable error codes\\b",
+      "expectFrom": "derived.errorCodes",
+      "requireIn": ["llms.txt"]
+    },
+    {
+      "id": "unicode-script-count",
+      "canonical": "{declared.unicodeScripts} Unicode scripts",
+      "match": "\\b(\\d+)\\s+Unicode scripts\\b",
+      "expectFrom": "declared.unicodeScripts",
+      "requireIn": ["README.md", "package.json"]
+    }
+  ]
+}

@@ -17,7 +17,8 @@ import { COMMANDS, GLOBAL_FLAGS } from './completion.js';
 
 type JsonSchema = Readonly<Record<string, unknown>>;
 
-const SUBJECTS = [
+/** Every `schema` subject, in listing order — also read by scripts/gate.ts (smoke) and verify:docs. */
+export const SUBJECTS = [
     'render',
     'inspect',
     'verify',
