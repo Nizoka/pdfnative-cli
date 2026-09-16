@@ -202,6 +202,53 @@ export type {
 // ── Document image blocks — CLI resolves src / dataBase64 to bytes ───
 export type { ImageBlock, DocumentBlock } from 'pdfnative';
 
+// ── PDF/X-4 conformance + structural validator (pdfnative 1.8.0) ─────
+// PDF_X_CONFORMANCE_TARGETS feeds `render --pdfx` the way
+// PDF_A_CONFORMANCE_TARGETS feeds `--tagged`; validatePdfX mirrors
+// validatePdfUA for `inspect --pdfx` / `--check pdfx`. The validator is
+// structural (ISO 15930-7 prerequisites) — veraPDF does not cover PDF/X.
+export { PDF_X_CONFORMANCE_TARGETS, validatePdfX } from 'pdfnative';
+export type { PdfXConformanceTarget, PdfXValidationResult, ColourBarOptions } from 'pdfnative';
+
+// ── Reproducible builds — pinned creation instant (pdfnative 1.8.0) ──
+// Set once per process from `--creation-date` / SOURCE_DATE_EPOCH; the
+// per-render `layout.creationDate` still wins inside the engine. All
+// dates are written in UTC (+00'00') since 1.8.0.
+export { setDefaultCreationDate, getDefaultCreationDate } from 'pdfnative';
+
+// ── Typography — layout.typography passthrough + flags (pdfnative 1.8.0)
+export type {
+    TypographyOptions,
+    UnitBindingOptions,
+    PunctuationSpacingRule,
+    PunctuationSpacingPreset,
+    Base14Metrics,
+} from 'pdfnative';
+
+// ── CMYK colour inputs (pdfnative 1.8.0) — PdfColor (above) now spans
+// RGB and CMYK; the tuple/string aliases type the usage/schema helpers.
+export type { PdfCmykTuple, PdfCmykString } from 'pdfnative';
+
+// ── Link annotations on existing PDFs — `annotate` type "link" ──────
+// validateURL is the scheme allow-list (http/https/mailto, no control
+// characters); the CLI builds the /Link dictionary body itself because
+// PdfModifier.addAnnotation() takes a dictionary body, not a full object.
+export { validateURL } from 'pdfnative';
+export type { LinkAnnotation } from 'pdfnative';
+
+// ── Universal Shaping Engine Unicode version — `doctor` (pdfnative 1.8.0)
+export { USE_UNICODE_VERSION } from 'pdfnative';
+
+// ── Custom fonts — `render --font-file` (pdfnative 1.8.0) ─────────────
+// validateFontData guards the parsed object; parseFontData lives in the
+// `pdfnative/tools` subpath export (same package — still the single
+// bridge). tsup keeps `pdfnative` external, so this costs nothing in the
+// bundle.
+export { validateFontData } from 'pdfnative';
+export type { FontValidationResult, FontData } from 'pdfnative';
+export { parseFontData } from 'pdfnative/tools';
+export type { FontDataObject, ParseFontDataOptions } from 'pdfnative/tools';
+
 // ── Untrusted-input inflate cap (anti zip-bomb, --max-inflate-size) ──
 export { setMaxInflateOutputSize, getMaxInflateOutputSize, DEFAULT_MAX_INFLATE_OUTPUT } from 'pdfnative';
 

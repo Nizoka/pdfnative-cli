@@ -286,11 +286,13 @@ describe('render metadata (DocumentParams.metadata, 1.7.0 trapped)', () => {
 });
 
 describe('render outputIntent (custom ICC profile via --layout)', () => {
-    it('embeds a caller-supplied RGB profile under a tagged mode', async () => {
-        // Minimal fake ICC profile: pdfnative validates a 128-byte header and
-        // an "RGB " data colour space at bytes 16–19, then embeds the bytes.
-        const icc = new Uint8Array(128);
-        icc[16] = 0x52; icc[17] = 0x47; icc[18] = 0x42; icc[19] = 0x20; // "RGB "
+    it('embeds a caller-supplied CMYK output profile under a tagged mode', async () => {
+        // pdfnative 1.8.0 validates a real ICC header: the `acsp` signature at
+        // byte 36, a size field no larger than the buffer, and an RGB/CMYK/Gray
+        // data colour space. A hand-made 128-byte stub is rejected since 1.8.0,
+        // so the test uses the committed synthetic (structurally valid,
+        // colourimetrically meaningless) CMYK press profile.
+        const icc = await fs.readFile(new URL('../fixtures/synthetic-cmyk.icc', import.meta.url));
         const input = await writeDoc([{ type: 'paragraph', text: 'intent' }]);
         const layout = await writeLayout({
             outputIntent: {
