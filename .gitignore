@@ -25,8 +25,12 @@ output.pdf
 Thumbs.db
 *.swp
 *.swo
-.vscode/settings.json
+
+# Claude Code — personal permission allow-list (settings.json is committed)
+.claude/settings.local.json
+
+# Release audit ledgers (skill release-audit) and gate logs live under test-output/
 
 # npm
 *.tgz
-.npmrc
+
