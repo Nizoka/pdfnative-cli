@@ -1,8 +1,10 @@
-import { parseArgs, hasFlag, getStringFlag } from './utils/args.js';
+import { parseArgs, hasFlag, getStringFlag, GLOBAL_BOOLEAN_FLAGS } from './utils/args.js';
+import { splitCommandArgv } from './utils/argv.js';
 import { CliError } from './utils/error.js';
 import { isJsonMode, emitJsonError } from './utils/agent.js';
 import { loadConfig, applyConfigDefaults } from './utils/config.js';
 import { cliVersion } from './utils/version.js';
+import { resolveReproducibleDate } from './utils/reproducible.js';
 
 // Lazy-import commands to keep startup fast for --help / --version
 type CommandFn = (args: ReturnType<typeof parseArgs>) => Promise<void>;
@@ -50,7 +52,7 @@ Options:
   --help,    -h   Show this help message
   --version, -V   Show version (add --json for machine-readable output)
 
-Global options (any command):
+Global options (any command; may be placed before or after the command name):
   --config <file>   Use a specific .pdfnativerc.json (default: nearest upward)
   --no-config       Ignore any .pdfnativerc.json
   --quiet,   -q     Suppress progress output on stderr
@@ -64,8 +66,16 @@ Global options (any command):
   --max-inflate-size <bytes>
                     Cap the decompressed size of any single PDF stream while
                     parsing untrusted input (anti zip-bomb; default 100 MiB).
+  --creation-date <iso8601>
+                    Pin the creation instant of every PDF written in this run
+                    (render, batch): /CreationDate, xmp:CreateDate, the {date}
+                    placeholder and the trailer /ID derive from it, all in UTC,
+                    so the output is byte-identical on every host. Falls back
+                    to $SOURCE_DATE_EPOCH (integer seconds) when absent.
+                    Encrypted output is never byte-reproducible (CSPRNG keys);
+                    sign --signing-time and metadata --mod-date are separate.
 
-For autonomous/agent usage see AGENTS.md.
+For autonomous/agent usage see docs/AGENT_CONTRACT.md.
 Run \`pdfnative <command> --help\` for per-command options.
 `;
 
@@ -113,46 +123,98 @@ Smart tables (document variant; fills TableBlock fields left unset in JSON):
   --cell-padding      Horizontal cell padding in points
                   (caption is per-table — set it in the JSON TableBlock)
 
-Layout (flags override values from --layout file):
-  --layout        Path to JSON layout file (PdfLayoutOptions)
+Layout (flags override values from --layout file; the nested typography and
+outputIntent objects merge one level deep instead of replacing each other):
+  --layout        Path to JSON layout file (PdfLayoutOptions; 50 MB cap; a
+                  creationDate ISO string and outputIntent.iccProfile number[]
+                  are revived)
   --page-size     Named (a4|letter|legal|a3|tabloid|a5) or WxH in points
   --margin        Uniform N or "top,right,bottom,left" in points
-  --tagged        none|pdfa1b|pdfa2b|pdfa2u|pdfa3b (PDF/A flag)
-  --strict        Escalate PDF/A conformance diagnostics (PDFA_NO_FONT_ENTRIES,
-                  PDFA_UNEMBEDDED_FORM_FONT, PDFA_DEVICE_CMYK_IMAGE) into an
-                  error BEFORE any output byte (exit 1, E_CHECK_FAILED).
-                  Without it, diagnostics are stderr warnings (and a
-                  diagnostics[] array in the --json envelope).
-  --conformance   DEPRECATED — alias for --tagged pdfa{1b|2b|3b}
   --compress      Enable Flate compression (initialises Node compression)
   --max-blocks    Max document blocks before pdfnative aborts (default 100000)
-  --lang          Comma-separated language packs (e.g. th,ja,ar,te,si,km)
+
+Conformance (one claim per file — --tagged and --pdfx are mutually exclusive):
+  --tagged        none|pdfa1b|pdfa2b|pdfa2u|pdfa3b (PDF/A claim)
+  --pdfx [pdfx4]  PDF/X-4 claim (ISO 15930-7; pdfnative 1.8.0). Needs an
+                  output (printer) ICC profile, every font embedded (--font
+                  latin --lang latin), metadata.trapped True|False and a
+                  TrimBox or ArtBox per page. Forbids encryption. Check the
+                  result with \`pdfnative inspect --check pdfx\`.
+  --output-intent-icc <file.icc>
+                  ICC profile for layout.outputIntent (RGB, CMYK or Gray;
+                  \`prtr\` class for PDF/X-4; validated by the engine; 16 MB
+                  cap). RGB content under a CMYK/Gray intent stays conformant
+                  through a calibrated /DefaultRGB.
+  --output-intent-id <string>
+                  outputConditionIdentifier (default: the ICC file's basename)
+  --trapped       true|false|unknown → /Info /Trapped (PDF/X needs true|false)
+  --strict        Escalate conformance diagnostics into an error BEFORE any
+                  output byte (exit 1, E_CHECK_FAILED): PDFA_NO_FONT_ENTRIES,
+                  PDFA_UNEMBEDDED_FORM_FONT, PDFA_DEVICE_CMYK_IMAGE,
+                  PDFA_DEVICE_CMYK_CONTENT, PDFA_ICC_PROFILE_VERSION,
+                  PDFX_NO_FONT_ENTRIES, PDFX_DEVICE_CMYK, PDFX_ANNOTATIONS,
+                  TYPOGRAPHY_FEATURE_INEFFECTIVE. Without it, diagnostics are
+                  stderr warnings (and a diagnostics[] array in the --json
+                  envelope). PDF/X coherence errors (layout.pdfx and
+                  layout.tagged combined, missing output profile, unknown
+                  trapping state, …) are E_INPUT.
+  --conformance   DEPRECATED — alias for --tagged pdfa{1b|2b|3b}
+
+Typography (pdfnative 1.8.0 layout.typography; the full option set —
+widows/orphans, unitBinding, bindShortWords, punctuationSpacing fr|fr-CA,
+opticalMargins, metrics exact, hyphenationLanguage — lives in the JSON):
+  --split-paragraphs        [true|false] paragraphs may break across pages
+                            (widows/orphans default to 2)
+  --keep-headings-with-next [true|false] a heading never ends a page alone
+  --kerning                 [true|false] pair kerning (needs a registered font)
+  --font-features <tags>    Comma-separated OpenType features: tnum, pnum,
+                            lnum, onum, zero, ordn, sups, subs, smcp, c2sc,
+                            case (TYPOGRAPHY_FEATURE_INEFFECTIVE warns when a
+                            tag changes nothing in the font)
+  Paragraph blocks accept align "justify", keepWithNext and splittable; text
+  may carry soft hyphens (U+00AD). Colours everywhere accept CMYK too:
+  [c, m, y, k] percent or "c m y k" operands 0–1 (DeviceCMYK).
+
+Fonts:
+  --lang          Comma-separated language packs (e.g. th,ja,ar,te,si,km).
+                  ha, yo, ig and sw (Hausa, Yoruba, Igbo, Swahili) are aliases
+                  of latin — combining tone marks are anchored by Noto Sans.
   --font          Register a bundled font shortcut (repeatable). The name
                   doubles as the --lang code. Allowed: latin, emoji,
-                  color-emoji, math, and the 22 script codes ar, hy, bn, ru,
+                  color-emoji, math, and the 27 script codes ar, hy, bn, ru,
                   hi, am, ka, el, he, ja, km, ko, my, pl, zh, si, ta, te, th,
-                  bo, tr, vi.
+                  bo, tr, vi, lo, nod, khb, tdd, cjm (Lao, Tai Tham, New Tai
+                  Lue, Tai Le and Cham since pdfnative 1.8.0).
+  --font-file <path.ttf>[:name]
+                  Register a TrueType/OpenType font you ship (repeatable) and
+                  embed it (added to --lang). Guarded: path checked, 32 MB
+                  cap, sfnt signature required (no collections, no WOFF),
+                  parsed and validated by pdfnative's font compiler before
+                  registration; never loaded from JSON. Name defaults to the
+                  file's basename ([a-z0-9-]).
 
 Images (document blocks):
   { "type": "image", "src": "logo.png" }        path, resolved relative to the
                                                 --input JSON's directory
   { "type": "image", "dataBase64": "…" }        inline base64 (JPEG/PNG)
-  Print production (bleed/trimBox/marks/userUnit), outputIntent (ICC RGB) and
-  viewerPreferences (duplex, numCopies, printPageRange, pickTrayByPDFSize) are
-  set in the --layout JSON — see \`pdfnative schema render\`.
+  Print production (bleed/trimBox/artBox/marks incl. colourBars/userUnit),
+  outputIntent and viewerPreferences (duplex, numCopies, printPageRange,
+  pickTrayByPDFSize) are set in the --layout JSON — see
+  \`pdfnative schema render\`.
 
 Header / Footer:
   --header-left, --header-center, --header-right
   --footer-left, --footer-center, --footer-right
                   Each accepts a template string. {page}, {pages}, {date} and
-                  {title} are substituted by pdfnative.
+                  {title} are substituted by pdfnative; {date} follows
+                  --creation-date / layout.creationDate when pinned.
 
 Watermark:
   --watermark-text       Text watermark
   --watermark-image      Image path (PNG/JPEG)
   --watermark-opacity    0.0–1.0
   --watermark-angle      degrees (text watermark)
-  --watermark-color      PdfColor (hex "#rrggbb", "r g b", …)
+  --watermark-color      PdfColor (hex "#rrggbb", "r g b", CMYK "c m y k", …)
   --watermark-font-size  points (text watermark)
   --watermark-position   background | foreground
 
@@ -224,9 +286,14 @@ Trusted timestamp (PAdES B-T — OPT-IN NETWORK, SSRF-guarded):
                           Combine with --profile pades for PAdES B-T.
   --timestamp-digest      sha256 (default) | sha384 | sha512 (TSA imprint)
   --timestamp-nonce <hex> Request nonce (default: random 8 bytes)
+  --timestamp-timeout <ms>
+                          Per-request TSA timeout (default: 10000, the
+                          guarded transport's default)
 
 Security: key material is never written to logs or error messages. Without
---timestamp the CLI performs no network I/O.
+--timestamp the CLI performs no network I/O. Pass --signing-time for a
+reproducible signature (RSA PKCS#1 v1.5 is deterministic; ECDSA needs
+--pure-crypto for RFC 6979 deterministic nonces).
 
   --help,    -h   Show this help message
 `;
@@ -244,7 +311,10 @@ Options:
   --trust              PEM file with trusted root certs (repeatable;
                        env: PDFNATIVE_VERIFY_TRUST). When omitted, self-signed
                        roots are accepted.
-  --strict             Exit code 1 if any signature fails any check.
+  --strict             Exit code 1 if any signature fails any check. Also
+                       refuses an RFC 3161 timestamp whose messageImprint
+                       uses SHA-1 (reported as a "weak digest" note and in
+                       timestampDigest otherwise).
   --revocation         Certificate revocation source (default: offline):
                          offline   embedded OCSP/CRL from the PDF /DSS only
                          online    additionally fetch via OCSP (AIA) and CRL
@@ -413,12 +483,20 @@ Options:
   --password      Password for an encrypted PDF (env: PDFNATIVE_PASSWORD)
   --pdfua         Include a PDF/UA (ISO 14289-1) structural validation report
                   (valid + errors + warnings)
+  --pdfx          Include a PDF/X-4 (ISO 15930-7) structural validation report
+                  from pdfnative's validatePdfX(): header, XMP identification,
+                  OutputIntent profile, page boxes, embedded fonts, annotations,
+                  actions, embedded files, OPI/PostScript XObjects, LZW,
+                  transfer functions, device colour. Not a certified preflight
+                  (veraPDF does not cover PDF/X).
+  --iso-dates     Normalise metadata.creationDate from the PDF date string
+                  (D:YYYYMMDDHHmmSS+HH'mm') to ISO 8601
   --signatures    List signature fields (fieldName, subFilter, byteRange,
                   isDocTimestamp, isPlaceholder — never the signature bytes)
   --check         Assert a property; repeatable; AND semantics; exits 1 on
-                  failure. Values: pdfa | signed | encrypted | pdfua |
+                  failure. Values: pdfa | signed | encrypted | pdfua | pdfx |
                   "signatures>=N"
-  --summary       Emit only the minimal verdict { pages, encrypted, signatures, pdfa }
+  --summary       Emit only the minimal verdict { pages, encrypted, signatures, pdfa, pdfx }
   --fields        Comma-separated dot-paths to keep (e.g. pageCount,metadata.title)
   --pretty        Force indented JSON even under --json (agent mode is compact)
   --help,    -h   Show this help message
@@ -671,8 +749,11 @@ Usage:
   pdfnative doctor [--format json|text] [--json]
 
 Reports the CLI version, Node version, Web Crypto (CSPRNG) availability — which
-\`encrypt\` requires — the resolved pdfnative version, and the registered command
-count. Fully offline. Exit code 0 when all checks pass, 1 otherwise.
+\`encrypt\` requires — the resolved pdfnative version, the registered command
+count, the bundled font inventory (31 modules / 27 scripts, each probed on
+disk), the Universal Shaping Engine's Unicode version and the conformance
+targets (--tagged / --pdfx). Fully offline. Exit code 0 when all checks pass,
+1 otherwise.
 
 Options:
   --format,  -f   text (default) or json
@@ -694,11 +775,16 @@ is a markup annotation plus a 1-based "page":
     { "page": 1, "type": "highlight", "rect": [72,700,520,716],
       "color": "#ffd400", "contents": "Review this" },
     { "page": 1, "type": "text", "rect": [540,700,560,720],
-      "icon": "Comment", "contents": "A sticky note" }
+      "icon": "Comment", "contents": "A sticky note" },
+    { "page": 2, "type": "link", "rect": [72,80,300,96],
+      "url": "https://pdfnative.dev" }
   ]
 
 Types: text, highlight, underline, strikeout, squiggly, square, circle, line,
-freetext. All need "rect": [x1,y1,x2,y2]; "line" also needs "start"/"end".
+freetext, link. All need "rect": [x1,y1,x2,y2]; "line" also needs
+"start"/"end"; "link" needs "url" (http:, https: or mailto: only — other
+schemes and control characters are rejected, E_INPUT). Colours accept hex,
+"r g b", or CMYK "c m y k" / [c,m,y,k].
 
 Options:
   --input,   -i         Input PDF path (default: stdin)
@@ -880,7 +966,9 @@ let activeCommand: string | null = null;
 
 async function main(): Promise<void> {
     const argv = process.argv.slice(2);
-    const args = parseArgs(argv);
+    // The boolean globals never swallow the next token, so they may precede
+    // the command name (`pdfnative --json render …`, v1.5.0).
+    const args = parseArgs(argv, { booleanFlags: GLOBAL_BOOLEAN_FLAGS });
 
     // Global output flags (recognised anywhere in argv).
     if (hasFlag(args.flags, 'no-color') || process.env['NO_COLOR'] !== undefined) {
@@ -924,7 +1012,7 @@ async function main(): Promise<void> {
         process.exit(0);
     }
 
-    const commandName = args.positionals[0];
+    const { commandName, commandArgv } = splitCommandArgv(argv);
 
     if (commandName === undefined) {
         process.stdout.write(USAGE);
@@ -963,17 +1051,7 @@ async function main(): Promise<void> {
         process.exit(0);
     }
 
-    // Strip ONLY the first occurrence of the command name from argv.
-    let stripped = false;
-    const rest = argv.filter((tok) => {
-        if (!stripped && tok === commandName) {
-            stripped = true;
-            return false;
-        }
-        return true;
-    });
-
-    const commandArgs = parseArgs(rest);
+    const commandArgs = parseArgs(commandArgv, { booleanFlags: GLOBAL_BOOLEAN_FLAGS });
 
     // Apply `.pdfnativerc.json` defaults (unless --no-config). CLI flags win.
     let effectiveArgs = commandArgs;
@@ -981,6 +1059,16 @@ async function main(): Promise<void> {
         const configPath = getStringFlag(commandArgs.flags, 'config');
         const defaults = loadConfig(commandName, configPath);
         effectiveArgs = applyConfigDefaults(commandArgs, defaults);
+    }
+
+    // Reproducible output (v1.5.0): --creation-date / SOURCE_DATE_EPOCH pin
+    // the creation instant process-wide, so every render in this run — a
+    // `batch --manifest` pipeline included — stamps the same date. Resolved
+    // after the config merge so a .pdfnativerc.json can supply it too.
+    const pinned = resolveReproducibleDate(effectiveArgs.flags);
+    if (pinned !== undefined) {
+        const bridge = await import('./core-bridge/index.js');
+        bridge.setDefaultCreationDate(pinned.date);
     }
 
     const command = await loadCommand(commandName);

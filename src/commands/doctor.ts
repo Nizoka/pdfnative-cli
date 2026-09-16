@@ -3,17 +3,28 @@
 // A zero-dependency, offline self-check for humans (onboarding) and agents
 // (pre-flight before attempting an operation — notably `encrypt`, which needs a
 // Web Crypto CSPRNG). Reports the CLI version, Node version, Web Crypto
-// availability, the resolved `pdfnative` version, and the registered command
-// count. Text by default; `--json` emits `{ ok, checks: [{ name, status, detail }] }`.
+// availability, the resolved `pdfnative` version, the registered command
+// count and — since v1.5.0 — the bundled font inventory (31 modules / 27
+// scripts, each file probed on disk), the Universal Shaping Engine's Unicode
+// version and the conformance targets (`--tagged` / `--pdfx`).
+// Text by default; `--json` emits `{ ok, checks: [{ name, status, value, detail }] }`.
 // Exit code 0 when all checks pass, 1 otherwise.
+//
+// Note: pdfnative's font registry is empty in a fresh process (the CLI only
+// registers a font on `--font`), so `getRegisteredLangs()` would always print
+// `[]` here; the allow-list plus an on-disk probe is the meaningful preflight.
 
 import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { ParsedArgs } from '../utils/args.js';
 import { hasFlag } from '../utils/args.js';
 import { isJsonMode } from '../utils/agent.js';
 import { serializeJson } from '../utils/projection.js';
 import { cliVersion } from '../utils/version.js';
 import { COMMANDS } from './completion.js';
+import { BUNDLED_FONT_MODULES, SCRIPT_CODES, FONT_ALIASES, resolveFontsDir } from '../utils/fonts.js';
+import { PDF_A_CONFORMANCE_TARGETS, PDF_X_CONFORMANCE_TARGETS, USE_UNICODE_VERSION } from '../core-bridge/index.js';
 
 type CheckStatus = 'ok' | 'warn' | 'error';
 
@@ -60,6 +71,54 @@ function pdfnativeCheck(): Check {
     }
 }
 
+/** Every bundled font module must resolve on disk: a partial install breaks `--font`. */
+function fontsCheck(): Check {
+    const modules = Object.keys(BUNDLED_FONT_MODULES).length;
+    const scripts = SCRIPT_CODES.length;
+    let dir: string;
+    try {
+        dir = resolveFontsDir();
+    } catch {
+        return { name: 'fonts', status: 'error', value: `${modules} modules / ${scripts} scripts`, detail: 'pdfnative fonts/ directory not resolvable' };
+    }
+    const missing = Object.entries(BUNDLED_FONT_MODULES)
+        .filter(([, file]) => !existsSync(join(dir, file)))
+        .map(([code]) => code);
+    const aliases = Object.keys(FONT_ALIASES).join(', ');
+    if (missing.length > 0) {
+        return {
+            name: 'fonts',
+            status: 'error',
+            value: `${modules} modules / ${scripts} scripts`,
+            detail: `missing bundled module(s): ${missing.join(', ')}`,
+        };
+    }
+    return {
+        name: 'fonts',
+        status: 'ok',
+        value: `${modules} modules / ${scripts} scripts`,
+        detail: `--font shortcuts: ${SCRIPT_CODES.join(', ')} (+ latin, emoji, color-emoji, math; aliases ${aliases} → latin)`,
+    };
+}
+
+function unicodeCheck(): Check {
+    return {
+        name: 'unicode',
+        status: 'ok',
+        value: USE_UNICODE_VERSION,
+        detail: 'Unicode Character Database of the Universal Shaping Engine',
+    };
+}
+
+function conformanceCheck(): Check {
+    return {
+        name: 'conformance',
+        status: 'ok',
+        value: [...PDF_A_CONFORMANCE_TARGETS, ...PDF_X_CONFORMANCE_TARGETS].join(','),
+        detail: '--tagged (PDF/A) and --pdfx (PDF/X) targets',
+    };
+}
+
 function buildChecks(): Check[] {
     return [
         { name: 'cli', status: 'ok', value: cliVersion(), detail: 'pdfnative-cli version' },
@@ -67,6 +126,9 @@ function buildChecks(): Check[] {
         webCryptoCheck(),
         pdfnativeCheck(),
         { name: 'commands', status: 'ok', value: String(COMMANDS.length), detail: 'registered commands' },
+        fontsCheck(),
+        unicodeCheck(),
+        conformanceCheck(),
     ];
 }
 
@@ -88,7 +150,7 @@ export async function doctor(args: ParsedArgs): Promise<void> {
         const lines = ['pdfnative-cli doctor', ''];
         for (const c of checks) {
             const mark = c.status === 'ok' ? 'ok  ' : c.status === 'warn' ? 'warn' : 'FAIL';
-            lines.push(`  ${c.name.padEnd(11)}${c.value.padEnd(14)}${mark}  (${c.detail})`);
+            lines.push(`  ${c.name.padEnd(12)}${c.value.padEnd(32)}${mark}  (${c.detail})`);
         }
         lines.push('', ok ? 'All checks passed.' : 'One or more checks FAILED.');
         process.stdout.write(lines.join('\n') + '\n');

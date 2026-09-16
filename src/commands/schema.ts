@@ -67,22 +67,44 @@ function renderSchema(): JsonSchema {
                     + 'labelRotation (pdfnative 1.7.0). Image blocks accept "src" (a '
                     + 'path resolved against the --input JSON\'s directory), '
                     + '"dataBase64" (inline base64 JPEG/PNG), or "data" (byte array) — '
-                    + 'the CLI resolves them to bytes before rendering.',
+                    + 'the CLI resolves them to bytes before rendering. Paragraph '
+                    + 'blocks accept align "left"|"right"|"center"|"justify", '
+                    + 'keepWithNext and splittable; heading blocks keepWithNext; text '
+                    + 'may carry soft hyphens U+00AD (pdfnative 1.8.0). Every colour '
+                    + 'field (PdfColor) accepts hex "#rrggbb", "r g b" (0–1), [r, g, b] '
+                    + '(0–255), or CMYK as "c m y k" operands (0–1) / [c, m, y, k] '
+                    + 'percent — emitted as DeviceCMYK (pdfnative 1.8.0).',
                 items: { type: 'object' },
             },
             layout: {
                 type: 'object',
                 description: 'PdfLayoutOptions overrides. Includes print production '
-                    + '(print: {bleed, trimBox, bleedBox, artBox, cropBox, marks, '
-                    + 'userUnit}), outputIntent ({iccProfile: number[], '
-                    + 'outputConditionIdentifier, …}, ICC RGB), viewerPreferences '
-                    + '(duplex, pickTrayByPDFSize, printPageRange [[first,last]…], '
-                    + 'numCopies) and strict (escalate PDF/A diagnostics to errors) — '
-                    + 'pdfnative 1.7.0.',
+                    + '(print: {bleed, trimBox, bleedBox, artBox, cropBox, marks: true | '
+                    + '{colourBars: true | {tints, size}}, userUnit}), outputIntent '
+                    + '({iccProfile: number[], outputConditionIdentifier, registryName, '
+                    + 'info} — an RGB, CMYK or Gray ICC profile; a prtr output profile '
+                    + 'for PDF/X-4; the CLI also reads one from --output-intent-icc), '
+                    + 'viewerPreferences (duplex, pickTrayByPDFSize, printPageRange '
+                    + '[[first,last]…], numCopies), strict (escalate diagnostics to '
+                    + 'errors), tagged (PDF/A level), pdfx ("pdfx4" — mutually '
+                    + 'exclusive with tagged and encryption; needs outputIntent, '
+                    + 'embedded fonts and metadata.trapped True|False), creationDate '
+                    + '(ISO 8601 string, revived to a Date; pins /CreationDate, '
+                    + 'xmp:CreateDate, {date} and the trailer /ID for byte-identical '
+                    + 'output) and typography ({splitParagraphs, orphans, widows, '
+                    + 'keepHeadingsWithNext: boolean | {minLines}, unitBinding: '
+                    + 'boolean | {units}, bindShortWords: boolean | {maxLength, '
+                    + 'words}, punctuationSpacing: "fr" | "fr-CA" | rules[], '
+                    + 'opticalMargins, metrics: "approximate" | "exact", fontFeatures: '
+                    + 'string[], kerning, hyphenationLanguage}) — pdfnative 1.8.0. '
+                    + 'The nested typography and outputIntent objects merge one level '
+                    + 'deep with the --layout file and the flags.',
             },
             metadata: {
                 type: 'object',
-                description: 'Document metadata → /Info + XMP (pdfnative 1.7.0).',
+                description: 'Document metadata → /Info + XMP (pdfnative 1.7.0). '
+                    + 'trapped is load-bearing under layout.pdfx: PDF/X requires True '
+                    + 'or False (Unknown throws); --trapped overrides it.',
                 properties: {
                     author: { type: 'string' },
                     subject: { type: 'string' },
@@ -92,7 +114,12 @@ function renderSchema(): JsonSchema {
             },
             fontEntries: {
                 type: 'array',
-                description: 'Pre-registered font entries (usually set via --font/--lang).',
+                description: 'Pre-registered font entries (usually set via --font/--lang; '
+                    + '--font <code> registers a bundled module — 27 scripts: ar, hy, bn, '
+                    + 'ru, hi, am, ka, el, he, ja, km, ko, my, pl, zh, si, ta, te, th, bo, '
+                    + 'tr, vi, lo, nod, khb, tdd, cjm, plus latin, emoji, color-emoji, '
+                    + 'math; ha, yo, ig, sw alias latin — and --font-file <path.ttf> '
+                    + 'registers a font you ship).',
                 items: { type: 'object' },
             },
         },
@@ -100,12 +127,15 @@ function renderSchema(): JsonSchema {
     const tableVariant: JsonSchema = {
         type: 'object',
         title: 'PdfParams',
-        description: 'Table-centric input (use with `render --variant table`).',
+        description: 'Table-centric input (use with `render --variant table`). Since '
+            + 'v1.5.0 --lang injects fontEntries on this path too, so a --tagged / '
+            + '--pdfx claim can be conformant.',
         required: ['title', 'headers', 'rows'],
         properties: {
             title: { type: 'string' },
             headers: { type: 'array', items: { type: 'string' } },
             rows: { type: 'array', items: { type: 'array' } },
+            fontEntries: { type: 'array', items: { type: 'object' } },
             metadata: {
                 type: 'object',
                 description: 'Document metadata → /Info + XMP (pdfnative 1.7.0).',
@@ -135,13 +165,17 @@ function inspectSchema(): JsonSchema {
         title: 'pdfnative-cli inspect output',
         description: 'JSON emitted by `pdfnative inspect --format json`.',
         type: 'object',
-        required: ['version', 'pageCount', 'encrypted', 'pdfaConformance', 'signatures', 'metadata'],
+        required: ['version', 'pageCount', 'encrypted', 'pdfaConformance', 'pdfxConformance', 'signatures', 'metadata'],
         additionalProperties: false,
         properties: {
             version: { type: 'string' },
             pageCount: { type: 'integer', minimum: 0 },
             encrypted: { type: 'boolean' },
             pdfaConformance: { type: ['string', 'null'] },
+            pdfxConformance: {
+                type: ['string', 'null'],
+                description: 'The XMP pdfxid:GTS_PDFXVersion claim (e.g. "PDF/X-4"), or null (v1.5.0).',
+            },
             signatures: {
                 description: 'Signature count, or — with `inspect --signatures` '
                     + '(pdfnative 1.7.0) — the detailed signature-field list (never '
@@ -171,7 +205,11 @@ function inspectSchema(): JsonSchema {
                 properties: {
                     title: { type: ['string', 'null'] },
                     author: { type: ['string', 'null'] },
-                    creationDate: { type: ['string', 'null'] },
+                    creationDate: {
+                        type: ['string', 'null'],
+                        description: 'The raw PDF date string (D:YYYYMMDDHHmmSS+HH\'mm\'), or '
+                            + 'ISO 8601 with --iso-dates (v1.5.0).',
+                    },
                     subject: { type: ['string', 'null'] },
                     producer: { type: ['string', 'null'] },
                     trapped: { type: 'string', enum: ['True', 'False', 'Unknown'] },
@@ -256,6 +294,18 @@ function inspectSchema(): JsonSchema {
                     warnings: { type: 'array', items: { type: 'string' } },
                 },
             },
+            pdfx: {
+                type: 'object',
+                description: 'Present with `inspect --pdfx` / `--check pdfx` (v1.5.0): '
+                    + 'pdfnative 1.8.0 validatePdfX(), the structural ISO 15930-7 '
+                    + 'prerequisites — not a certified preflight; veraPDF does not '
+                    + 'cover PDF/X.',
+                properties: {
+                    valid: { type: 'boolean' },
+                    errors: { type: 'array', items: { type: 'string' } },
+                    warnings: { type: 'array', items: { type: 'string' } },
+                },
+            },
             verbose: {
                 type: 'object',
                 properties: {
@@ -314,6 +364,12 @@ function verifySchema(): JsonSchema {
                         timestampValid: { type: 'boolean' },
                         timestampTime: { type: ['string', 'null'] },
                         tsaSubject: { type: ['string', 'null'] },
+                        timestampDigest: {
+                            type: ['string', 'null'],
+                            description: 'RFC 3161 messageImprint digest (sha1, sha256, …). '
+                                + 'sha1 is a weak digest: a note is emitted and --strict '
+                                + 'refuses it (v1.5.0).',
+                        },
                         revocationChecked: { type: 'boolean' },
                         revocationStatus: { type: 'string', enum: ['unknown', 'good', 'revoked'] },
                         revocationSource: { type: 'string', enum: ['embedded', 'online', 'none'] },
@@ -395,15 +451,20 @@ function annotateSchema(): JsonSchema {
             type: {
                 type: 'string',
                 enum: ['text', 'highlight', 'underline', 'strikeout', 'squiggly',
-                    'square', 'circle', 'line', 'freetext'],
+                    'square', 'circle', 'line', 'freetext', 'link'],
             },
             rect: {
                 type: 'array', minItems: 4, maxItems: 4, items: { type: 'number' },
                 description: '[x1, y1, x2, y2] in PDF user space (points).',
             },
+            url: {
+                type: 'string',
+                description: 'link only (v1.5.0): http:, https: or mailto: URI; other '
+                    + 'schemes and control characters are rejected (E_INPUT).',
+            },
             contents: { type: 'string' },
-            color: { description: 'PdfColor: hex "#rrggbb", "r g b", or tuple.' },
-            interiorColor: { description: 'Fill colour for square/circle.' },
+            color: { description: 'PdfColor: hex "#rrggbb", "r g b" (0–1), [r, g, b] (0–255), or CMYK "c m y k" (0–1) / [c, m, y, k] percent.' },
+            interiorColor: { description: 'Fill colour for square/circle (same PdfColor forms).' },
             opacity: { type: 'number', minimum: 0, maximum: 1 },
             title: { type: 'string' },
             modified: { type: 'string' },
@@ -462,13 +523,14 @@ function inspectSummarySchema(): JsonSchema {
         title: 'pdfnative-cli inspect summary output',
         description: 'JSON emitted by `pdfnative inspect --summary` (minimal verdict).',
         type: 'object',
-        required: ['pages', 'encrypted', 'signatures', 'pdfa'],
+        required: ['pages', 'encrypted', 'signatures', 'pdfa', 'pdfx'],
         additionalProperties: false,
         properties: {
             pages: { type: 'integer', minimum: 0 },
             encrypted: { type: 'boolean' },
             signatures: { type: 'integer', minimum: 0 },
             pdfa: { type: ['string', 'null'] },
+            pdfx: { type: ['string', 'null'], description: 'The PDF/X claim (e.g. "PDF/X-4"), or null (v1.5.0).' },
         },
     };
 }
@@ -638,11 +700,28 @@ function statusSchema(): JsonSchema {
                 properties: {
                     url: { type: 'string' },
                     digest: { type: 'string', enum: ['sha256', 'sha384', 'sha512'] },
+                    timeoutMs: { type: 'integer', minimum: 1, description: '--timestamp-timeout (v1.5.0).' },
                 },
+            },
+            pdfx: {
+                type: 'string',
+                enum: ['pdfx4'],
+                description: 'render: the PDF/X target claimed (--pdfx / layout.pdfx), v1.5.0.',
+            },
+            creationDate: {
+                type: 'string',
+                format: 'date-time',
+                description: 'render: the pinned creation instant (ISO 8601, UTC) when '
+                    + 'output is reproducible — from --creation-date, layout.creationDate '
+                    + 'or SOURCE_DATE_EPOCH (v1.5.0). Absent when the wall clock was used.',
             },
             diagnostics: {
                 type: 'array',
-                description: 'render: non-strict PDF/A conformance diagnostics.',
+                description: 'render: non-strict conformance diagnostics — PDFA_NO_FONT_ENTRIES, '
+                    + 'PDFA_UNEMBEDDED_FORM_FONT, PDFA_DEVICE_CMYK_IMAGE, '
+                    + 'PDFA_DEVICE_CMYK_CONTENT, PDFA_ICC_PROFILE_VERSION, '
+                    + 'PDFX_NO_FONT_ENTRIES, PDFX_DEVICE_CMYK, PDFX_ANNOTATIONS, '
+                    + 'TYPOGRAPHY_FEATURE_INEFFECTIVE (pdfnative 1.8.0; additions-only).',
                 items: {
                     type: 'object',
                     properties: {

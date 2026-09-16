@@ -5,6 +5,24 @@ export interface ParsedArgs {
     readonly positionals: readonly string[];
 }
 
+export interface ParseArgsOptions {
+    /**
+     * Flag names (without dashes) that NEVER take a value. A bare token that
+     * follows one of them stays a positional instead of being swallowed as
+     * the flag's value — `--json render …` keeps `render` as the command.
+     */
+    readonly booleanFlags?: ReadonlySet<string>;
+}
+
+/**
+ * The global flags that take no value, long and short forms. Passed by the
+ * dispatcher to both parse passes so a global flag may precede the command
+ * name (v1.5.0; ROADMAP "global flags before the command name").
+ */
+export const GLOBAL_BOOLEAN_FLAGS: ReadonlySet<string> = new Set([
+    'help', 'h', 'version', 'V', 'json', 'dry-run', 'quiet', 'q', 'no-color', 'no-config',
+]);
+
 /**
  * Zero-dependency argument parser.
  *
@@ -20,9 +38,10 @@ export interface ParsedArgs {
  * (e.g. `--cert-chain a.pem --cert-chain b.pem`), values are collected into
  * a `readonly string[]`. Use `getStringFlagAll()` to retrieve them.
  */
-export function parseArgs(argv: readonly string[]): ParsedArgs {
+export function parseArgs(argv: readonly string[], options: ParseArgsOptions = {}): ParsedArgs {
     const flags: Record<string, string | boolean | string[]> = {};
     const positionals: string[] = [];
+    const booleanFlags = options.booleanFlags ?? new Set<string>();
     let i = 0;
 
     const setFlag = (key: string, value: string | boolean): void => {
@@ -66,7 +85,7 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
             } else {
                 const key = token.slice(2);
                 const next = argv[i + 1];
-                if (next !== undefined && !next.startsWith('-')) {
+                if (!booleanFlags.has(key) && next !== undefined && !next.startsWith('-')) {
                     // --flag value
                     setFlag(key, next);
                     i++;
@@ -79,7 +98,7 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
             // -f value
             const key = token.slice(1);
             const next = argv[i + 1];
-            if (next !== undefined && !next.startsWith('-')) {
+            if (!booleanFlags.has(key) && next !== undefined && !next.startsWith('-')) {
                 setFlag(key, next);
                 i++;
             } else {

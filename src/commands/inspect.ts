@@ -1,13 +1,15 @@
-import { openPdf, validatePdfUA, isStream, readFormFields, listSignatures, nameValue } from '../core-bridge/index.js';
-import type { PdfReader, PdfUAValidationResult, PageLabelRange, ParsedAnnotation, PdfEncryptionInfo, PdfSignatureInfo, PdfDict } from '../core-bridge/index.js';
+import { openPdf, validatePdfUA, validatePdfX, isStream, readFormFields, listSignatures, nameValue } from '../core-bridge/index.js';
+import type { PdfReader, PdfUAValidationResult, PdfXValidationResult, PageLabelRange, ParsedAnnotation, PdfEncryptionInfo, PdfSignatureInfo, PdfDict } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../utils/args.js';
 import { readFileOrStdin } from '../utils/io.js';
 import { CliError, ErrorCode } from '../utils/error.js';
 import { isJsonMode } from '../utils/agent.js';
 import { selectFields, serializeJson, parseFieldList } from '../utils/projection.js';
 import { resolveSourcePassword, mapPdfError } from '../utils/pdfops.js';
+import { pdfDateToIso } from '../utils/pdfdate.js';
 
-const VALID_CHECKS = new Set(['pdfa', 'signed', 'encrypted', 'pdfua']);
+/** `--check` assertions; `pdfx` (structural PDF/X-4, pdfnative 1.8.0) since v1.5.0. */
+const VALID_CHECKS = new Set(['pdfa', 'signed', 'encrypted', 'pdfua', 'pdfx']);
 
 /** Parametrized check: `--check "signatures>=N"` (N non-placeholder signatures). */
 const SIG_COUNT_CHECK = /^signatures>=(\d+)$/;
@@ -79,6 +81,8 @@ interface InspectResult {
     readonly pageCount: number;
     readonly encrypted: boolean;
     readonly pdfaConformance: string | null;
+    /** XMP `pdfxid:GTS_PDFXVersion` (e.g. `PDF/X-4`), or null (v1.5.0). */
+    readonly pdfxConformance: string | null;
     readonly signatures: number;
     readonly metadata: {
         readonly title: string | null;
@@ -95,6 +99,12 @@ interface InspectResult {
     readonly pages?: readonly PageInfo[];
     readonly annotations?: readonly AnnotationInfo[];
     readonly pdfua?: {
+        readonly valid: boolean;
+        readonly errors: readonly string[];
+        readonly warnings: readonly string[];
+    };
+    /** `--pdfx` / `--check pdfx`: pdfnative's structural ISO 15930-7 validator (v1.5.0). */
+    readonly pdfx?: {
         readonly valid: boolean;
         readonly errors: readonly string[];
         readonly warnings: readonly string[];
@@ -162,6 +172,16 @@ function extractPdfaConformance(reader: PdfReader): string | null {
         return `${partMatch[1] as string}${(confMatch[1] as string).toLowerCase()}`;
     }
     return null;
+}
+
+/** The PDF/X claim from XMP (`<pdfxid:GTS_PDFXVersion>PDF/X-4</…>`), or null. */
+function extractPdfxConformance(reader: PdfReader): string | null {
+    const xmp = readXmp(reader);
+    if (xmp === null) return null;
+    const element = /<pdfxid:GTS_PDFXVersion>\s*([^<]+?)\s*<\/pdfxid:GTS_PDFXVersion>/.exec(xmp)?.[1];
+    if (element !== undefined) return element;
+    const attribute = /\bpdfxid:GTS_PDFXVersion="([^"]+)"/.exec(xmp)?.[1];
+    return attribute ?? null;
 }
 
 function countSignatures(reader: PdfReader): number {
@@ -305,6 +325,18 @@ function runPdfUaCheck(bytes: Uint8Array): NonNullable<InspectResult['pdfua']> {
     return { valid: res.valid, errors: res.errors, warnings: res.warnings };
 }
 
+/**
+ * pdfnative 1.8.0 `validatePdfX()`: the structural PDF/X-4 prerequisites
+ * (header, XMP identification, OutputIntent profile, page boxes, embedded
+ * fonts, annotations, actions, embedded files, OPI/PostScript/reference
+ * XObjects, LZW, transfer functions, device colour). veraPDF does not cover
+ * PDF/X; a `valid` result is not a certified preflight.
+ */
+function runPdfXCheck(bytes: Uint8Array): NonNullable<InspectResult['pdfx']> {
+    const res: PdfXValidationResult = validatePdfX(bytes);
+    return { valid: res.valid, errors: res.errors, warnings: res.warnings };
+}
+
 /** Read the document's /PageLabels number tree (pdfnative 1.5.0), or undefined. */
 function inspectPageLabels(reader: PdfReader): readonly PageLabelInfo[] | undefined {
     let ranges: PageLabelRange[] | null;
@@ -391,6 +423,7 @@ function toInspectSummary(result: InspectResult): Record<string, unknown> {
         encrypted: result.encrypted,
         signatures: result.signatures,
         pdfa: result.pdfaConformance,
+        pdfx: result.pdfxConformance,
     };
 }
 
@@ -412,6 +445,7 @@ function evaluateChecks(
         if (c === 'signed') out.push({ name: c, passed: signedCount > 0 });
         if (c === 'encrypted') out.push({ name: c, passed: result.encrypted });
         if (c === 'pdfua') out.push({ name: c, passed: result.pdfua?.valid === true });
+        if (c === 'pdfx') out.push({ name: c, passed: result.pdfx?.valid === true });
         if (sigCount !== null) {
             const wanted = Number.parseInt(sigCount[1] as string, 10);
             out.push({ name: c, passed: signedCount >= wanted });
@@ -435,6 +469,9 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     const password = resolveSourcePassword(args.flags);
     const checks = getStringFlagAll(args.flags, 'check');
     const includePdfua = hasFlag(args.flags, 'pdfua') || checks.includes('pdfua');
+    const includePdfx = hasFlag(args.flags, 'pdfx') || checks.includes('pdfx');
+    // v1.5.0: normalise /Info dates (D:YYYYMMDDHHmmSS+HH'mm') to ISO 8601.
+    const isoDates = hasFlag(args.flags, 'iso-dates');
 
     if (format !== 'json' && format !== 'text') {
         throw new CliError(`Invalid --format value "${format}". Valid: json, text.`, 2);
@@ -452,16 +489,18 @@ export async function inspect(args: ParsedArgs): Promise<void> {
 
     const info = reader.getInfo();
     const trapped = readTrapped(info);
+    const rawCreationDate = info !== null ? safeInfoString(info.get('CreationDate')) : null;
     const baseResult: InspectResult = {
         version: extractVersion(reader),
         pageCount: reader.pageCount,
         encrypted: extractEncrypted(reader),
         pdfaConformance: extractPdfaConformance(reader),
+        pdfxConformance: extractPdfxConformance(reader),
         signatures: countSignatures(reader),
         metadata: {
             title: info !== null ? safeInfoString(info.get('Title')) : null,
             author: info !== null ? safeInfoString(info.get('Author')) : null,
-            creationDate: info !== null ? safeInfoString(info.get('CreationDate')) : null,
+            creationDate: rawCreationDate !== null && isoDates ? pdfDateToIso(rawCreationDate) : rawCreationDate,
             subject: info !== null ? safeInfoString(info.get('Subject')) : null,
             producer: info !== null ? safeInfoString(info.get('Producer')) : null,
             ...(trapped !== undefined ? { trapped } : {}),
@@ -502,6 +541,7 @@ export async function inspect(args: ParsedArgs): Promise<void> {
         ...(includePages ? { pages: inspectPages(reader) } : {}),
         ...(includeAnnotations ? { annotations: inspectAnnotations(reader) } : {}),
         ...(includePdfua ? { pdfua: runPdfUaCheck(pdfBytes) } : {}),
+        ...(includePdfx ? { pdfx: runPdfXCheck(pdfBytes) } : {}),
         ...(verbose ? { verbose: buildVerbose(reader) } : {}),
     };
 
@@ -528,6 +568,7 @@ export async function inspect(args: ParsedArgs): Promise<void> {
             `Pages:          ${result.pageCount}`,
             `Encrypted:      ${result.encrypted ? 'yes' : 'no'}`,
             `PDF/A:          ${result.pdfaConformance ?? 'none'}`,
+            `PDF/X:          ${result.pdfxConformance ?? 'none'}`,
             `Signatures:     ${result.signatures}`,
             `Title:          ${result.metadata.title ?? '—'}`,
             `Author:         ${result.metadata.author ?? '—'}`,
@@ -601,6 +642,11 @@ export async function inspect(args: ParsedArgs): Promise<void> {
             lines.push(`PDF/UA:         ${result.pdfua.valid ? 'valid' : 'invalid'}`);
             for (const err of result.pdfua.errors) lines.push(`  error:   ${err}`);
             for (const warn of result.pdfua.warnings) lines.push(`  warning: ${warn}`);
+        }
+        if (result.pdfx !== undefined) {
+            lines.push(`PDF/X check:    ${result.pdfx.valid ? 'valid' : 'invalid'} (structural, ISO 15930-7)`);
+            for (const err of result.pdfx.errors) lines.push(`  error:   ${err}`);
+            for (const warn of result.pdfx.warnings) lines.push(`  warning: ${warn}`);
         }
         if (result.verbose !== undefined) {
             lines.push(`Trailer keys:   ${result.verbose.trailerKeys.join(', ')}`);

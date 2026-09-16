@@ -71,11 +71,19 @@ export interface TimestampVerifyResult {
     readonly trusted: boolean;
     /** Diagnostic for failures; never leaks byte offsets. */
     readonly note: string | null;
+    /**
+     * The TSTInfo messageImprint hash algorithm as a node:crypto digest name
+     * (`sha1`, `sha256`, …), or null when absent/unknown. `sha1` is a weak
+     * digest: `verify` reports it as a note and refuses it under --strict
+     * (v1.5.0).
+     */
+    readonly imprintAlgorithm: string | null;
 }
 
 const ABSENT: TimestampVerifyResult = {
     present: false,
     valid: false,
+    imprintAlgorithm: null,
     genTime: null,
     tsaSubject: null,
     chainValid: false,
@@ -190,6 +198,7 @@ export function verifyTimestamp(
     const token = extractTimestampToken(unsignedAttrsRaw);
     if (token === null) return ABSENT;
 
+    let imprintAlgorithm: string | null = null;
     const fail = (note: string): TimestampVerifyResult => ({
         present: true,
         valid: false,
@@ -198,6 +207,7 @@ export function verifyTimestamp(
         chainValid: false,
         trusted: false,
         note,
+        imprintAlgorithm,
     });
 
     const encap = extractEContent(token);
@@ -208,6 +218,7 @@ export function verifyTimestamp(
     if (tst === null) {
         return fail('failed to parse TSTInfo');
     }
+    imprintAlgorithm = tst.hashAlgorithm;
 
     // (2) eContent integrity: signed messageDigest == SHA-256(TSTInfo).
     const tokenMd = extractSignedMessageDigest(token);
@@ -269,6 +280,7 @@ export function verifyTimestamp(
         chainValid: built.chainValid,
         trusted,
         note: null,
+        imprintAlgorithm,
     };
 }
 
@@ -313,6 +325,8 @@ function toHex(bytes: Uint8Array): string {
 }
 
 export interface DocTimestampVerifyResult {
+    /** messageImprint hash algorithm (node:crypto digest name), or null — `sha1` is weak (v1.5.0). */
+    readonly imprintAlgorithm: string | null;
     /** True when both the byte-range imprint and the token signature verify. */
     readonly valid: boolean;
     /** TSTInfo messageImprint == hash of the /ByteRange-covered bytes. */
@@ -350,6 +364,7 @@ export function verifyDocTimestamp(
     byteRange: readonly [number, number, number, number],
     trustRoots: readonly X509Certificate[],
 ): DocTimestampVerifyResult {
+    let imprintAlgorithm: string | null = null;
     const fail = (note: string): DocTimestampVerifyResult => ({
         valid: false,
         imprintValid: false,
@@ -361,6 +376,7 @@ export function verifyDocTimestamp(
         chainValid: false,
         trusted: false,
         note,
+        imprintAlgorithm,
     });
 
     let info: ParsedTstInfo;
@@ -378,6 +394,7 @@ export function verifyDocTimestamp(
     if (digestName === null) {
         return fail('unsupported messageImprint hash algorithm in timestamp token');
     }
+    imprintAlgorithm = digestName;
     const [a, b, c, d] = byteRange;
     const hash = createHash(digestName);
     hash.update(pdfBytes.subarray(a, a + b));
@@ -457,6 +474,7 @@ export function verifyDocTimestamp(
     }
 
     return {
+        imprintAlgorithm,
         valid: imprintValid && signatureValid,
         imprintValid,
         signatureValid,

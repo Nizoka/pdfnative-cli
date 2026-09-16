@@ -20,7 +20,8 @@ export const AI_GOVERNANCE_POLICY = Object.freeze({
         'Machine-readable contract governing how AI coding agents may propose issues, '
         + 'contributions, and changes across the pdfnative monorepo. Agents that scan '
         + 'repository configuration on initialization MUST honour this file.',
-    version: '1.0.0',
+    version: '1.1.0',
+    spec_updated: '2026-09-13',
     applies_to: ['pdfnative', 'pdfnative-cli', 'pdfnative-mcp', 'pdfnative-react'],
     policy: {
         automatic_issue_reporting: false,
@@ -56,6 +57,17 @@ export const AI_GOVERNANCE_POLICY = Object.freeze({
             'duplicate_search_performed',
             'affected_packages',
             'identity_reminder_shown',
+        ],
+    },
+    capability_manifest: {
+        sources: ['AGENTS.md', '.github/AGENT_RULES.md'],
+        on_demand: [
+            'docs/assets/ecosystem.json',
+            'docs/AGENT_CONTRACT.md',
+            '.github/instructions/',
+            'ROADMAP.md',
+            'SECURITY.md',
+            'llms.txt',
         ],
     },
     verification: {

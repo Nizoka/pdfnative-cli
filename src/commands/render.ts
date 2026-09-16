@@ -1,8 +1,6 @@
 import { watchFile, unwatchFile } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { resolve as resolvePath, dirname, isAbsolute, join as joinPath } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { createRequire } from 'node:module';
+import { resolve as resolvePath, dirname, isAbsolute } from 'node:path';
 import {
     buildDocumentPDFBytes,
     buildDocumentPDFStream,
@@ -13,10 +11,8 @@ import {
     buildPDFStreamPageByPage,
     buildPDFStreamTrue,
     initNodeCompression,
-    loadFontData,
-    hasFontLoader,
-    registerFont,
     inspectDocumentLayout,
+    getDefaultCreationDate,
 } from '../core-bridge/index.js';
 import type {
     DocumentParams,
@@ -49,71 +45,27 @@ import { serializeJson } from '../utils/projection.js';
 import {
     buildLayoutOptions,
     assertStreamingCompatible,
+    mergeNestedLayout,
+    reviveLayoutJson,
+    parseTrapped,
 } from '../utils/layout.js';
+import { classifyBuildError } from '../utils/build-errors.js';
+import {
+    applyFontFlags,
+    buildFontEntriesForLangs,
+    loadCustomFonts,
+    normalizeLangs,
+} from '../utils/fonts.js';
 
 const VALID_VARIANTS = new Set(['document', 'table']);
-
-/**
- * Allow-list of bundled font shortcuts exposed via `--font <name>`.
- * Each maps to a Noto-* data module shipped with pdfnative ≥ 1.1.0 under
- * its `fonts/` directory (which is not part of the package `exports` map,
- * so we resolve it via `package.json` and import a `file://` URL).
- *
- * Adding to this list is intentional (no auto-discovery) so the CLI surface
- * stays predictable and free from path-based RCE vectors.
- */
-const BUNDLED_FONT_MODULES: Readonly<Record<string, string>> = Object.freeze({
-    // Latin + monochrome / COLRv1 colour emoji
-    latin: 'noto-sans-data.js',
-    emoji: 'noto-emoji-data.js',
-    'color-emoji': 'noto-color-emoji-data.js',
-    // Mathematical / technical symbols (pdfnative ≥ 1.5.0). Code points in the
-    // math operator / geometric-shape blocks are auto-routed to this font.
-    math: 'noto-sans-math-data.js',
-    // 22 Unicode scripts (pdfnative ≥ 1.3.0). The shortcut name doubles as the
-    // `--lang` code; pdfnative routes each code point to the font whose cmap
-    // covers it, so any registered script font is used automatically.
-    ar: 'noto-arabic-data.js',
-    hy: 'noto-armenian-data.js',
-    bn: 'noto-bengali-data.js',
-    ru: 'noto-cyrillic-data.js',
-    hi: 'noto-devanagari-data.js',
-    am: 'noto-ethiopic-data.js',
-    ka: 'noto-georgian-data.js',
-    el: 'noto-greek-data.js',
-    he: 'noto-hebrew-data.js',
-    ja: 'noto-jp-data.js',
-    km: 'noto-khmer-data.js',
-    ko: 'noto-kr-data.js',
-    my: 'noto-myanmar-data.js',
-    pl: 'noto-polish-data.js',
-    zh: 'noto-sc-data.js',
-    si: 'noto-sinhala-data.js',
-    ta: 'noto-tamil-data.js',
-    te: 'noto-telugu-data.js',
-    th: 'noto-thai-data.js',
-    bo: 'noto-tibetan-data.js',
-    tr: 'noto-turkish-data.js',
-    vi: 'noto-vietnamese-data.js',
-});
-
-let cachedFontsDir: string | null = null;
-function resolveFontsDir(): string {
-    if (cachedFontsDir !== null) return cachedFontsDir;
-    const require = createRequire(import.meta.url);
-    // pdfnative's package.json is not exported, but the main entry is. Resolve
-    // the main entry (.../dist/index.js) and walk up two levels to the package
-    // root, which contains the `fonts/` directory.
-    const main = require.resolve('pdfnative');
-    cachedFontsDir = joinPath(dirname(dirname(main)), 'fonts');
-    return cachedFontsDir;
-}
 
 interface DocumentInputShape {
     readonly blocks?: unknown;
     readonly fontEntries?: unknown;
     readonly layout?: unknown;
 }
+
+type Trapped = 'True' | 'False' | 'Unknown';
 
 /** Best-effort structural guard for `PdfParams` (table variant). */
 function isPdfParamsLike(value: unknown): value is PdfParams {
@@ -142,7 +94,7 @@ function hasTocBlock(params: DocumentParams): boolean {
     return false;
 }
 
-// ── Conformance diagnostics + build-error mapping (pdfnative 1.7.0) ──────
+// ── Conformance diagnostics + build-error mapping (pdfnative 1.7.0/1.8.0) ──
 
 /** True when the global `--quiet`/`-q` flag is active (set by index.ts). */
 function isQuiet(): boolean {
@@ -158,28 +110,20 @@ interface CollectedDiagnostic {
 
 /**
  * Map errors thrown by pdfnative's builders to stable CLI error codes:
- *   - strict-mode PDF/A diagnostic escalations (prefixed `pdfnative: ` by
- *     `createDiagnosticEmitter`, thrown before the first output byte) →
+ *   - strict-mode diagnostic escalations (prefixed `pdfnative: ` by
+ *     createDiagnosticEmitter, thrown before the first output byte) →
  *     exit 1 / `E_CHECK_FAILED` — a conformance check failed, by request.
- *   - option-validation errors (`print.*` from validatePrintOptions —
- *     including `print.userUnit` under pdfa1b — `chart:` from the chart
- *     validators, `outputIntent.*` from the ICC profile guard) →
+ *   - option-validation errors (`print.*`, `chart:`, `outputIntent.*`, and
+ *     since 1.8.0 the PDF/X coherence errors `PDF/X…` / `layout.pdfx…`) →
  *     exit 1 / `E_INPUT` — the input JSON/layout asked for something invalid.
+ *     The prefix table lives in src/utils/build-errors.ts.
  *   - anything else is rethrown unchanged (envelope default: `E_RUNTIME`).
  */
 function mapBuildError(e: unknown, strict: boolean): never {
     if (e instanceof CliError) throw e;
     const message = e instanceof Error ? e.message : String(e);
-    if (strict && message.startsWith('pdfnative:')) {
-        throw new CliError(message, 1, ErrorCode.CHECK_FAILED);
-    }
-    if (
-        message.startsWith('print.') ||
-        message.startsWith('chart:') ||
-        message.startsWith('outputIntent.')
-    ) {
-        throw new CliError(message, 1, ErrorCode.INPUT);
-    }
+    const code = classifyBuildError(message, strict);
+    if (code !== null) throw new CliError(message, 1, code);
     throw e instanceof Error ? e : new Error(message);
 }
 
@@ -331,7 +275,7 @@ function parseTableDefaults(args: ParsedArgs): TableDefaults | undefined {
             } else if (low === 'false' || low === 'off' || low === 'no' || low === '0') {
                 defaults.zebra = false;
             } else {
-                // Treat any other value as a PdfColor (e.g. "0.95 0.95 0.98").
+                // Treat any other value as a PdfColor (e.g. "0.95 0.95 0.98", or a CMYK "0 0 0 0.05").
                 defaults.zebra = s as PdfColor;
             }
         }
@@ -374,64 +318,6 @@ function applyTableDefaults(params: DocumentParams, defaults: TableDefaults): Do
     return { ...params, blocks: blocks as DocumentParams['blocks'] };
 }
 
-/** Build font entries for bundled-language codes (e.g. th, ja, ar). */
-async function buildFontEntriesForLangs(
-    langs: readonly string[],
-    nextRefStart: number,
-): Promise<readonly FontEntry[]> {
-    if (langs.length === 0) return [];
-    const entries: FontEntry[] = [];
-    let nextRef = nextRefStart;
-    for (const lang of langs) {
-        if (!hasFontLoader(lang)) {
-            throw new CliError(
-                `--lang "${lang}" is not a bundled pdfnative font. ` +
-                'Use --font to register a bundled font shortcut, or register a loader programmatically.',
-                2,
-            );
-        }
-        const fontData = await loadFontData(lang);
-        if (fontData === null) {
-            throw new CliError(`Failed to load font data for --lang "${lang}".`, 1);
-        }
-        entries.push({ fontData, fontRef: `/F${nextRef}`, lang });
-        nextRef++;
-    }
-    return entries;
-}
-
-/**
- * Register bundled font shortcuts from `--font` flags. Names are validated
- * against {@link BUNDLED_FONT_MODULES}. Idempotent across watch re-renders
- * (pdfnative's `registerFont` simply overwrites existing entries).
- */
-async function applyFontFlags(fontFlags: readonly string[]): Promise<void> {
-    if (fontFlags.length === 0) return;
-    // Validate all names BEFORE touching the filesystem so unknown shortcuts
-    // surface a CliError rather than a resolution error.
-    const resolved: { name: string; fileName: string }[] = [];
-    for (const raw of fontFlags) {
-        const name = raw.trim().toLowerCase();
-        if (name.length === 0) continue;
-        const fileName = BUNDLED_FONT_MODULES[name];
-        if (fileName === undefined) {
-            const allowed = Object.keys(BUNDLED_FONT_MODULES).join(', ');
-            throw new CliError(
-                `--font "${raw}" is not a recognized bundled font. Allowed: ${allowed}.`,
-                2,
-            );
-        }
-        resolved.push({ name, fileName });
-    }
-    if (resolved.length === 0) return;
-    const fontsDir = resolveFontsDir();
-    for (const { name, fileName } of resolved) {
-        const fileUrl = pathToFileURL(joinPath(fontsDir, fileName)).href;
-        // The Noto data modules ARE the FontData shape (namespace import).
-        registerFont(name, () => import(fileUrl) as Promise<never>);
-    }
-}
-
 /**
  * Deep-merge `override` on top of `base`. Plain objects merge recursively;
  * arrays and primitives are replaced wholesale (override wins). Used by
@@ -455,6 +341,22 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
         && Object.getPrototypeOf(value) === Object.prototype;
 }
 
+/** `--trapped` flag wins over the JSON's metadata.trapped (the CLI stays authoritative). */
+function applyTrapped<T extends { readonly metadata?: unknown }>(params: T, trapped: Trapped | undefined): T {
+    if (trapped === undefined) return params;
+    const existing = isPlainObject(params.metadata) ? params.metadata : {};
+    return { ...params, metadata: { ...existing, trapped } };
+}
+
+/** Append the fontEntries for `langs` after the ones the JSON already carries. */
+async function withFontEntries<T extends { readonly fontEntries?: unknown }>(params: T, langs: readonly string[]): Promise<T> {
+    if (langs.length === 0) return params;
+    const existing = (Array.isArray(params.fontEntries) ? params.fontEntries : []) as readonly FontEntry[];
+    // /F1 = Helvetica, /F2 = Bold; user fonts start at /F3 + (existing count).
+    const fontEntries = await buildFontEntriesForLangs(langs, 3 + existing.length);
+    return { ...params, fontEntries: [...existing, ...fontEntries] };
+}
+
 interface RenderConfig {
     readonly variant: string;
     readonly useStream: boolean;
@@ -471,6 +373,8 @@ interface RenderConfig {
     readonly dryRun: boolean;
     /** `--chunk-size` (bytes) for --stream / --stream-true StreamOptions. */
     readonly chunkSize: number | undefined;
+    /** `--trapped` → metadata.trapped (load-bearing under --pdfx). */
+    readonly trapped: Trapped | undefined;
 }
 
 /** Parse `--outline`: `auto` selects heading-derived bookmarks; any other value
@@ -507,6 +411,19 @@ async function loadTemplate(templatePath: string): Promise<unknown> {
         const message = e instanceof Error ? e.message : String(e);
         throw new CliError(`Failed to parse --template JSON: ${message}`, 1);
     }
+}
+
+/**
+ * Conformance fields of the success envelope: the PDF/X target when one is
+ * claimed, and the pinned creation instant when output is reproducible
+ * (from --creation-date, layout.creationDate or SOURCE_DATE_EPOCH).
+ */
+function conformanceFields(layout: Partial<PdfLayoutOptions>): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    if (layout.pdfx !== undefined) out.pdfx = layout.pdfx;
+    const pinned = layout.creationDate ?? getDefaultCreationDate() ?? null;
+    if (pinned !== null) out.creationDate = pinned.toISOString();
+    return out;
 }
 
 /** Single render pass. Reused by both one-shot and watch loops. */
@@ -553,24 +470,28 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
                 ErrorCode.INPUT,
             );
         }
+        let tableParams: PdfParams = applyTrapped(parsedInput, cfg.trapped);
+        // v1.5.0: the table variant embeds fonts too (`PdfParams.fontEntries`),
+        // so a `--tagged`/`--pdfx` claim can be conformant on this path.
+        tableParams = await withFontEntries(tableParams, cfg.langs);
+        const tableLayout: Partial<PdfLayoutOptions> = { ...cfg.layout, onDiagnostic };
         if (cfg.dryRun) {
-            emitStatus({ command: 'render', variant: 'table', dryRun: true, output: cfg.outputPath ?? '-' });
+            emitStatus({ command: 'render', variant: 'table', dryRun: true, output: cfg.outputPath ?? '-', ...conformanceFields(tableLayout) });
             return;
         }
-        const tableLayout: Partial<PdfLayoutOptions> = { ...cfg.layout, onDiagnostic };
         let bytes: number | null = null;
         try {
             if (cfg.usePageStream) {
-                const generator = buildPDFStreamPageByPage(parsedInput, tableLayout);
+                const generator = buildPDFStreamPageByPage(tableParams, tableLayout);
                 await writeStreamingOutput(generator, cfg.outputPath);
             } else if (cfg.useStreamTrue) {
-                const generator = buildPDFStreamTrue(parsedInput, tableLayout, streamOpts);
+                const generator = buildPDFStreamTrue(tableParams, tableLayout, streamOpts);
                 await writeStreamingOutput(generator, cfg.outputPath);
             } else if (cfg.useStream) {
-                const generator = buildPDFStream(parsedInput, tableLayout, streamOpts);
+                const generator = buildPDFStream(tableParams, tableLayout, streamOpts);
                 await writeStreamingOutput(generator, cfg.outputPath);
             } else {
-                const pdfBytes = buildPDFBytes(parsedInput, tableLayout);
+                const pdfBytes = buildPDFBytes(tableParams, tableLayout);
                 bytes = pdfBytes.length;
                 await writeOutput(pdfBytes, cfg.outputPath);
             }
@@ -580,6 +501,7 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
         emitStatus({
             command: 'render', variant: 'table', dryRun: false,
             output: cfg.outputPath ?? '-', bytes,
+            ...conformanceFields(tableLayout),
             ...diagnosticsField(),
         });
         return;
@@ -614,22 +536,24 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
         params = { ...params, outline: cfg.outline as DocumentParams['outline'] };
     }
 
-    if (cfg.langs.length > 0) {
-        const existing = (params.fontEntries ?? []) as readonly FontEntry[];
-        // /F1 = Helvetica, /F2 = Bold; user fonts start at /F3 + (existing count).
-        const fontEntries = await buildFontEntriesForLangs(cfg.langs, 3 + existing.length);
-        params = { ...params, fontEntries: [...existing, ...fontEntries] };
-    }
+    params = applyTrapped(params, cfg.trapped);
+    params = await withFontEntries(params, cfg.langs);
 
     // Merge layout: params.layout (JSON-embedded, lowest priority) is the base;
-    // CLI flags / --layout file (already in `layout`) override on top.
+    // CLI flags / --layout file (already in `layout`) override on top. The
+    // JSON layout goes through the same reviver as a --layout file
+    // (creationDate string, outputIntent.iccProfile number[]), and the
+    // nested `typography` / `outputIntent` objects merge one level deep
+    // (v1.5.0) instead of replacing each other.
     // pdfnative uses `layoutOptions ?? params.layout` — an empty object from
     // the CLI side is not nullish, so params.layout would be silently dropped
     // without this explicit merge. A `strict` set in the user's JSON survives
     // (the CLI only ever layers `strict: true` on top, never `false`).
+    const jsonLayout = isPlainObject(params.layout)
+        ? (reviveLayoutJson(params.layout) as Partial<PdfLayoutOptions>)
+        : {};
     const effectiveLayout: Partial<PdfLayoutOptions> = {
-        ...(params.layout ?? {}),
-        ...cfg.layout,
+        ...mergeNestedLayout(jsonLayout, cfg.layout),
         onDiagnostic,
     };
 
@@ -666,7 +590,7 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
     }
 
     if (cfg.dryRun) {
-        emitStatus({ command: 'render', variant: 'document', dryRun: true, output: cfg.outputPath ?? '-' });
+        emitStatus({ command: 'render', variant: 'document', dryRun: true, output: cfg.outputPath ?? '-', ...conformanceFields(effectiveLayout) });
         return;
     }
 
@@ -698,6 +622,7 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
     emitStatus({
         command: 'render', variant: 'document', dryRun: false,
         output: cfg.outputPath ?? '-', bytes,
+        ...conformanceFields(effectiveLayout),
         ...diagnosticsField(),
     });
 }
@@ -714,12 +639,15 @@ export async function render(args: ParsedArgs): Promise<void> {
     const langsRaw = getStringFlag(args.flags, 'lang');
     const templatePath = getStringFlag(args.flags, 'template');
     const fontFlags = getStringFlagAll(args.flags, 'font');
+    const fontFiles = getStringFlagAll(args.flags, 'font-file');
     const tableDefaults = parseTableDefaults(args);
     const outlineSpec = getStringFlag(args.flags, 'outline');
     const inspectLayout = hasFlag(args.flags, 'inspect-layout');
     const pretty = hasFlag(args.flags, 'pretty');
     const strict = hasFlag(args.flags, 'strict');
     const chunkSize = parseChunkSize(getStringFlag(args.flags, 'chunk-size'));
+    const trappedRaw = getStringFlag(args.flags, 'trapped');
+    const trapped = trappedRaw !== undefined ? parseTrapped(trappedRaw) : undefined;
 
     if (!VALID_VARIANTS.has(variant)) {
         throw new CliError(
@@ -765,12 +693,13 @@ export async function render(args: ParsedArgs): Promise<void> {
         await initNodeCompression();
     }
 
-    // Register --font shortcuts before any --lang resolution happens.
+    // Register --font shortcuts and --font-file programs before any --lang
+    // resolution happens. A custom font is implicitly added to the --lang
+    // list: it has no effect unless its fontEntries are injected.
     await applyFontFlags(fontFlags);
-
-    const langs = langsRaw === undefined
-        ? []
-        : langsRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+    const customFonts = await loadCustomFonts(fontFiles, isQuiet());
+    const langs = [...normalizeLangs(langsRaw)];
+    for (const name of customFonts) if (!langs.includes(name)) langs.push(name);
 
     const template = templatePath !== undefined ? await loadTemplate(templatePath) : undefined;
     const outline = outlineSpec !== undefined ? await loadOutline(outlineSpec) : undefined;
@@ -794,6 +723,7 @@ export async function render(args: ParsedArgs): Promise<void> {
         pretty,
         dryRun,
         chunkSize,
+        trapped,
     };
 
     // Initial render (always runs, even in --watch mode).

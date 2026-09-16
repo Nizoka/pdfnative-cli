@@ -446,7 +446,8 @@ describe('inspect', () => {
         it('--summary emits the canonical minimal verdict', async () => {
             const out = await runJson(['--summary']);
             const doc = JSON.parse(out);
-            expect(Object.keys(doc).sort()).toEqual(['encrypted', 'pages', 'pdfa', 'signatures']);
+            // v1.5.0 adds the PDF/X claim beside the PDF/A one.
+            expect(Object.keys(doc).sort()).toEqual(['encrypted', 'pages', 'pdfa', 'pdfx', 'signatures']);
             expect(typeof doc.pages).toBe('number');
             expect(typeof doc.encrypted).toBe('boolean');
         });

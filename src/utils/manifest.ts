@@ -45,6 +45,8 @@ const PATH_FLAGS: ReadonlySet<string> = new Set([
     'input', 'i', 'output', 'o', 'output-dir',
     'key', 'cert', 'cert-chain', 'trust',
     'data', 'annotations', 'template', 'layout', 'watermark-image',
+    // v1.5.0: PDF/X output profile and user-shipped font programs
+    'output-intent-icc', 'font-file',
 ]);
 
 export interface ManifestTaskPlan {

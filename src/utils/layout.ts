@@ -5,8 +5,10 @@
 // Precedence: CLI flags > layout file > pdfnative defaults.
 
 import { readFile } from 'node:fs/promises';
+import { basename, extname } from 'node:path';
 import {
     PDF_A_CONFORMANCE_TARGETS,
+    PDF_X_CONFORMANCE_TARGETS,
 } from '../core-bridge/index.js';
 import type {
     PdfLayoutOptions,
@@ -16,16 +18,20 @@ import type {
     PdfAttachment,
     PdfAttachmentRelationship,
     LayoutDebugOptions,
+    TypographyOptions,
+    CustomOutputIntent,
+    PdfXConformanceTarget,
 } from '../core-bridge/index.js';
-import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from './args.js';
-import { validatePath, readBinaryFile } from './io.js';
-import { CliError, deprecate } from './error.js';
+import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag, getBoolFlag } from './args.js';
+import { validatePath, readBinaryFile, readBinaryFileCapped, assertJsonSizeLimit } from './io.js';
+import { CliError, ErrorCode, deprecate } from './error.js';
 import {
     normalizeEncryptAlgo,
     readEncryptTrigger,
     parsePermissions,
     firstNonEmpty,
 } from './pdfops.js';
+import { parseIsoDate } from './reproducible.js';
 
 /**
  * Tagged-mode values accepted by the `--tagged` flag.
@@ -37,6 +43,22 @@ import {
 export const VALID_TAGGED = ['none', ...PDF_A_CONFORMANCE_TARGETS] as const;
 export type TaggedValue = (typeof VALID_TAGGED)[number];
 
+/** PDF/X targets accepted by `--pdfx` (pdfnative 1.8.0 `PDF_X_CONFORMANCE_TARGETS`). */
+export const VALID_PDFX: readonly string[] = [...PDF_X_CONFORMANCE_TARGETS];
+
+/** Size cap for an ICC profile passed via --output-intent-icc (press profiles are a few MB). */
+export const MAX_ICC_PROFILE_BYTES = 16 * 1024 * 1024;
+
+/**
+ * The layout keys that are objects a caller may spread across two layers
+ * (a document's `layout`, a `--layout` file, the flags). They merge one
+ * level deep instead of replacing each other, so a `typography` object in
+ * the document JSON survives a `--kerning` flag. Kept to the two objects
+ * v1.5.0 adds flags for; `print`, `viewerPreferences` and the rest keep
+ * their replace semantics (byte-identical to 1.4.0).
+ */
+export const NESTED_LAYOUT_KEYS: readonly string[] = ['typography', 'outputIntent'];
+
 /** Built-in named page sizes (points). Matches pdfnative `PAGE_SIZES`. */
 const NAMED_PAGE_SIZES: Readonly<Record<string, readonly [number, number]>> = {
     a4:      [595.28, 841.89],
@@ -47,38 +69,25 @@ const NAMED_PAGE_SIZES: Readonly<Record<string, readonly [number, number]>> = {
     a5:      [419.53, 595.28],
 };
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
- * Load a `Partial<PdfLayoutOptions>` JSON file from disk.
- * Returns an empty object when no path is provided.
- *
- * Validates path against directory traversal and JSON shape (must be an object).
- * Binary attachment payloads must be supplied via `--attachment` flag — JSON
- * fields like `attachments[].data` are NOT supported (no path/data injection).
+ * Revive the values JSON cannot carry natively in a layout object, and strip
+ * the ones the CLI never accepts from JSON:
+ *   - `attachments[].data` is removed — binary payloads must come from
+ *     `--attachment <path>` so the path guard applies (no data injection).
+ *   - `outputIntent.iccProfile` number[] → Uint8Array (pdfnative validates
+ *     the ICC header — `acsp` signature, size field, colour space — before
+ *     embedding; ICC profiles are not executable payloads).
+ *   - `creationDate` ISO string → Date (pdfnative 1.8.0 pins the creation
+ *     instant, the `{date}` placeholder and the trailer /ID from it).
+ * Applied to a `--layout` file AND to the document JSON's `layout` key, so
+ * both routes behave the same.
  */
-export async function loadLayoutFile(
-    filePath: string | undefined,
-): Promise<Partial<PdfLayoutOptions>> {
-    if (filePath === undefined) return {};
-    validatePath(filePath);
-    let raw: string;
-    try {
-        raw = await readFile(filePath, 'utf8');
-    } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new CliError(`Failed to read --layout file: ${msg}`, 1);
-    }
-    let parsed: unknown;
-    try {
-        parsed = JSON.parse(raw);
-    } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new CliError(`Failed to parse --layout JSON: ${msg}`, 1);
-    }
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-        throw new CliError('--layout file must contain a JSON object.', 1);
-    }
-    // Strip any attachments[].data — binary payloads must come from --attachment, not JSON.
-    const obj = parsed as Record<string, unknown>;
+export function reviveLayoutJson(input: Record<string, unknown>): Record<string, unknown> {
+    const obj: Record<string, unknown> = { ...input };
     if (Array.isArray(obj.attachments)) {
         obj.attachments = obj.attachments.map((a): unknown => {
             if (typeof a !== 'object' || a === null) return a;
@@ -87,21 +96,75 @@ export async function loadLayoutFile(
             return rest;
         });
     }
-    // Revive outputIntent.iccProfile (pdfnative 1.7.0 CustomOutputIntent):
-    // JSON can only carry a number array, but the engine expects Uint8Array.
-    // ICC profiles are not executable payloads and the engine validates the
-    // 128-byte header + RGB colour space before embedding.
     const oi = obj.outputIntent;
-    if (typeof oi === 'object' && oi !== null && !Array.isArray(oi)) {
-        const oiRec = oi as Record<string, unknown>;
-        if (Array.isArray(oiRec.iccProfile)) {
-            obj.outputIntent = {
-                ...oiRec,
-                iccProfile: Uint8Array.from(oiRec.iccProfile as readonly number[]),
-            };
+    if (isPlainObject(oi) && Array.isArray(oi.iccProfile)) {
+        obj.outputIntent = { ...oi, iccProfile: Uint8Array.from(oi.iccProfile as readonly number[]) };
+    }
+    if (typeof obj.creationDate === 'string') {
+        const date = new Date(obj.creationDate);
+        if (Number.isNaN(date.getTime())) {
+            throw new CliError(
+                `layout.creationDate "${obj.creationDate}" is not an ISO 8601 instant.`,
+                1,
+                ErrorCode.INPUT,
+            );
+        }
+        obj.creationDate = date;
+    }
+    return obj;
+}
+
+/**
+ * Load a `Partial<PdfLayoutOptions>` JSON file from disk.
+ * Returns an empty object when no path is provided.
+ *
+ * Validates path against directory traversal, the 50 MB JSON cap and the
+ * JSON shape (must be an object), then revives the JSON-only values.
+ */
+export async function loadLayoutFile(
+    filePath: string | undefined,
+): Promise<Partial<PdfLayoutOptions>> {
+    if (filePath === undefined) return {};
+    validatePath(filePath);
+    let raw: Buffer;
+    try {
+        raw = await readFile(filePath);
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new CliError(`Failed to read --layout file: ${msg}`, 1);
+    }
+    assertJsonSizeLimit(raw);
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(raw.toString('utf8'));
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new CliError(`Failed to parse --layout JSON: ${msg}`, 1);
+    }
+    if (!isPlainObject(parsed)) {
+        throw new CliError('--layout file must contain a JSON object.', 1);
+    }
+    return reviveLayoutJson(parsed) as Partial<PdfLayoutOptions>;
+}
+
+/**
+ * Layer `override` on top of `base`: the keys in {@link NESTED_LAYOUT_KEYS}
+ * merge one level deep when both sides are objects; every other key is
+ * replaced by the override (the historical shallow-spread semantics).
+ */
+export function mergeNestedLayout(
+    base: Partial<PdfLayoutOptions>,
+    override: Partial<PdfLayoutOptions>,
+): Partial<PdfLayoutOptions> {
+    const out: Record<string, unknown> = { ...(base as Record<string, unknown>), ...(override as Record<string, unknown>) };
+    const b = base as Record<string, unknown>;
+    const o = override as Record<string, unknown>;
+    for (const key of NESTED_LAYOUT_KEYS) {
+        if (isPlainObject(b[key]) && isPlainObject(o[key])) {
+            out[key] = { ...b[key], ...o[key] };
         }
     }
-    return obj as Partial<PdfLayoutOptions>;
+    return out as Partial<PdfLayoutOptions>;
 }
 
 /** Parse the `--debug-layout` flag into `PdfLayoutOptions.debug`, or undefined.
@@ -204,6 +267,29 @@ function conformanceToTagged(value: string): PdfLayoutOptions['tagged'] {
     return ('pdfa' + value) as Exclude<TaggedValue, 'none'>;
 }
 
+/**
+ * Parse `--pdfx [target]` (pdfnative 1.8.0). A bare flag selects the only
+ * target, `pdfx4`; `none` clears a target inherited from the layout file.
+ */
+export function parsePdfx(raw: string | boolean): PdfXConformanceTarget | false {
+    if (raw === true) return 'pdfx4';
+    if (raw === false) return false;
+    const v = raw.trim().toLowerCase();
+    if (v === '' ) return 'pdfx4';
+    if (v === 'none') return false;
+    if (VALID_PDFX.includes(v)) return v as PdfXConformanceTarget;
+    throw new CliError(`Invalid --pdfx value "${raw}". Valid: ${VALID_PDFX.join(', ')}, none.`, 2);
+}
+
+/** Parse `--trapped true|false|unknown` into the /Info /Trapped name. */
+export function parseTrapped(raw: string): 'True' | 'False' | 'Unknown' {
+    const v = raw.trim().toLowerCase();
+    if (v === 'true') return 'True';
+    if (v === 'false') return 'False';
+    if (v === 'unknown') return 'Unknown';
+    throw new CliError(`Invalid --trapped value "${raw}". Valid: true, false, unknown.`, 2);
+}
+
 interface HeaderFooterFlags {
     readonly left?: string;
     readonly center?: string;
@@ -304,6 +390,8 @@ async function buildWatermarkFromFlags(
         const t: Record<string, unknown> = { text };
         if (opacity !== undefined) t.opacity = parseUnit(opacity, 'watermark-opacity', 0, 1);
         if (angle !== undefined) t.angle = parseFloatFlag(angle, 'watermark-angle');
+        // PdfColor passes through as given: hex, "r g b", or a CMYK "c m y k"
+        // operand string (pdfnative 1.8.0 parses four values as DeviceCMYK).
         if (color !== undefined) t.color = color;
         if (fontSize !== undefined) t.fontSize = parseFloatFlag(fontSize, 'watermark-font-size');
         wm.text = t as unknown as WatermarkOptions['text'];
@@ -397,10 +485,76 @@ async function loadAttachmentsFromFlags(
 }
 
 /**
+ * Build `layout.outputIntent` from `--output-intent-icc <file.icc>` and
+ * `--output-intent-id <string>` (pdfnative 1.8.0: RGB, CMYK or Gray
+ * profiles; PDF/X-4 needs a `prtr` output profile). The ICC bytes are
+ * size-capped here and header-validated by the engine (`acsp` signature,
+ * size field, colour space). Merges into an outputIntent inherited from the
+ * layout file: only the fields given as flags are replaced.
+ */
+async function buildOutputIntentFromFlags(
+    args: ParsedArgs,
+    existing: CustomOutputIntent | undefined,
+): Promise<CustomOutputIntent | undefined> {
+    const iccPath = getStringFlag(args.flags, 'output-intent-icc');
+    const id = getStringFlag(args.flags, 'output-intent-id');
+    if (iccPath === undefined && id === undefined) return existing;
+    if (iccPath === undefined && existing === undefined) {
+        throw new CliError('--output-intent-id needs an ICC profile: pass --output-intent-icc <file.icc> (or outputIntent.iccProfile in --layout).', 2);
+    }
+    const out: { -readonly [K in keyof CustomOutputIntent]: CustomOutputIntent[K] } = {
+        ...(existing ?? { iccProfile: new Uint8Array(0), outputConditionIdentifier: '' }),
+    };
+    if (iccPath !== undefined) {
+        out.iccProfile = await readBinaryFileCapped(iccPath, MAX_ICC_PROFILE_BYTES, 'ICC profile');
+        if (id === undefined && (existing?.outputConditionIdentifier === undefined || existing.outputConditionIdentifier === '')) {
+            out.outputConditionIdentifier = basename(iccPath, extname(iccPath));
+        }
+    }
+    if (id !== undefined) {
+        if (id.trim().length === 0) throw new CliError('--output-intent-id must not be empty.', 2);
+        out.outputConditionIdentifier = id.trim();
+    }
+    return out;
+}
+
+const FONT_FEATURE_TAG = /^[a-z0-9]{4}$/i;
+
+/**
+ * The high-frequency typography flags (pdfnative 1.8.0 `layout.typography`).
+ * Everything else — widows/orphans counts, unit binding, punctuation
+ * spacing, optical margins, metrics, hyphenation language — is reachable
+ * through `layout.typography` in the document JSON or a --layout file.
+ */
+export function buildTypographyFromFlags(args: ParsedArgs): Partial<TypographyOptions> | undefined {
+    const out: { -readonly [K in keyof TypographyOptions]: TypographyOptions[K] } = {};
+    let any = false;
+    const split = getBoolFlag(args.flags, 'split-paragraphs');
+    if (split !== undefined) { out.splitParagraphs = split; any = true; }
+    const keep = getBoolFlag(args.flags, 'keep-headings-with-next');
+    if (keep !== undefined) { out.keepHeadingsWithNext = keep; any = true; }
+    const kerning = getBoolFlag(args.flags, 'kerning');
+    if (kerning !== undefined) { out.kerning = kerning; any = true; }
+    const features = getStringFlag(args.flags, 'font-features');
+    if (features !== undefined) {
+        const tags = features.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+        if (tags.length === 0) throw new CliError('--font-features expects a comma-separated list of OpenType feature tags (e.g. onum,smcp).', 2);
+        for (const tag of tags) {
+            if (!FONT_FEATURE_TAG.test(tag)) {
+                throw new CliError(`Invalid --font-features tag "${tag}": an OpenType feature tag is four ASCII letters or digits (e.g. tnum, onum, smcp).`, 2);
+            }
+        }
+        out.fontFeatures = tags.map((t) => t.toLowerCase());
+        any = true;
+    }
+    return any ? out : undefined;
+}
+
+/**
  * Compose the final `Partial<PdfLayoutOptions>` for a render invocation.
  *
  * Order of precedence (low → high): pdfnative defaults → --layout file → CLI flags.
- * Throws CliError on invalid combinations (e.g. encryption + tagged).
+ * Throws CliError on invalid combinations (e.g. encryption + tagged, pdfx + tagged).
  */
 export async function buildLayoutOptions(
     args: ParsedArgs,
@@ -448,6 +602,14 @@ export async function buildLayoutOptions(
         out.maxBlocks = n;
     }
 
+    // --creation-date (v1.5.0, reproducible output). The flag wins over a
+    // creationDate in the layout file; SOURCE_DATE_EPOCH is applied
+    // process-wide by the dispatcher and therefore ranks below the file.
+    const creationDate = getStringFlag(args.flags, 'creation-date');
+    if (creationDate !== undefined) {
+        out.creationDate = parseIsoDate(creationDate, 'creation-date');
+    }
+
     // --tagged / deprecated --conformance
     const tagged = getStringFlag(args.flags, 'tagged');
     const conformance = getStringFlag(args.flags, 'conformance');
@@ -462,6 +624,14 @@ export async function buildLayoutOptions(
     } else if (conformance !== undefined) {
         deprecate('conformance', '--tagged pdfa<level>');
         out.tagged = conformanceToTagged(conformance);
+    }
+
+    // --pdfx [pdfx4] (pdfnative 1.8.0 PDF/X-4 claim)
+    const pdfxRaw = args.flags['pdfx'];
+    if (pdfxRaw !== undefined) {
+        const target = parsePdfx(typeof pdfxRaw === 'boolean' ? pdfxRaw : (typeof pdfxRaw === 'string' ? pdfxRaw : (pdfxRaw[0] ?? '')));
+        if (target === false) delete out.pdfx;
+        else out.pdfx = target;
     }
 
     // --header-* / --footer-*
@@ -491,6 +661,16 @@ export async function buildLayoutOptions(
     const attachments = await loadAttachmentsFromFlags(args);
     if (attachments !== undefined) out.attachments = attachments;
 
+    // --output-intent-icc / --output-intent-id (merge into the file's outputIntent)
+    const outputIntent = await buildOutputIntentFromFlags(args, fromFile.outputIntent);
+    if (outputIntent !== undefined) out.outputIntent = outputIntent;
+
+    // Typography flags merge into the file's typography object (one level).
+    const typography = buildTypographyFromFlags(args);
+    if (typography !== undefined) {
+        out.typography = { ...(fromFile.typography ?? {}), ...typography };
+    }
+
     // Validate mutually-exclusive combinations
     const tg = out.tagged;
     if (encryption !== undefined && tg !== undefined && tg !== false) {
@@ -498,6 +678,20 @@ export async function buildLayoutOptions(
             'Encryption is mutually exclusive with --tagged (PDF/A forbids encryption per ISO 19005-1 §6.3.2).',
             2,
         );
+    }
+    if (out.pdfx !== undefined) {
+        if (tg !== undefined && tg !== false) {
+            throw new CliError(
+                '--pdfx and --tagged are mutually exclusive: pdfnative writes one conformance claim per file (PDF/X-4 or PDF/A).',
+                2,
+            );
+        }
+        if (out.encryption !== undefined) {
+            throw new CliError(
+                '--pdfx is mutually exclusive with encryption (PDF/X forbids encryption, ISO 15930-7).',
+                2,
+            );
+        }
     }
 
     return out as Partial<PdfLayoutOptions>;

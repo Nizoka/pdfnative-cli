@@ -64,13 +64,15 @@ function isBlockedIPv4(ip: string): boolean {
     if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
         return true;
     }
-    const [a, b] = parts as [number, number, number, number];
+    const [a, b, c] = parts as [number, number, number, number];
     if (a === 0) return true; // "this" network
     if (a === 10) return true; // private
     if (a === 127) return true; // loopback
     if (a === 169 && b === 254) return true; // link-local (incl. cloud metadata 169.254.169.254)
     if (a === 172 && b >= 16 && b <= 31) return true; // private
     if (a === 192 && b === 168) return true; // private
+    if (a === 192 && b === 0 && c === 2) return true; // TEST-NET-1 documentation range (RFC 5737) — v1.5.0
+    if (a === 198 && (b === 18 || b === 19)) return true; // benchmarking range 198.18.0.0/15 (RFC 2544) — v1.5.0
     if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
     if (a >= 224) return true; // multicast + reserved
     return false;
@@ -81,6 +83,7 @@ function isBlockedIPv6(ip: string): boolean {
     if (ip.startsWith('fe80')) return true; // link-local
     if (ip.startsWith('fc') || ip.startsWith('fd')) return true; // unique-local
     if (ip.startsWith('ff')) return true; // multicast
+    if (ip.startsWith('64:ff9b:')) return true; // NAT64 well-known prefix 64:ff9b::/96 (RFC 6052) — v1.5.0
     // IPv4-mapped (::ffff:a.b.c.d) — extract and re-check.
     const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
     if (mapped !== null) return isBlockedIPv4(mapped[1] as string);
