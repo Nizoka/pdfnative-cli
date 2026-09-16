@@ -682,8 +682,8 @@ Options:
   --data               Path to the values JSON (required unless --flatten/--export)
   --flatten            Also flatten after filling (or flatten existing values
                        when --data is omitted)
-  --export             Read-only: emit current field values as a --data-shaped
-                       JSON map (ignores --data/--flatten)
+  --export             Read-only: emit current field values as a JSON map in
+                       the shape --data accepts (ignores --data/--flatten)
   --force              Flatten even if a signed signature field is present
   --on-unknown         Behaviour for unknown field names: throw (default)|ignore
   --need-appearances   Allow non-WinAnsi values by setting /NeedAppearances

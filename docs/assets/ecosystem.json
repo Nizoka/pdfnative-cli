@@ -23,9 +23,9 @@
     }
   },
   "declared": {
-    "tests": 600,
-    "coverageStatements": 79,
-    "coverageMeasured": 83.6,
+    "tests": 1058,
+    "coverageStatements": 82,
+    "coverageMeasured": 84.97,
     "bundleBudgetBytes": 458752,
     "pdfaSamples": 13,
     "pdfxSamples": 3,
@@ -48,9 +48,11 @@
     "globalFlags": 10,
     "manifestCommands": 14,
     "pdfaCorpus": 16,
-    "testFiles": 40,
-    "renderSamples": 50,
-    "sampleScripts": 63
+    "fontAliases": 4,
+    "testFiles": 72,
+    "renderSamples": 63,
+    "sampleScripts": 75,
+    "samplePdfs": 79
   },
   "assertions": [
     {
