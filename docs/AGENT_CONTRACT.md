@@ -1,6 +1,6 @@
 # Agent contract — driving pdfnative-cli from autonomous agents
 
-_Verified on 2026-09-16 · pdfnative-cli v1.5.0 · pdfnative 1.8.0_
+_Verified on 2026-09-17 · pdfnative-cli v1.5.0 · pdfnative 1.8.0_
 
 `pdfnative-cli` is built so that an autonomous AI agent — or any program — can
 drive it inside a larger automated process **deterministically and safely**.

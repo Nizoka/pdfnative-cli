@@ -8,7 +8,7 @@
 > Zero extra runtime dependencies; all PDF logic lives in `pdfnative`.
 
 Current version: 1.5.0 (built on pdfnative 1.8.0; requires Node ≥ 22).
-Verified on 2026-09-16 against the source tree.
+Verified on 2026-09-17 against the source tree.
 
 This file is an LLM-facing capability manifest (see https://llmstxt.org). For a
 machine-readable JSON manifest run `pdfnative schema manifest`; the full contract is

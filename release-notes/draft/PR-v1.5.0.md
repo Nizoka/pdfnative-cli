@@ -132,7 +132,11 @@ Claude Code before merge; the ledger lands under `test-output/.audit/1.5.0/`).
 - `npm run corpus:pdfa && npm run validate:pdfx` → 16 files; PDF/X 2 PASS + 1 XFAIL.
 - `npm run validate:pdfa` with veraPDF 1.30.2 (portable) + JDK 13 (`JAVACMD`) →
   11 PASS + 2 XFAIL + 3 SKIP (the PDF/X files), exit 0.
-- `npx tsx scripts/gate.ts --publish --require-all` → PENDING_GATE.
+- `npx tsx scripts/gate.ts --publish --require-all` → **13 passed, 0 skipped in 308 s**
+  (typecheck:all 24 s, lint 14 s, test:coverage 114 s — 1058 tests, 85.0 % stmts —, build
+  21 s, dist-check, smoke — 21 commands —, bundle-size 357 KiB of the 448 KiB budget,
+  verify:docs 6 s, test:generate 31 s — 79 PDFs —, verify:samples 5 s, corpus:pdfa 9 s,
+  validate:pdfx 4 s, validate:pdfa 77 s).
 - Built binary smoke: `--version` 1.5.0; `doctor --json` (pdfnative 1.8.0, fonts
   31/27, unicode, conformance); PDF/X-4 render → `inspect --check pdfx` exit 0 →
   `annotate` link → `--check pdfx` exit 1; identical SHA-256 under `TZ=Europe/Paris`

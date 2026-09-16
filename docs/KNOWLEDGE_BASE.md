@@ -1601,4 +1601,4 @@ See [SECURITY.md](../SECURITY.md) for the full policy.
 
 ---
 
-*Verified on 2026-09-16 · pdfnative-cli v1.5.0 · pdfnative 1.8.0*
+*Verified on 2026-09-17 · pdfnative-cli v1.5.0 · pdfnative 1.8.0*

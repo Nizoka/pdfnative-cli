@@ -1,6 +1,6 @@
 {
   "$comment": "Single source of every count and version quoted in the docs, the agent files and the release notes. `npm run verify:docs` holds every document to it; `npm run release:prepare` bumps `packages.pdfnative-cli.version` and `verifiedOn`. `declared` holds figures no filesystem walk can derive (measured at release); `derived` holds figures verify:docs recomputes from the source constants (COMMANDS, SUBJECTS, ErrorCode, GLOBAL_FLAGS, MANIFEST_COMMANDS, the corpus table, the samples tree) and fails when they drift. `assertions` are the prose tokens each listed file must carry verbatim.",
-  "verifiedOn": "2026-09-16",
+  "verifiedOn": "2026-09-17",
   "packages": {
     "pdfnative-cli": {
       "version": "1.5.0",
