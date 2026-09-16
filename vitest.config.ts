@@ -83,10 +83,10 @@ export default defineConfig({
                 // `declared.coverageStatements` mirrors the statements floor
                 // and `verify:docs` holds every document to it. They are
                 // re-measured at each release and never lowered.
-                statements: 79,
-                branches: 68,
-                functions: 83,
-                lines: 79,
+                statements: 82,
+                branches: 71,
+                functions: 86,
+                lines: 82,
             },
         },
     },
