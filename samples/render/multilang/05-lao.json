@@ -1,0 +1,19 @@
+{
+  "title": "Lao — ພາສາລາວ",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "Lao script (Noto Sans Lao, pdfnative 1.8.0) — demonstration content",
+    "keywords": "lao, multilingual, shaping"
+  },
+  "blocks": [
+    { "type": "heading", "text": "ພາສາລາວ — Lao", "level": 1 },
+    { "type": "paragraph", "text": "ສະບາຍດີ. ນີ້ແມ່ນເອກະສານຕົວຢ່າງທີ່ຂຽນເປັນພາສາລາວ ເພື່ອສະແດງການປະກອບຕົວອັກສອນ ວັນນະຍຸດ ແລະ ສະຫຼະ ຂອງຟອນ Noto Sans Lao ທີ່ຕິດມາກັບ pdfnative 1.8.0." },
+    { "type": "paragraph", "text": "Rendered with --font lo --lang lo (plus latin for the Latin runs). The Lao shaper positions tone marks above vowels (ນ້ຳ, ກ່ຳ) and keeps the Pali virama beside its base; extracted text (pdfnative extract-text) returns the source code points." },
+    { "type": "heading", "text": "ຕົວເລກ ແລະ ວັນທີ — Numbers and dates", "level": 2 },
+    { "type": "list", "items": [
+      "ວັນຈັນ, ວັນອັງຄານ, ວັນພຸດ, ວັນພະຫັດ, ວັນສຸກ",
+      "໑ ໒ ໓ ໔ ໕ ໖ ໗ ໘ ໙ ໐ — Lao digits",
+      "ຂອບໃຈຫຼາຍໆ — thank you very much"
+    ] }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "title": "Typography — Punctuation Spacing, Unit Binding & Short Words",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "punctuationSpacing fr, unitBinding (ISO 80000-1), bindShortWords (pdfnative 1.8.0)",
+    "keywords": "typography, punctuation, no-break space, units, ISO 80000-1"
+  },
+  "layout": {
+    "typography": {
+      "punctuationSpacing": "fr",
+      "unitBinding": true,
+      "bindShortWords": { "maxLength": 1, "words": ["à", "y", "a", "l"] }
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "Spacing rules that never break a line in the wrong place", "level": 1 },
+    { "type": "paragraph", "text": "Three rules run over every text run before line breaking. punctuationSpacing: \"fr\" inserts the narrow no-break space (U+202F) French typography puts before : ; ! ? and the no-break space inside « guillemets » — a registered font is required for the narrow space (the base-14 fonts degrade to the fr-CA preset). unitBinding keeps a number and its unit together with a no-break space, as ISO 80000-1 requires. bindShortWords glues one-letter words to the word that follows.", "align": "justify" },
+    { "type": "heading", "text": "Sample text — demonstration content in French", "level": 2 },
+    { "type": "paragraph", "text": "Prix : 150 € ; livraison en 48 h ! Vraiment ? Le colis pèse 12 kg et mesure 40 cm × 30 cm ; la température de stockage est de 5 °C à 25 °C. « Une remise de 15 % s'applique dès 3 articles », précise la notice. La vitesse maximale est de 120 km/h ; l'autonomie atteint 400 km à 20 °C.", "align": "justify" },
+    { "type": "heading", "text": "What to look for", "level": 2 },
+    { "type": "list", "items": [
+      "A colon, semicolon, exclamation or question mark never starts a line: the space before it is unbreakable (and narrow).",
+      "150 € and 12 kg stay on one line: the space between a figure and its unit is a no-break space.",
+      "The one-letter words listed in bindShortWords (à, y, a, l) stay with the following word.",
+      "Render again without the typography object to compare the line breaks."
+    ] }
+  ]
+}

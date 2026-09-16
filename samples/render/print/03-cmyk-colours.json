@@ -1,0 +1,30 @@
+{
+  "title": "Print Production — CMYK Colours",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "DeviceCMYK colours as [c, m, y, k] tuples and 'c m y k' strings (pdfnative 1.8.0)",
+    "keywords": "print, cmyk, rich black, process colour"
+  },
+  "blocks": [
+    { "type": "heading", "text": "CMYK everywhere a colour is accepted", "level": 1, "color": [0, 100, 100, 0] },
+    { "type": "paragraph", "text": "Every PdfColor field accepts a four-element form since pdfnative 1.8.0: a tuple of ink percentages [c, m, y, k] (0–100) or a string of four operands \"c m y k\" (0–1). Both are emitted as DeviceCMYK fill (k) and stroke (K) operators. This heading is process red [0, 100, 100, 0]; the paragraph below is a rich black.", "align": "justify" },
+    { "type": "paragraph", "text": "Rich black [60, 40, 40, 100] prints deeper than pure K on coated stock; solid black [0, 0, 0, 100] is what body text should normally use, so registration stays forgiving.", "color": [60, 40, 40, 100] },
+    { "type": "paragraph", "text": "Operand string form: \"1 0.6 0 0.1\" (a process blue).", "color": "1 0.6 0 0.1" },
+    { "type": "heading", "text": "Swatches", "level": 2 },
+    { "type": "table",
+      "headers": ["Name", "Tuple (percent)", "String (0–1)"],
+      "rows": [
+        { "cells": ["Cyan", "[100, 0, 0, 0]", "\"1 0 0 0\""], "type": "normal", "pointed": false },
+        { "cells": ["Magenta", "[0, 100, 0, 0]", "\"0 1 0 0\""], "type": "normal", "pointed": false },
+        { "cells": ["Yellow", "[0, 0, 100, 0]", "\"0 0 1 0\""], "type": "normal", "pointed": false },
+        { "cells": ["Black (K)", "[0, 0, 0, 100]", "\"0 0 0 1\""], "type": "normal", "pointed": false },
+        { "cells": ["Rich black", "[60, 40, 40, 100]", "\"0.6 0.4 0.4 1\""], "type": "normal", "pointed": false }
+      ],
+      "zebra": "0 0 0 0.06"
+    },
+    { "type": "heading", "text": "Charts in CMYK", "level": 2 },
+    { "type": "chart", "kind": "bar", "title": "Ink coverage by plate", "categories": ["C", "M", "Y", "K"],
+      "series": [ { "name": "Coverage %", "values": [38, 41, 27, 62], "color": [0, 0, 0, 100] } ] },
+    { "type": "paragraph", "text": "Under a PDF/A claim whose OutputIntent is not CMYK, CMYK content raises PDFA_DEVICE_CMYK_CONTENT; under PDF/X-4 with a CMYK output profile it is exactly what the press expects (see 05-pdfx4.json).", "fontSize": 10 }
+  ]
+}

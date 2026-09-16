@@ -1,0 +1,28 @@
+{
+  "title": "Print Production — PDF/X-4 Press File",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "PDF/X-4 (ISO 15930-7): CMYK output intent, embedded fonts, known trapping state, colour bars (pdfnative 1.8.0)",
+    "keywords": "print, pdf/x-4, output intent, cmyk, prepress",
+    "trapped": "False"
+  },
+  "layout": {
+    "print": {
+      "bleed": 14.17,
+      "marks": { "colourBars": true }
+    },
+    "outputIntent": {
+      "outputConditionIdentifier": "Synthetic CMYK (pdfnative test profile)",
+      "registryName": "http://www.color.org",
+      "info": "A structurally valid, colourimetrically meaningless CMYK press profile shipped with the samples. Ask your printer for their ICC profile (e.g. ISO Coated v2, GRACoL)."
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "A4 flyer, 5 mm bleed, PDF/X-4", "level": 1, "color": [0, 100, 100, 0] },
+    { "type": "paragraph", "text": "Rendered with: pdfnative render --input 05-pdfx4.json --pdfx pdfx4 --output-intent-icc synthetic-cmyk.icc --font latin --lang latin --trapped false --strict. The claim needs an output (prtr) ICC profile in layout.outputIntent — the bytes come from --output-intent-icc, the identifier and registry from this JSON — every font embedded (--font latin --lang latin), a known trapping state (metadata.trapped True or False) and a TrimBox or ArtBox per page (bleed: 14.17 derives the TrimBox). PDF/X forbids encryption and cannot be combined with a PDF/A claim.", "align": "justify", "color": [0, 0, 0, 100] },
+    { "type": "heading", "text": "What the validator checks", "level": 2 },
+    { "type": "paragraph", "text": "pdfnative inspect --check pdfx runs the structural ISO 15930-7 validator: header version, XMP identification (pdfxid:GTS_PDFXVersion, xmpMM:DocumentID/VersionID/RenditionClass, pdf:Trapped), the /GTS_PDFX OutputIntent with an embedded prtr profile, TrimBox-or-ArtBox nesting, embedded fonts (page resources, Form XObjects, patterns, annotation appearances), no annotations in the print area, no actions, JavaScript or embedded files, no OPI, PostScript or reference XObjects, no LZW, no transfer functions, device colour consistent with the intent. veraPDF does not cover PDF/X; a certified preflight remains the last word before press.", "align": "justify", "color": [0, 0, 0, 100] },
+    { "type": "heading", "text": "Colour", "level": 2 },
+    { "type": "paragraph", "text": "Body text is solid K [0, 0, 0, 100]; the title is process red [0, 100, 100, 0]. RGB content is allowed under a CMYK output intent: pdfnative routes it through a calibrated /DefaultRGB so the file stays conformant.", "align": "justify", "color": [0, 0, 0, 100] }
+  ]
+}

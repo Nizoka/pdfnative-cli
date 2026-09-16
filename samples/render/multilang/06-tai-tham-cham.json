@@ -1,0 +1,20 @@
+{
+  "title": "Tai Tham, New Tai Lue, Tai Le & Cham",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "Four scripts shaped by the Universal Shaping Engine (pdfnative 1.8.0) — demonstration content",
+    "keywords": "tai tham, new tai lue, tai le, cham, universal shaping engine"
+  },
+  "blocks": [
+    { "type": "heading", "text": "Scripts added in pdfnative 1.8.0", "level": 1 },
+    { "type": "paragraph", "text": "Rendered with --font nod --font khb --font tdd --font cjm --font latin --lang nod,khb,tdd,cjm,latin. Tai Tham (Lanna) and Cham go through the Universal Shaping Engine, whose cluster grammar comes from Unicode 17.0.0; New Tai Lue and Tai Le are simple scripts with their own fonts. Each code point is routed to the font whose cmap covers it." },
+    { "type": "heading", "text": "Tai Tham (nod) — ᨲᩫ᩠ᩅᨾᩮᩬᩥᨦ", "level": 2 },
+    { "type": "paragraph", "text": "ᨲᩫ᩠ᩅᨾᩮᩬᩥᨦ ᨸᩩᨶ ᨻᩱᨬ᩠ᨬ᩠ᨿᨲ᩠ᨲ ᨷᩣᩃᩦ — subjoined consonants (sakot) and pre-base vowels reorder before the base." },
+    { "type": "heading", "text": "New Tai Lue (khb) — ᦎᦸᧈᦑᦸᧈ", "level": 2 },
+    { "type": "paragraph", "text": "ᦎᦸᧈᦑᦸᧈ ᦍᦲᧂ ᦺᦖᧈ ᦵᦋᦲᧉ ᦎᦱᧂᧈ ᦵᦉᦲᦰ — the script of Sipsongpanna Dai." },
+    { "type": "heading", "text": "Tai Le (tdd) — ᥖᥭᥰ ᥘᥫᥴ", "level": 2 },
+    { "type": "paragraph", "text": "ᥖᥭᥰ ᥘᥫᥴ ᥐᥩᥴ ᥖᥭᥰ ᥐᥩᥴ — tone letters follow the syllable." },
+    { "type": "heading", "text": "Cham (cjm) — ꨌꩌ", "level": 2 },
+    { "type": "paragraph", "text": "ꨌꩌ ꨭꨌꨯꨱꨭ ꨓꨭꨩꨯꨭ ꨀꨋꨩ ꨟꨩꨮꨭꨩꨯꨭ — Eastern Cham, with medial consonants and final consonants shaped by the engine." }
+  ]
+}

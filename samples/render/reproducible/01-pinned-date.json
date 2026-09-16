@@ -1,0 +1,21 @@
+{
+  "title": "Reproducible Output — Pinned Creation Date",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "Byte-identical output across hosts and runs: --creation-date / SOURCE_DATE_EPOCH (v1.5.0, pdfnative 1.8.0)",
+    "keywords": "reproducible builds, source date epoch, deterministic"
+  },
+  "blocks": [
+    { "type": "heading", "text": "Byte-identical on every host", "level": 1 },
+    { "type": "paragraph", "text": "Unencrypted pdfnative output is a pure function of its inputs plus one instant: the creation date. /Info /CreationDate, xmp:CreateDate, the {date} placeholder printed in this page's header and the trailer /ID (an MD5 over title, creation date and object count) all derive from it, and since pdfnative 1.8.0 every date is written in UTC — so pinning the instant makes the bytes identical on a laptop in Paris and a CI runner in UTC.", "align": "justify" },
+    { "type": "heading", "text": "Two ways to pin it", "level": 2 },
+    { "type": "list", "items": [
+      "--creation-date 2026-01-01T00:00:00Z — a global flag, so a batch --manifest pipeline inherits it.",
+      "SOURCE_DATE_EPOCH=1767225600 — the reproducible-builds.org convention (integer seconds); used when the flag is absent.",
+      "layout.creationDate in the document JSON or a --layout file — revived from an ISO string."
+    ] },
+    { "type": "heading", "text": "What stays non-reproducible", "level": 2 },
+    { "type": "paragraph", "text": "Encrypted output (the file key and AES IVs come from a CSPRNG by design — ISO 32000-1 §7.6), native ECDSA signatures (a random nonce; --pure-crypto uses RFC 6979 deterministic nonces), and anything stamped by a timestamp authority. Signing time (sign --signing-time) and metadata --mod-date are separate instants with a legal meaning of their own and are not covered by the pin.", "align": "justify" },
+    { "type": "paragraph", "text": "Run samples/render/reproducible/01-double-render.sh (or .ps1): it renders this document twice under two time zones and compares the SHA-256 hashes.", "fontSize": 10 }
+  ]
+}

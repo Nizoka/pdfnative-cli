@@ -1,0 +1,20 @@
+{
+  "title": "Hausa, Yoruba, Igbo & Swahili — Latin with combining marks",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "Four African languages set with the bundled latin module (pdfnative 1.8.0 latin-marks shaper) — demonstration content",
+    "keywords": "hausa, yoruba, igbo, swahili, combining marks, tone marks"
+  },
+  "blocks": [
+    { "type": "heading", "text": "No new font, no new key", "level": 1 },
+    { "type": "paragraph", "text": "ha, yo, ig and sw are aliases of latin on the CLI: --font latin --lang ha,yo,ig,sw registers the one Noto Sans module. The 1.8.0 latin-marks shaper anchors free-standing combining marks (tone marks, dots below) on their base with the font's mark-to-base and mark-to-mark tables, so NFD text renders composed." },
+    { "type": "heading", "text": "Hausa (ha)", "level": 2 },
+    { "type": "paragraph", "text": "Sannu da zuwa. Ƙasar Hausa tana da ɓangarori da yawa; ɗan Adam yana koyon ƴan kalmomi kowace rana — ɓ, ɗ, ƙ and ƴ are hooked letters of their own." },
+    { "type": "heading", "text": "Yoruba (yo)", "level": 2 },
+    { "type": "paragraph", "text": "Ẹ káàbọ̀. Ọ̀tọ̀ ìjọ àti ìlú: ẹ̀kọ́ ọmọdé ní ọjọ́ kọ̀ọ̀kan. Àwọn àmì ohùn (grave, acute) jókòó lórí àwọn fáwẹ́lì pẹ̀lú àmì abẹ́ (ẹ, ọ, ṣ)." },
+    { "type": "heading", "text": "Igbo (ig)", "level": 2 },
+    { "type": "paragraph", "text": "Nnọọ. Ị̀ na-ekwu Igbo? Ụ̀mụ̀ akwụkwọ na-amụ ihe ọ̀hụ́rụ́ kwa ụbọchị — ị, ọ, ụ carry a dot below and a tone mark above." },
+    { "type": "heading", "text": "Swahili (sw)", "level": 2 },
+    { "type": "paragraph", "text": "Karibu sana. Lugha ya Kiswahili inazungumzwa Afrika Mashariki na inaandikwa kwa herufi za Kilatini bila alama za ziada — plain Latin, listed here because the alias exists for symmetry." }
+  ]
+}
