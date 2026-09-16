@@ -2,16 +2,16 @@
 
 A comprehensive collection of sample files covering every feature of pdfnative-cli, organized by category. Each category corresponds to a distinct capability of the `pdfnative` library.
 
-> **Generated PDFs are not committed.** All output goes to `samples/output/` which is git-ignored.
+> **Generated PDFs are not committed.** The per-script demos write to `samples/output/`; the generator writes the baseline corpus to `test-output/samples/` — both git-ignored.
 
 ---
 
 ## Quick Navigation
 
 **New to pdfnative-cli?** Follow this path:
-1. ✅ Run a quick sample: `node samples/run-all.js --category document`
+1. ✅ Run a quick sample: `npm run build && npx tsx scripts/generate-samples.ts --category document`
 2. ✅ View sample JSON: [render/document/01-minimal.json](render/document/01-minimal.json)
-3. ✅ Try a different feature: `node samples/run-all.js --category barcode`
+3. ✅ Try a different feature: `npx tsx scripts/generate-samples.ts --category typography`
 4. ✅ Read the docs: [../docs/KNOWLEDGE_BASE.md](../docs/KNOWLEDGE_BASE.md)
 5. ✅ Check FAQ: [../docs/KNOWLEDGE_BASE.md#12-frequently-asked-questions](../docs/KNOWLEDGE_BASE.md#12-frequently-asked-questions)
 
@@ -19,15 +19,25 @@ A comprehensive collection of sample files covering every feature of pdfnative-c
 
 ## Quick Start
 
-### Run all render samples at once
+### Run every sample at once (v1.5.0 — the baseline run)
 
 ```bash
-# Prerequisites: pdfnative-cli installed globally
-npm install -g pdfnative-cli
+# From the repo root: build the CLI, then render every sample JSON, the multilang
+# drivers and the derived outputs (merge/split/extract, annotate, fill, metadata,
+# encrypt/decrypt, sign) into test-output/samples/ with the BUILT binary — 79 PDFs,
+# byte-stable (TZ=UTC, creation date pinned to 2026-01-01T00:00:00Z)
+npm run build && npm run test:generate
 
-# From the repo root — renders all JSON samples to samples/output/
-node samples/run-all.js
+# Compare the run with the committed baseline (tests/regression/baselines/samples.sha256.json)
+npx tsx scripts/verify-samples.ts
+
+# One category only, or a globally installed binary
+npx tsx scripts/generate-samples.ts --category typography
+PDFNATIVE_CLI="$(which pdfnative)" npm run test:generate
 ```
+
+The shell / PowerShell scripts under each directory are self-contained demos that write to
+`samples/output/` (git-ignored); they assume `pdfnative` on the PATH (`npm install -g pdfnative-cli`).
 
 Run a single sample:
 
@@ -51,7 +61,7 @@ pdfnative render `
 
 ```
 samples/
-├── run-all.js                    Cross-platform batch renderer (Node.js ≥ 22)
+├── README.md                     This file (the generator is scripts/generate-samples.ts — `npm run test:generate`)
 ├── render/                       JSON payloads for pdfnative render
 │   ├── document/                 General-purpose documents (06-max-blocks.* = --max-blocks guard, v1.1.0)
 │   ├── table/                    Table-heavy layouts
@@ -71,12 +81,17 @@ samples/
 │   │   ├── 03-thai.json          Real Thai monthly report (headings, list, table in Thai)
 │   │   ├── 03-thai.js            Node.js driver: registerFonts(th) → render 03-thai.json
 │   │   ├── 04-multilingual.json  Real multilingual doc (EN + Thai + Japanese + Arabic + Russian)
-│   │   └── 04-multilingual.js    Node.js driver: registerFonts(th,ja,ar,ru) → render 04-multilingual.json
-│   ├── table-variant/            (v0.2.0) Table-centric PdfParams (--variant table)
+│   │   ├── 04-multilingual.js    Node.js driver: registerFonts(th,ja,ar,ru) → render 04-multilingual.json
+│   │   ├── 05-lao.json           (v1.5.0) Lao — `--font lo --lang lo`
+│   │   ├── 06-tai-tham-cham.json (v1.5.0) Tai Tham, New Tai Lue, Tai Le, Cham — `nod khb tdd cjm`
+│   │   └── 07-african-latin.json (v1.5.0) Hausa, Yoruba, Igbo, Swahili — the `ha yo ig sw` aliases of `latin`
+│   ├── table-variant/            (v0.2.0) Table-centric PdfParams (--variant table; fonts embedded since v1.5.0)
 │   ├── font/                     (v0.3.0) `--font` / `--lang` flag demo (latin preset)
 │   │   ├── 01-latin.*            Latin preset shortcut
-│   │   ├── 02-new-scripts.*      (v1.1.0) Six new 1.3.0 scripts + COLRv1 colour emoji
-│   │   └── 03-emoji.*            (v1.1.0) Monochrome emoji preset (`--font emoji`)
+│   │   ├── 02-new-scripts.*      (v1.1.0) Six 1.3.0 scripts + COLRv1 colour emoji
+│   │   ├── 03-emoji.*            (v1.1.0) Monochrome emoji preset (`--font emoji`)
+│   │   ├── 04-new-scripts-1.8.*  (v1.5.0) The five 1.8.0 scripts (Lao, Tai Tham, New Tai Lue, Tai Le, Cham)
+│   │   └── 05-font-file.*        (v1.5.0) `--font-file <path.ttf>[:name]` — a custom font from disk
 │   ├── template/                 (v0.3.0) `--template` deep-merge demo (base + override)
 │   ├── watch/                    (v0.3.0) `--watch` interactive auto-rebuild demo
 │   ├── table-smart/              (v1.0.0) Smart tables: zebra, caption, repeat-header, wrap
@@ -89,17 +104,31 @@ samples/
 │   │   ├── 03-stacked-bars.json  (v1.4.0) stackedBar / stackedBarH + dataLabels
 │   │   ├── 04-area-scatter.json  (v1.4.0) area + dual axes (axis2) + log-scale scatter
 │   │   └── 05-time-axis.json     (v1.4.0) time x-axis (ISO xValues) + labelRotation
-│   └── print/                    (v1.4.0) Print production & viewer preferences (pdfnative 1.7.0)
-│       ├── 01-bleed-marks.json   (v1.4.0) layout.print — bleed, TrimBox, crop/registration marks, trapped
-│       └── 02-viewer-prefs.json  (v1.4.0) layout.viewerPreferences — duplex, copies, print range, tray
+│   ├── print/                    (v1.4.0) Print production & viewer preferences (pdfnative ≥ 1.7.0)
+│   │   ├── 01-bleed-marks.json   (v1.4.0) layout.print — bleed, TrimBox, crop/registration marks, trapped
+│   │   ├── 02-viewer-prefs.json  (v1.4.0) layout.viewerPreferences — duplex, copies, print range, tray
+│   │   ├── 03-cmyk-colours.json  (v1.5.0) CMYK colours ("c m y k" / [c,m,y,k]) in headings, tables, charts
+│   │   ├── 04-colour-bars.json   (v1.5.0) layout.print.marks.colourBars — printer's colour bars
+│   │   ├── 05-pdfx4.json + .sh/.ps1 (v1.5.0) PDF/X-4: --pdfx pdfx4 --output-intent-icc, then inspect --check pdfx
+│   │   └── synthetic-cmyk.icc    (v1.5.0) Synthetic prtr CMYK profile — NOT a press profile
+│   ├── typography/               (v1.5.0) layout.typography — the 1.8.0 typography engine
+│   │   ├── 01-paragraph-breaking.json        widows/orphans, keepWithNext, splittable paragraphs
+│   │   ├── 02-justify-optical-hyphenation.json  justify, optical margins, soft hyphens
+│   │   ├── 03-french-spacing-units-short-words.json  punctuationSpacing "fr", unitBinding, short words
+│   │   ├── 04-kerning-features-metrics.json  kerning, OpenType features, exact base-14 metrics
+│   │   └── 01-typography.*       Renders all four with --font latin --lang latin (+ the four flags)
+│   └── reproducible/             (v1.5.0) Byte-reproducible output
+│       ├── 01-pinned-date.json   Rendered with --creation-date 2026-01-01T00:00:00Z
+│       ├── 02-source-date-epoch.json  Same document, rendered with SOURCE_DATE_EPOCH=1767225600
+│       └── 01-double-render.*    Renders twice under different TZ values and compares SHA-256 (the proof)
 ├── merge/                        (v1.2.0) Concatenate PDFs (pdfnative page-tree)
 ├── split/                        (v1.2.0) Split one PDF into many (per-page or per-range)
 ├── extract/                      (v1.2.0) Pull selected pages into a new PDF
 ├── extract-text/                 (v1.3.0) Reading-order text (text | json | ndjson)
 ├── fill/                         (v1.3.0) Fill, flatten & export AcroForms
 ├── encrypt/                      (v1.3.0) Encrypt / decrypt (AES-128/256, --password, --stream)
-├── doctor/                       (v1.3.0) Environment / capability preflight
-├── annotate/                     (v1.2.0) Attach markup annotations (incremental save)
+├── doctor/                       (v1.3.0) Environment / capability preflight (02-capabilities.* = v1.5.0 fonts/unicode/conformance)
+├── annotate/                     (v1.2.0) Attach markup annotations (incremental save); 02-link.* = v1.5.0 link annotations
 ├── metadata/                     (v1.4.0) Incremental /Info + XMP metadata update (keeps signatures)
 ├── compare/                      (v1.4.0) Text/structure diff of two PDFs (CI exit codes)
 ├── govern/                       (v1.2.0) AI-governance / HITL: rules, policy, verify-issue
@@ -112,7 +141,8 @@ samples/
 │   ├── 01-json-and-dry-run.*     --json status envelope + --dry-run validation
 │   ├── 02-schema.*               `schema` command — versioned JSON Schemas
 │   ├── 03-error-envelope.*       Deterministic failures (stable E_* error codes)
-│   └── 04-token-economy.*        ~90% smaller output via --summary / --fields / compact JSON
+│   ├── 04-token-economy.*        ~90% smaller output via --summary / --fields / compact JSON
+│   └── 05-global-flags-first.*   (v1.5.0) `pdfnative --json --dry-run render …` — global flags before the command
 ├── completion/                   (v1.0.0) Shell-completion script generation
 ├── config/                       (v1.0.0) `.pdfnativerc.json` default-flags demo
 ├── sign/                         Digital signature shell / PowerShell scripts
@@ -124,7 +154,8 @@ samples/
 │   ├── 06-timestamp.*            (v1.4.0) PAdES B-T — sign --timestamp <tsa> --profile pades
 │   ├── 07-native-crypto.*        (v1.2.0) Native node:crypto (default) vs pure-JS (--pure-crypto)
 │   ├── 08-ltv.*                  (v1.4.0) Full PAdES ladder: B-B → B-T → B-LT → B-LTA
-│   └── 09-multiple-signatures.*  (v1.4.0) Two signers via --allow-multiple / --field-name
+│   ├── 09-multiple-signatures.*  (v1.4.0) Two signers via --allow-multiple / --field-name
+│   └── 10-timestamp-timeout.*    (v1.5.0) sign --timestamp <tsa> --timestamp-timeout <ms> (network only with PDFNATIVE_TSA_URL)
 ├── inspect/                      PDF inspection shell / PowerShell scripts
 │   ├── 01-json.*                 JSON metadata report
 │   ├── 02-text.*                 Human-readable text report
@@ -133,14 +164,17 @@ samples/
 │   ├── 05-pdfua.*                (v1.1.0) PDF/UA (ISO 14289-1) structural validation gate
 │   ├── 06-check-signed-encrypted.* (v1.1.0) CI gates for --check signed / --check encrypted
 │   ├── 07-annotations.*          (v1.2.0) List markup + link annotations (inspect --annotations)
-│   └── 08-list-signatures.*      (v1.4.0) inspect --signatures inventory + --check "signatures>=N"
+│   ├── 08-list-signatures.*      (v1.4.0) inspect --signatures inventory + --check "signatures>=N"
+│   ├── 09-check-pdfx.*           (v1.5.0) inspect --pdfx / --check pdfx on a PDF/X-4 render (pass, then broken by annotate)
+│   └── 10-iso-dates.*            (v1.5.0) inspect --iso-dates — PDF dates as ISO 8601
 ├── verify/                       Signature verification shell / PowerShell scripts
 │   ├── 01-self-signed.*          (v0.2.0) Verify a self-signed PDF
 │   ├── 02-strict-mode.*          (v0.2.0) `--strict` exits non-zero on failure
 │   ├── 03-cms-rsa.*              (v0.3.0) Verify CMS RSA-SHA256 signature value
 │   ├── 04-cms-ecdsa.*            (v0.3.0) Verify CMS ECDSA-SHA256 signature value
 │   ├── 05-revocation.*           (v1.0.0) OCSP/CRL revocation + timestamp (PAdES-T)
-│   └── 06-online-revocation.*    (v1.1.0) Offline default + commented SSRF-guarded online variant
+│   ├── 06-online-revocation.*    (v1.1.0) Offline default + commented SSRF-guarded online variant
+│   └── 07-weak-digest.*          (v1.5.0) timestampDigest + the SHA-1 weak-digest note, refused under --strict
 └── streaming/                    Streaming render Node.js scripts
 ```
 
@@ -242,13 +276,15 @@ pdfnative render --input doc.json --output doc.pdf --conformance 2b --font latin
 
 > **PDF/A conformance:** the `--tagged pdfa*` flag only *declares* the claim —
 > real conformance requires embedded fonts (ISO 19005 §6.2.11.4.1 / §6.3.4), so
-> always pass `--font latin --lang latin` (`run-all.js` applies them
-> automatically for the `pdfa` and `attachments` categories). Without them the
-> render emits a `PDFA_NO_FONT_ENTRIES` warning and the output fails the
-> reference validator. PDF/A outputs are validated with veraPDF in CI
-> (blocking — conformant corpus plus negative canaries); run
-> `npm run validate:pdfa` locally, but note it exits 0 as a *skip* when veraPDF
-> is not installed — that is not a proof of conformance.
+> always pass `--font latin --lang latin` (the generator's plan,
+> `scripts/lib/sample-plan.ts`, applies them to the `pdfa` and `attachments`
+> categories). Without them the render emits a `PDFA_NO_FONT_ENTRIES` warning and
+> the output fails the reference validator. PDF/A outputs are validated with
+> veraPDF in CI (blocking — a 16-file conformance corpus with negative canaries;
+> its PDF/X-4 entries are validated by pdfnative's validator); run
+> `npm run corpus:pdfa && npm run validate:pdfx && npm run validate:pdfa`
+> locally, but note the PDF/A step exits 0 as a *skip* when veraPDF is not
+> installed — that is not a proof of conformance.
 
 ### `render/encryption/` — Password Protection (v0.2.0)
 
@@ -286,16 +322,19 @@ This is the Factur-X / ZUGFeRD pattern — a human-readable PDF/A-3 with a machi
 
 ### `render/multilang/` — Non-Latin Scripts & Multilingual PDFs (v0.2.0)
 
-pdfnative ships Noto Sans font data for 22 Unicode scripts (plus a math font and
-COLRv1 colour emoji) inside the package itself (`pdfnative/dist/../fonts/noto-*-data.js`).
-No external font files, no network access, no extra dependencies. Font data is
-loaded lazily on first use and cached. The `render --font <code>` allow-list
-covers all 22 script codes — see the README feature table.
+pdfnative ships Noto Sans font data for 27 Unicode scripts (plus a math font and
+COLRv1 colour emoji — 31 font modules) inside the package itself
+(`pdfnative/dist/../fonts/noto-*-data.js`). No external font files, no network
+access, no extra dependencies. Font data is loaded lazily on first use and cached.
+The `render --font <code>` allow-list covers all 27 script codes plus the
+`ha` / `yo` / `ig` / `sw` aliases of `latin` — see the README feature table.
 
-Because the pdfnative CLI starts a fresh process per invocation, font loaders must
-be registered via `registerFonts()` **before** the render call — which is only
-possible from a programmatic Node.js context. The two `.js` driver scripts below
-do exactly that and then call `buildDocumentPDFBytes` directly.
+`--font <code> --lang <code>` registers a bundled script for the duration of one
+render, so no driver script is needed (`01-thai.json` renders with
+`--font th --lang th`). The two `.js` driver scripts below show the programmatic
+pattern instead — `registerFonts()` + `buildDocumentPDFBytes` from the pdfnative
+API — and honour `PDFNATIVE_SAMPLES_OUT` and `SOURCE_DATE_EPOCH` so the generator
+can include their output in the baseline.
 
 #### JSON samples (content + documentation)
 
@@ -305,6 +344,9 @@ do exactly that and then call `buildDocumentPDFBytes` directly.
 | [02-japanese.json](render/multilang/02-japanese.json) | Guide: how to enable Japanese / CJK rendering |
 | [03-thai.json](render/multilang/03-thai.json) | **Real Thai document** — monthly report with headings, paragraphs, list, table (all in Thai) |
 | [04-multilingual.json](render/multilang/04-multilingual.json) | **Real multilingual document** — English + Thai + Japanese + Arabic (RTL) + Russian in one PDF |
+| [05-lao.json](render/multilang/05-lao.json) | (v1.5.0) **Lao** — `--font lo --lang lo` (the 1.8.0 Lao shaper) |
+| [06-tai-tham-cham.json](render/multilang/06-tai-tham-cham.json) | (v1.5.0) **Tai Tham, New Tai Lue, Tai Le, Cham** — `--font nod --font khb --font tdd --font cjm` (USE engine) |
+| [07-african-latin.json](render/multilang/07-african-latin.json) | (v1.5.0) **Hausa, Yoruba, Igbo, Swahili** — `--font ha --font yo --font ig --font sw` resolve to the Latin font |
 
 #### Node.js driver scripts (Font loader + render)
 
@@ -375,6 +417,15 @@ const pdf = buildDocumentPDFBytes({
 | Tamil | `ta` | `noto-tamil-data.js` |
 | Georgian | `ka` | `noto-georgian-data.js` |
 | Armenian | `hy` | `noto-armenian-data.js` |
+| Telugu / Sinhala / Khmer / Myanmar / Tibetan / Amharic | `te` `si` `km` `my` `bo` `am` | `noto-*-data.js` (1.3.0) |
+| Lao | `lo` | `noto-lao-data.js` (1.8.0) |
+| Tai Tham (Lanna) | `nod` | `noto-taitham-data.js` (1.8.0) |
+| New Tai Lue | `khb` | `noto-newtailue-data.js` (1.8.0) |
+| Tai Le | `tdd` | `noto-taile-data.js` (1.8.0) |
+| Cham | `cjm` | `noto-cham-data.js` (1.8.0) |
+| Hausa / Yoruba / Igbo / Swahili | `ha` `yo` `ig` `sw` | aliases of `latin` (`noto-sans-data.js`) |
+
+`pdfnative doctor` lists the whole inventory (`fonts: 31 modules / 27 scripts`) and checks every module is on disk.
 
 ### `render/table-variant/` — Table-centric API (v0.2.0)
 
@@ -384,7 +435,7 @@ const pdf = buildDocumentPDFBytes({
 | [01-financial-transactions.sh](render/table-variant/01-financial-transactions.sh) | Driver using `--variant table` |
 | [01-financial-transactions.ps1](render/table-variant/01-financial-transactions.ps1) | PowerShell equivalent |
 
-`--variant table` switches the renderer to `buildPDFBytes` / `buildPDFStream`, which accept the lower-level `PdfParams` shape (suitable for ledger / transactional reports).
+`--variant table` switches the renderer to `buildPDFBytes` / `buildPDFStream`, which accept the lower-level `PdfParams` shape (suitable for ledger / transactional reports). Since v1.5.0 `--font latin --lang latin` embeds fonts on this path too, so a table render can claim PDF/A (`--tagged pdfa2b --strict`).
 
 ### `render/font/` — Font & Language Presets (v0.3.0)
 
@@ -399,8 +450,13 @@ const pdf = buildDocumentPDFBytes({
 | [03-emoji.json](render/font/03-emoji.json) | (v1.1.0) Monochrome emoji document body |
 | [03-emoji.sh](render/font/03-emoji.sh) | (v1.1.0) Renders with `--font emoji --lang emoji` |
 | [03-emoji.ps1](render/font/03-emoji.ps1) | (v1.1.0) PowerShell equivalent |
+| [04-new-scripts-1.8.json](render/font/04-new-scripts-1.8.json) | (v1.5.0) A table of the five 1.8.0 scripts — Lao, Tai Tham, New Tai Lue, Tai Le, Cham |
+| [04-new-scripts-1.8.sh](render/font/04-new-scripts-1.8.sh) | (v1.5.0) Renders with `--font lo --font nod --font khb --font tdd --font cjm --font latin` and the matching `--lang` list |
+| [04-new-scripts-1.8.ps1](render/font/04-new-scripts-1.8.ps1) | (v1.5.0) PowerShell equivalent |
+| [05-font-file.sh](render/font/05-font-file.sh) | (v1.5.0) `--font-file <path.ttf>[:name]` — registers a TrueType/OpenType file from disk (32 MiB cap, magic bytes, validated by the engine) and uses it as a `--lang` |
+| [05-font-file.ps1](render/font/05-font-file.ps1) | (v1.5.0) PowerShell equivalent |
 
-The `--font` and `--lang` flags select a preset (or, repeated, multiple scripts) from pdfnative's bundled font registry without requiring a `registerFonts` driver script. `latin` is the safe baseline; non-Latin presets can be selected directly by code (`te`, `si`, `km`, `my`, `bo`, `am`, `emoji`, `color-emoji`, …).
+The `--font` and `--lang` flags select a preset (or, repeated, multiple scripts) from pdfnative's bundled font registry without requiring a `registerFonts` driver script. `latin` is the safe baseline; non-Latin presets can be selected directly by code (`te`, `si`, `km`, `my`, `bo`, `am`, `lo`, `nod`, `khb`, `tdd`, `cjm`, `emoji`, `color-emoji`, …), and `--font-file` adds your own font — only from a command-line path, never from a JSON payload.
 
 ### `render/template/` — `--template` Deep Merge (v0.3.0)
 
@@ -411,7 +467,7 @@ The `--font` and `--lang` flags select a preset (or, repeated, multiple scripts)
 | [01-merge.sh](render/template/01-merge.sh) | `pdfnative render --template base.json --input override.json --output …` |
 | [01-merge.ps1](render/template/01-merge.ps1) | PowerShell equivalent |
 
-The CLI deep-merges `--template` into `--input` before rendering. Use this to share boilerplate across many documents (e.g. corporate header/footer templates). This category is **skipped by `run-all.js`** because both files are partial payloads.
+The CLI deep-merges `--template` into `--input` before rendering. Use this to share boilerplate across many documents (e.g. corporate header/footer templates). This category is **skipped by the generator** (`scripts/lib/sample-plan.ts`) because both files are partial payloads.
 
 ### `render/watch/` — `--watch` Auto-Rebuild (v0.3.0, interactive)
 
@@ -420,17 +476,17 @@ The CLI deep-merges `--template` into `--input` before rendering. Use this to sh
 | [01-basic.sh](render/watch/01-basic.sh) | Starts `pdfnative render … --watch` and re-renders on JSON change (Bash) |
 | [01-basic.ps1](render/watch/01-basic.ps1) | PowerShell equivalent |
 
-`--watch` keeps the process running and rebuilds the PDF whenever the input JSON changes. **Skipped by `run-all.js`** because it never exits — run manually and Ctrl-C when done.
+`--watch` keeps the process running and rebuilds the PDF whenever the input JSON changes. **Skipped by the generator** because it never exits — run manually and Ctrl-C when done.
 
 ### `render/table-smart/` — Smart Tables (v1.0.0)
 
 | File | Description |
 |------|-------------|
-| [01-smart-invoice.json](render/table-smart/01-smart-invoice.json) | Invoice using pdfnative 1.2.0 smart-table fields set directly in JSON: `zebra`, `caption`, `repeatHeader`, `wrap`, `minRowHeight`, `cellPadding` |
+| [01-smart-invoice.json](render/table-smart/01-smart-invoice.json) | Invoice using the smart-table fields (pdfnative ≥ 1.2.0) set directly in JSON: `zebra`, `caption`, `repeatHeader`, `wrap`, `minRowHeight`, `cellPadding` |
 | [01-smart-invoice.sh](render/table-smart/01-smart-invoice.sh) | Renders the smart-table invoice (Bash) |
 | [01-smart-invoice.ps1](render/table-smart/01-smart-invoice.ps1) | PowerShell equivalent |
 
-Smart-table fields live on the `table` block in the JSON payload (no extra CLI flags required), so `run-all.js` renders this category automatically. Document-wide defaults can also be supplied via the `--table-wrap` and `--zebra` render flags.
+Smart-table fields live on the `table` block in the JSON payload (no extra CLI flags required), so the generator renders this category like any other document. Document-wide defaults can also be supplied via the `--table-wrap` and `--zebra` render flags.
 
 ### `render/outline/` — PDF Bookmarks (v1.2.0)
 
@@ -441,7 +497,7 @@ Smart-table fields live on the `table` block in the JSON payload (no extra CLI f
 | [01-outline.sh](render/outline/01-outline.sh) | Renders bookmarks two ways: `--outline auto` (from headings) and `--outline <tree.json>` |
 | [01-outline.ps1](render/outline/01-outline.ps1) | PowerShell equivalent |
 
-`--outline auto` derives the bookmark tree from the document's headings; `--outline <file.json>` supplies an explicit tree. `run-all.js` renders `01-headings.json` with `--outline auto` and skips the non-document `02-outline-tree.json`.
+`--outline auto` derives the bookmark tree from the document's headings; `--outline <file.json>` supplies an explicit tree. The generator renders `01-headings.json` with `--outline auto` and skips the non-document `02-outline-tree.json`.
 
 ### `render/math/` — Mathematical Symbols (v1.2.0)
 
@@ -466,7 +522,7 @@ Registering `--font math` lets pdfnative auto-route math/technical code points t
 
 ## Page-Tree Samples (v1.2.0)
 
-pdfnative 1.5.0's page-tree API powers three composable document operations. Each ships Bash + PowerShell drivers that render their inputs first, then transform them.
+The engine's page-tree API (pdfnative ≥ 1.5.0) powers three composable document operations. Each ships Bash + PowerShell drivers that render their inputs first, then transform them.
 
 ### `merge/` — Concatenate PDFs
 
@@ -490,11 +546,11 @@ pdfnative 1.5.0's page-tree API powers three composable document operations. Eac
 | [01-extract.sh](extract/01-extract.sh) | Extracts pages in arbitrary order (`--pages 4,1-2`; order preserved, repeats allowed) |
 | [01-extract.ps1](extract/01-extract.ps1) | PowerShell equivalent |
 
-Page-tree commands (`merge`, `split`, `extract`) also accept `--password` for encrypted sources, `--encrypt [aes-128|aes-256]` (with `--owner-password`) to re-encrypt the output, and `--stream` for constant-memory output — all new in pdfnative 1.6.0.
+Page-tree commands (`merge`, `split`, `extract`) also accept `--password` for encrypted sources, `--encrypt [aes-128|aes-256]` (with `--owner-password`) to re-encrypt the output, and `--stream` for constant-memory output — all since pdfnative ≥ 1.6.0.
 
 ---
 
-## Text, Forms & Encryption Samples (v1.3.0, pdfnative 1.6.0)
+## Text, Forms & Encryption Samples (v1.3.0, pdfnative ≥ 1.6.0)
 
 ### `extract-text/` — Reading-Order Text Extraction
 
@@ -532,8 +588,10 @@ Passwords are read from `$PDFNATIVE_ENCRYPT_OWNER_PASS` / `$PDFNATIVE_ENCRYPT_US
 |------|-------------|
 | [01-doctor.sh](doctor/01-doctor.sh) | Human-readable + `--format json` capability report (agent pre-flight) |
 | [01-doctor.ps1](doctor/01-doctor.ps1) | PowerShell equivalent |
+| [02-capabilities.sh](doctor/02-capabilities.sh) | (v1.5.0) Projects the `fonts` (31 modules / 27 scripts), `unicode` and `conformance` checks with `--fields` — the pre-flight an agent runs before `--pdfx` or `--font lo` |
+| [02-capabilities.ps1](doctor/02-capabilities.ps1) | (v1.5.0) PowerShell equivalent |
 
-`doctor` checks the CLI/Node/pdfnative versions, Web Crypto (CSPRNG) availability — which `encrypt` requires — and the registered command count. Exit code 0 when all checks pass, 1 otherwise. Fully offline.
+`doctor` checks the CLI/Node/pdfnative versions, Web Crypto (CSPRNG) availability — which `encrypt` requires — the registered command count and, since v1.5.0, the bundled font inventory (each module probed on disk), the engine's Unicode version and the claimable conformance targets (`pdfa1b,pdfa2b,pdfa2u,pdfa3b,pdfx4`). Exit code 0 when all checks pass, 1 otherwise. Fully offline.
 
 ### `render/chart/` — Native Vector Charts
 
@@ -545,7 +603,7 @@ Passwords are read from `$PDFNATIVE_ENCRYPT_OWNER_PASS` / `$PDFNATIVE_ENCRYPT_US
 | [04-area-scatter.json](render/chart/04-area-scatter.json) | (v1.4.0) `area` with a secondary right axis (`series.yAxis` + `axis2`) and a `scatter` on a linear `xAxis` with a log-scale value axis |
 | [05-time-axis.json](render/chart/05-time-axis.json) | (v1.4.0) `line` on a time `xAxis` (ISO 8601 `xValues`) + bar chart with `labelRotation: 45` |
 
-Charts render as pure PDF path operators — zero dependencies, no rasterisation, tagged `/Figure` with alt text. Charts v2 (v1.4.0, pdfnative 1.7.0) grows the family to 9 types (`bar`, `barH`, `stackedBar`, `stackedBarH`, `line`, `area`, `scatter`, `pie`, `donut`) with dual axes (`axis2`), `xAxis` `category|linear|time`, logarithmic value scale, `dataLabels`, and `labelStride`/`labelRotation`. Rendered by `run-all.js` like any other document sample.
+Charts render as pure PDF path operators — zero dependencies, no rasterisation, tagged `/Figure` with alt text. Charts v2 (v1.4.0, pdfnative ≥ 1.7.0) grows the family to 9 types (`bar`, `barH`, `stackedBar`, `stackedBarH`, `line`, `area`, `scatter`, `pie`, `donut`) with dual axes (`axis2`), `xAxis` `category|linear|time`, logarithmic value scale, `dataLabels`, and `labelStride`/`labelRotation`. Series colours accept CMYK since v1.5.0. Rendered by the generator like any other document sample.
 
 ---
 
@@ -558,12 +616,15 @@ Charts render as pure PDF path operators — zero dependencies, no rasterisation
 | [01-annotations.json](annotate/01-annotations.json) | Three markup annotations (highlight, sticky text note, review square) on page 1 |
 | [01-annotate.sh](annotate/01-annotate.sh) | Attaches the annotations with an incremental save (original bytes preserved) |
 | [01-annotate.ps1](annotate/01-annotate.ps1) | PowerShell equivalent |
+| [02-links.json](annotate/02-links.json) | (v1.5.0) Two `link` annotations (`rect` + `url`) — one `https`, one `mailto` |
+| [02-link.sh](annotate/02-link.sh) | (v1.5.0) Attaches them, lists them back with `inspect --annotations`, then shows a `javascript:` URL refused with `E_INPUT` |
+| [02-link.ps1](annotate/02-link.ps1) | (v1.5.0) PowerShell equivalent |
 
-Annotations are attached with an incremental save, so any existing signature stays intact. Read them back with `inspect --annotations`.
+Annotations are attached with an incremental save, so any existing signature stays intact. Read them back with `inspect --annotations`. `link` URLs go through pdfnative's `validateURL` (`http`, `https`, `mailto` only); a link added to a PDF/X-4 file breaks its claim (see `inspect/09-check-pdfx.*`).
 
 ---
 
-## Long-term signatures & document ops Samples (v1.4.0, pdfnative 1.7.0)
+## Long-term signatures & document ops Samples (v1.4.0, pdfnative ≥ 1.7.0)
 
 v1.4.0 lights up the sign-side LTV ladder (PAdES B-T → B-LT → B-LTA) and adds document
 operations: metadata editing, PDF comparison, manifest pipelines, and print production.
@@ -595,13 +656,44 @@ operations: metadata editing, PDF comparison, manifest pipelines, and print prod
 |------|-------------|
 | [01-bleed-marks.json](render/print/01-bleed-marks.json) | (v1.4.0) `layout.print` — 9 pt bleed shorthand (derives `/TrimBox`, sets `/BleedBox`), crop + registration marks, `metadata.trapped` |
 | [02-viewer-prefs.json](render/print/02-viewer-prefs.json) | (v1.4.0) `layout.viewerPreferences` — duplex, `numCopies`, `printPageRange`, `pickTrayByPDFSize` print-dialog defaults |
+| [03-cmyk-colours.json](render/print/03-cmyk-colours.json) | (v1.5.0) CMYK colours — `"c m y k"` (0–1) and `[c,m,y,k]` (percent) on headings, paragraphs, a table and a chart; the content stream carries `k` / `K` operators |
+| [04-colour-bars.json](render/print/04-colour-bars.json) | (v1.5.0) `layout.print.marks.colourBars` — printer's colour bars beside the crop and registration marks (`{ tints, size }` form) |
+| [05-pdfx4.json](render/print/05-pdfx4.json) | (v1.5.0) A PDF/X-4 brochure body: CMYK text, bleed, trapped |
+| [05-pdfx4.sh](render/print/05-pdfx4.sh) | (v1.5.0) `render --pdfx pdfx4 --output-intent-icc synthetic-cmyk.icc --font latin --lang latin --trapped false --strict`, then `inspect --check pdfx` (exit 0), then an `annotate` link that breaks the claim (exit 1) |
+| [05-pdfx4.ps1](render/print/05-pdfx4.ps1) | (v1.5.0) PowerShell equivalent |
+| [synthetic-cmyk.icc](render/print/synthetic-cmyk.icc) | (v1.5.0) A synthetic ICC v2 `prtr` CMYK profile (from pdfnative's docs) — valid for the validators, **not a press profile** |
 
-Both are plain document samples rendered by `run-all.js`. `layout.print` also accepts explicit `trimBox`/`bleedBox`/`artBox`/`cropBox` and `userUnit`; an `outputIntent` (ICC RGB) can be declared alongside.
+`01`–`04` are plain document samples rendered by the generator; `05-pdfx4.json` is rendered with the PDF/X-4 flags (`scripts/lib/sample-plan.ts`). `layout.print` also accepts explicit `trimBox`/`bleedBox`/`artBox`/`cropBox` and `userUnit`; an `outputIntent` (ICC RGB for PDF/A-style characterisation, ICC `prtr` CMYK for PDF/X) can be declared in the JSON as a number array or passed with `--output-intent-icc`.
+
+### `render/typography/` — The Typography Engine (v1.5.0)
+
+| File | Description |
+|------|-------------|
+| [01-paragraph-breaking.json](render/typography/01-paragraph-breaking.json) | `layout.typography.widows` / `orphans`, `keepWithNext` on headings, `splittable` paragraphs — long paragraphs break across pages without a stranded line |
+| [02-justify-optical-hyphenation.json](render/typography/02-justify-optical-hyphenation.json) | `align: "justify"`, `opticalMargins`, `softHyphens` (U+00AD break opportunities) |
+| [03-french-spacing-units-short-words.json](render/typography/03-french-spacing-units-short-words.json) | `punctuationSpacing: "fr"` (narrow no-break space before `; : ! ?`, inside guillemets), `unitBinding` (`150 €`, `20 %` never break), short-word rules — the demonstrated content is French (`demo-language: fr`) |
+| [04-kerning-features-metrics.json](render/typography/04-kerning-features-metrics.json) | `kerning`, OpenType `features` (`onum`, `smcp`, `liga`), `metrics: "exact"` base-14 widths |
+| [01-typography.sh](render/typography/01-typography.sh) | Renders all four with `--font latin --lang latin`, then re-renders `01` with the flags `--split-paragraphs --keep-headings-with-next --kerning --font-features onum,liga` and shows `--inspect-layout` |
+| [01-typography.ps1](render/typography/01-typography.ps1) | PowerShell equivalent |
+
+Every typography option lives in `layout.typography` (JSON, `--layout` file or the four flags; flags win, nested objects merge one level). Requesting a feature the font cannot honour (`tnum` on a font without the table) emits `TYPOGRAPHY_FEATURE_INEFFECTIVE` — a warning, or `E_CHECK_FAILED` under `--strict`. Tagged output carries `/ActualText`, so `extract-text` returns the source text, not the inserted spaces.
+
+### `render/reproducible/` — Byte-Reproducible Output (v1.5.0)
+
+| File | Description |
+|------|-------------|
+| [01-pinned-date.json](render/reproducible/01-pinned-date.json) | A document with a `{date}` header placeholder, rendered with the global `--creation-date 2026-01-01T00:00:00Z` |
+| [02-source-date-epoch.json](render/reproducible/02-source-date-epoch.json) | The same document, rendered with `SOURCE_DATE_EPOCH=1767225600` (the same instant) — the baseline lists the two outputs as an identical pair |
+| [01-double-render.sh](render/reproducible/01-double-render.sh) | **The proof**: renders `01` under `TZ=Europe/Paris` and `TZ=UTC`, compares the SHA-256 (exit 1 if they differ), renders once more through `SOURCE_DATE_EPOCH`, then renders without a pin to show the bytes vary |
+| [01-double-render.ps1](render/reproducible/01-double-render.ps1) | PowerShell equivalent |
+
+`--creation-date` (or `SOURCE_DATE_EPOCH`) pins `/CreationDate`, `xmp:CreateDate`, the `{date}` placeholder and the trailer `/ID`, all in UTC. Encrypted output is never reproducible (CSPRNG keys), and a signed file's incremental revision carries a per-revision `/ID` — the baseline fingerprints those semantically.
 
 ### Network-dependent samples
 
-The timestamp / LTV samples ([sign/06-timestamp.*](sign/06-timestamp.sh) and
-[sign/08-ltv.*](sign/08-ltv.sh)) run **offline by default**: they always perform the
+The timestamp / LTV samples ([sign/06-timestamp.*](sign/06-timestamp.sh),
+[sign/08-ltv.*](sign/08-ltv.sh) and [sign/10-timestamp-timeout.*](sign/10-timestamp-timeout.sh))
+run **offline by default**: they always perform the
 offline part (render → PAdES B-B sign) and only exercise the network — through the
 CLI's SSRF-guarded client — when the `PDFNATIVE_TSA_URL` environment variable points
 at an RFC 3161 TSA. Without it, the network rungs are printed as explained commands.
@@ -652,6 +744,8 @@ Demonstrate the `pdfnative sign` command. Both Unix shell and PowerShell scripts
 | [sign/08-ltv.ps1](sign/08-ltv.ps1) | (v1.4.0) PowerShell equivalent |
 | [sign/09-multiple-signatures.sh](sign/09-multiple-signatures.sh) | (v1.4.0) Two signers on one PDF with `--allow-multiple` / `--field-name`, inventoried with `inspect --signatures` and both verified — fully offline |
 | [sign/09-multiple-signatures.ps1](sign/09-multiple-signatures.ps1) | (v1.4.0) PowerShell equivalent |
+| [sign/10-timestamp-timeout.sh](sign/10-timestamp-timeout.sh) | (v1.5.0) `sign --timestamp <tsa> --timestamp-timeout <ms>` — a bounded TSA round-trip reported as `timestamp.timeoutMs`; the `--dry-run` never opens a socket; network only when `PDFNATIVE_TSA_URL` is set |
+| [sign/10-timestamp-timeout.ps1](sign/10-timestamp-timeout.ps1) | (v1.5.0) PowerShell equivalent |
 
 **Prerequisites:** `openssl` on your PATH (ships with Git for Windows).
 
@@ -689,6 +783,10 @@ Demonstrate the `pdfnative inspect` command.
 | [inspect/07-annotations.ps1](inspect/07-annotations.ps1) | (v1.2.0) PowerShell equivalent |
 | [inspect/08-list-signatures.sh](inspect/08-list-signatures.sh) | (v1.4.0) `inspect --signatures` JSON inventory + `--check "signatures>=N"` CI gates (pass and clean-fail shown) — fully offline |
 | [inspect/08-list-signatures.ps1](inspect/08-list-signatures.ps1) | (v1.4.0) PowerShell equivalent |
+| [inspect/09-check-pdfx.sh](inspect/09-check-pdfx.sh) | (v1.5.0) Render a PDF/X-4 file, `inspect --pdfx --fields pdfx.valid,pdfxConformance` and `--check pdfx` (exit 0); then `annotate` a link and watch the claim fail (exit 1, `E_CHECK_FAILED`) |
+| [inspect/09-check-pdfx.ps1](inspect/09-check-pdfx.ps1) | (v1.5.0) PowerShell equivalent |
+| [inspect/10-iso-dates.sh](inspect/10-iso-dates.sh) | (v1.5.0) `inspect --iso-dates` — `metadata.creationDate` / `modDate` as ISO 8601 instead of `D:YYYYMMDD…` (pinned with `--creation-date` so the value is predictable) |
+| [inspect/10-iso-dates.ps1](inspect/10-iso-dates.ps1) | (v1.5.0) PowerShell equivalent |
 
 ---
 
@@ -710,8 +808,10 @@ Demonstrate the `pdfnative verify` command — verifies CMS/PKCS#7 signatures em
 | [verify/05-revocation.ps1](verify/05-revocation.ps1) | (v1.0.0) PowerShell equivalent |
 | [verify/06-online-revocation.sh](verify/06-online-revocation.sh) | (v1.1.0) Offline-by-default verify, with a commented SSRF-guarded `--revocation online` variant |
 | [verify/06-online-revocation.ps1](verify/06-online-revocation.ps1) | (v1.1.0) PowerShell equivalent |
+| [verify/07-weak-digest.sh](verify/07-weak-digest.sh) | (v1.5.0) Shows `timestampDigest` in the report and the `weak digest: RFC 3161 messageImprint uses SHA-1` note a legacy token produces; under `--strict` such a timestamp fails (`E_VERIFY_FAILED`) — fully offline |
+| [verify/07-weak-digest.ps1](verify/07-weak-digest.ps1) | (v1.5.0) PowerShell equivalent |
 
-**Scope:** verify checks **integrity** (byte-range SHA-256), **CMS signature value** (RSA-PKCS#1 v1.5 — SHA-256/384/512 since v1.4.0 — and ECDSA-SHA256 over P-256), **certificate chain signatures**, **trust** (against `--trust <root.pem>` PEM roots, or self-signed acceptance), **RFC 3161 timestamp validation (PAdES-T)**, and **OCSP (RFC 6960) + CRL (RFC 5280) revocation** — embedded from the PDF `/DSS` offline by default, with opt-in SSRF-guarded online fetching via `--revocation online`. Since v1.4.0 each signature also reports its `fieldName`, and `/DocTimeStamp` revisions (PAdES B-LTA) are validated as RFC 3161 tokens (`isDocTimestamp: true`). Sign-side LTV **shipped in v1.4.0** — see [sign/06-timestamp.*](sign/06-timestamp.sh), [sign/08-ltv.sh](sign/08-ltv.sh), and [SECURITY.md](../SECURITY.md#network-access--revocation-checking).
+**Scope:** verify checks **integrity** (byte-range SHA-256), **CMS signature value** (RSA-PKCS#1 v1.5 — SHA-256/384/512 since v1.4.0 — and ECDSA-SHA256 over P-256), **certificate chain signatures**, **trust** (against `--trust <root.pem>` PEM roots, or self-signed acceptance), **RFC 3161 timestamp validation (PAdES-T)**, and **OCSP (RFC 6960) + CRL (RFC 5280) revocation** — embedded from the PDF `/DSS` offline by default, with opt-in SSRF-guarded online fetching via `--revocation online`. Since v1.4.0 each signature also reports its `fieldName`, and `/DocTimeStamp` revisions (PAdES B-LTA) are validated as RFC 3161 tokens (`isDocTimestamp: true`); since v1.5.0 each timestamp reports its `timestampDigest` and a SHA-1 imprint is refused under `--strict`. Sign-side LTV **shipped in v1.4.0** — see [sign/06-timestamp.*](sign/06-timestamp.sh), [sign/08-ltv.sh](sign/08-ltv.sh), and [SECURITY.md](../SECURITY.md#network-access-opt-in-only).
 
 ---
 
@@ -730,7 +830,23 @@ Demonstrate the `pdfnative batch` command — renders every `*.json` in a direct
 | [batch/manifest/tasks.json](batch/manifest/tasks.json) | (v1.4.0) The pipeline manifest (schema subject `batch-manifest`) — `"@id"` flag values reference an earlier task's output |
 | [batch/manifest/report.json](batch/manifest/report.json) | (v1.4.0) Document definition rendered by the manifest's first task |
 
-In directory mode, render flags other than `--input-dir` / `--output-dir` / `--concurrency` / `--fail-fast` / `--format` are forwarded to every file. In manifest mode (v1.4.0), tasks run sequentially and may use 16 whitelisted commands; add `--continue-on-error` to keep going past a failure (tasks depending on it via `@` are skipped).
+In directory mode, render flags other than `--input-dir` / `--output-dir` / `--concurrency` / `--fail-fast` / `--format` are forwarded to every file. In manifest mode (v1.4.0), tasks run sequentially and may use the 14 whitelisted manifest commands (of the 21 commands); add `--continue-on-error` to keep going past a failure (tasks depending on it via `@` are skipped). A global `--creation-date` pins every task of the run (v1.5.0).
+
+---
+
+## Agent Samples (v1.1.0)
+
+Demonstrate the agent-native contract — see [../docs/AGENT_CONTRACT.md](../docs/AGENT_CONTRACT.md).
+
+| Script | Description |
+|--------|-------------|
+| [agent/01-json-and-dry-run.sh](agent/01-json-and-dry-run.sh) | `--json` status envelope on stderr + `--dry-run` validation without output |
+| [agent/02-schema.sh](agent/02-schema.sh) | `schema list` / `schema render` / `schema manifest` — self-description before invoking |
+| [agent/03-error-envelope.sh](agent/03-error-envelope.sh) | Deterministic failures: the `{ ok: false, error: { code } }` envelope and the 12 stable error codes |
+| [agent/04-token-economy.sh](agent/04-token-economy.sh) | `--summary`, `--fields` and compact JSON — ~90 % smaller stdout |
+| [agent/05-global-flags-first.sh](agent/05-global-flags-first.sh) | (v1.5.0) `pdfnative --json --dry-run render …` and `pdfnative --creation-date … render …` — global flags before the command name |
+
+Each script has a `.ps1` twin.
 
 ---
 
@@ -788,33 +904,34 @@ bash samples/streaming/03-true-streaming.sh
 
 ---
 
-## run-all.js Options
+## Generating every sample (the baseline)
 
 ```
-node samples/run-all.js [--category <name>] [--clean]
-
-  --category <name>   Only render samples in render/<name>/
-                      e.g. --category barcode
-  --clean             Delete samples/output/ before running
+npm run build && npm run test:generate          # every sample → test-output/samples/
+npx tsx scripts/generate-samples.ts --category <name>   # one category (render/<name>/ or a command family)
+npx tsx scripts/verify-samples.ts [--strict] [--json]   # compare with the committed baseline
+npx tsx scripts/verify-samples.ts --update      # rebaseline — declare it in the release note
 ```
 
-**Skipped categories:** `watch/` and `template/` are skipped by default — `watch/` runs forever, and `template/` contains partial payloads that must be merged via `--template`. Run them manually using the per-script `.sh` / `.ps1` drivers.
+`scripts/generate-samples.ts` (v1.5.0, replaces `run-all.js`) clears `test-output/samples/`
+and drives the **built** CLI (`dist/cli.cjs`, or `PDFNATIVE_CLI`) under `TZ=UTC` with the
+creation instant pinned twice — `--creation-date 2026-01-01T00:00:00Z` and
+`SOURCE_DATE_EPOCH=1767225600` — so every run yields the same 79 PDFs. The plan is
+`scripts/lib/sample-plan.ts`: per-category flags (`pdfa` / `attachments` → `--font latin
+--lang latin --tagged …`, `typography` → the four flags, `print/05-pdfx4.json` → the PDF/X-4
+flags, …), the multilang driver scripts, deterministic passwords for the encryption samples,
+and the derived steps (`merge` / `split` / `extract`, `annotate`, `fill`, `metadata`,
+`encrypt` / `decrypt`, `sign` with the committed test key pair and `--signing-time`).
 
-Examples:
+**Skipped:** `watch/` (never exits), `template/` (partial payloads), `outline/02-outline-tree.json`
+(not a document), `multilang/01-thai.json` and `02-japanese.json` (guides) — run them with the
+per-script `.sh` / `.ps1` drivers. Network samples (`sign --timestamp`, `doc-timestamp`,
+`ltv --online`) are out of the corpus by design.
 
-```bash
-# Render only barcode samples
-node samples/run-all.js --category barcode
-
-# Render the v0.3.0 font preset sample
-node samples/run-all.js --category font
-
-# Run the full render → sign → verify pipeline
-bash samples/sign/04-roundtrip.sh
-
-# Clean output and re-render everything
-node samples/run-all.js --clean
-```
+The baseline `tests/regression/baselines/samples.sha256.json` records a SHA-256 per sample —
+byte-exact for plain output, a canonical projection for the encrypted and signed ones — and
+the release each hash dates from (`since`). `tests/regression/samples.test.ts` and the
+`sample-regression` workflow hold every run to it.
 
 ---
 
@@ -910,4 +1027,5 @@ Every block type accepted by `pdfnative render` is demonstrated in [render/docum
 
 - [../README.md](../README.md) — Installation, quick start, command reference
 - [../docs/KNOWLEDGE_BASE.md](../docs/KNOWLEDGE_BASE.md) — Full CLI documentation, architecture, FAQ
+- [../docs/AGENT_CONTRACT.md](../docs/AGENT_CONTRACT.md) — The process contract for autonomous agents
 - [pdfnative library](https://github.com/Nizoka/pdfnative) — Core PDF generation engine (Node.js API with more features)

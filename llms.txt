@@ -1,13 +1,18 @@
 # pdfnative-cli
 
 > Official command-line interface for **pdfnative** — an agent-native PDF toolkit.
-> Render JSON to PDF, extract text, fill/flatten AcroForms, merge/split/extract
-> pages, encrypt/decrypt, sign and verify (CMS, LTV), and inspect — with a
-> deterministic process contract designed to be driven by autonomous AI agents.
+> Render JSON to PDF (typography, PDF/A, PDF/X-4, CMYK, 27 Unicode scripts), extract
+> text, fill/flatten AcroForms, merge/split/extract pages, encrypt/decrypt, sign and
+> verify (CMS, LTV), inspect and compare — with a deterministic process contract
+> designed to be driven by autonomous AI agents, and byte-reproducible output.
 > Zero extra runtime dependencies; all PDF logic lives in `pdfnative`.
 
+Current version: 1.5.0 (built on pdfnative 1.8.0; requires Node ≥ 22).
+Verified on 2026-09-16 against the source tree.
+
 This file is an LLM-facing capability manifest (see https://llmstxt.org). For a
-machine-readable JSON manifest run `pdfnative schema manifest`.
+machine-readable JSON manifest run `pdfnative schema manifest`; the full contract is
+docs/AGENT_CONTRACT.md.
 
 ## Process contract (how to call it)
 
@@ -17,8 +22,8 @@ machine-readable JSON manifest run `pdfnative schema manifest`.
 - **Exit codes**: `0` success, `1` runtime/check failure, `2` usage error.
 - **`--json`** (agent mode): success emits `{ "ok": true, "command", … }` on
   stderr; failure emits `{ "ok": false, "command", "error": { "code", "message" } }`.
-  Place `--json` AFTER the sub-command name.
-- **Stable error codes** (branch on these, not on the message):
+  Global flags may be placed before or after the command name (v1.5.0).
+- **12 stable error codes** (branch on these, not on the message):
   `E_USAGE, E_INPUT, E_PARSE, E_IO, E_SIGN, E_VERIFY_FAILED, E_CHECK_FAILED,`
   `E_POLICY, E_UNSUPPORTED, E_PASSWORD, E_NETWORK, E_RUNTIME`.
 - **Offline by default**: the ONLY network opt-ins are `verify --revocation online`,
@@ -26,53 +31,63 @@ machine-readable JSON manifest run `pdfnative schema manifest`.
   `batch --allow-network`; all SSRF-guarded, no redirects. Failures → `E_NETWORK`.
 - **Token economy**: `--summary` (minimal verdict), `--fields a,b.c` (dot-path
   projection), compact JSON by default under `--json` (`--pretty` opts out).
-- **`--dry-run`** validates inputs without writing output.
+- **`--dry-run`** validates inputs without writing output and never touches the network.
+- **Reproducible output** (v1.5.0): global `--creation-date <iso8601>` (or
+  `SOURCE_DATE_EPOCH`) pins every date in UTC — the same input renders to identical
+  bytes on every host. Encrypted output is never reproducible (CSPRNG keys).
 - **Self-description**: `pdfnative schema <subject>` (Draft 2020-12, 19 subjects
-  incl. `metadata`, `ltv-data`, `compare`, `batch-manifest`) and
+  incl. `render`, `status`, `metadata`, `ltv-data`, `compare`, `batch-manifest`) and
   `pdfnative schema manifest` (capability list) — validate before you invoke.
 - **PAdES ladder**: `sign --timestamp <tsa> --profile pades` (B-T) →
   `ltv add --online` (B-LT) → `doc-timestamp --url <tsa>` (B-LTA) →
   `ltv add --online`.
 
-## Commands
+## Commands (21 commands)
 
-- `render` — JSON document/table → PDF (22 Unicode scripts, math, colour emoji,
-  bookmarks, native charts, watermarks, PDF/A, encryption, streaming). PDF/A
-  outputs are validated against the veraPDF reference validator in CI
-  (blocking); conformance recipe: `--tagged pdfa<level> --font latin --lang latin`.
+- `render` — JSON document/table → PDF (27 Unicode scripts + `--font-file`, math,
+  colour emoji, bookmarks, native charts, watermarks, PDF/A, PDF/X-4
+  (`--pdfx pdfx4 --output-intent-icc <cmyk.icc> --trapped false`), CMYK colours,
+  typography (`layout.typography`; `--split-paragraphs`, `--keep-headings-with-next`,
+  `--kerning`, `--font-features`), encryption, streaming). `--strict` turns the 9
+  diagnostic codes into `E_CHECK_FAILED`. PDF/A outputs are validated against veraPDF
+  in CI (blocking); recipe: `--tagged pdfa<level> --font latin --lang latin`.
 - `extract-text` — reading-order Unicode text as `text | json | ndjson`
-  (`--runs` for positioned runs, `--password` for encrypted PDFs). No OCR.
+  (`--runs` for positioned runs, `--password` for encrypted PDFs). No OCR; tagged
+  input yields the `/ActualText` source text.
 - `fill` — fill, flatten, and/or **export** an AcroForm (`--data values.json`,
   `--flatten`, `--export`); incremental save keeps existing signatures valid.
-  `fill --export` emits current values as a `--data` map (read → edit → fill).
 - `encrypt` / `decrypt` — re-secure with AES-128/256, or remove encryption
   (`--password`, `--stream` for constant memory). Rebuilds the page tree (drops
   signatures/forms, like `merge`).
 - `merge` / `split` / `extract` — page-tree ops; support encrypted sources
   (`--password`), output re-encryption (`--encrypt`), and constant-memory
   streaming (`--stream`).
-- `annotate` — attach markup annotations via incremental save (`--password` for
-  encrypted PDFs).
+- `annotate` — attach markup annotations and (v1.5.0) `link` annotations (`url`
+  validated: http/https/mailto) via incremental save (`--password` for encrypted PDFs).
 - `metadata` — update /Info + XMP metadata via incremental save (existing
-  signatures stay valid); reading metadata stays in `inspect`.
+  signatures stay valid); reading metadata stays in `inspect`. Note: the rewrite drops
+  a PDF/X identification (upstream limit) — re-check with `inspect --check pdfx`.
 - `sign` / `verify` — CMS/PKCS#7 RSA & ECDSA signing (native constant-time
-  crypto; `--timestamp <tsa-url>` for RFC 3161 / PAdES B-T, `--profile pades`,
-  `--digest sha256|sha384|sha512`, `--allow-multiple` for multi-signatures,
-  visible `--signature-rect`) and verification with LTV (RFC 3161 timestamps,
-  /DocTimeStamp revisions, OCSP, CRL).
+  crypto; `--timestamp <tsa-url>` for RFC 3161 / PAdES B-T with `--timestamp-timeout
+  <ms>`, `--profile pades`, `--digest sha256|sha384|sha512`, `--allow-multiple` for
+  multi-signatures, visible `--signature-rect`) and verification with LTV (RFC 3161
+  timestamps, /DocTimeStamp revisions, OCSP, CRL). `verify` reports `timestampDigest`
+  and refuses a SHA-1 messageImprint under `--strict`.
 - `ltv` — PAdES B-LT: `collect` (needs `--online`) / `embed` (100% offline) /
   `add` — archive OCSP+CRL validation data into /DSS + /VRI.
 - `doc-timestamp` — PAdES B-LTA: append an RFC 3161 /DocTimeStamp revision
   (`--url <tsa>` required; repeat to renew).
 - `compare` — diff two PDFs by text + structure; identical → exit 0,
   different → exit 1 / `E_CHECK_FAILED`. No visual/raster diff.
-- `inspect` — metadata, conformance, signatures (`--signatures` inventory),
-  annotations, form fields (`--form-fields`), encryption scheme
-  (`--encryption`), PDF/UA validation, `--check "signatures>=N"`.
+- `inspect` — metadata (`--iso-dates` → ISO 8601), PDF/A and PDF/X conformance
+  (`--pdfx` report), signatures (`--signatures` inventory), annotations, form fields
+  (`--form-fields`), encryption scheme (`--encryption`), PDF/UA validation,
+  `--check pdfa|signed|encrypted|pdfua|pdfx|"signatures>=N"`; `--summary` =
+  `{ pages, encrypted, signatures, pdfa, pdfx }`.
 - `batch` — render a directory of JSON inputs in parallel, or run a
   declarative multi-command pipeline (`--manifest tasks.json`, `@<id>` output
-  references, `--allow-network` gate). 14 whitelisted manifest commands:
-  render, sign, verify, inspect, merge, split, extract, extract-text, fill,
+  references, `--allow-network` gate). The manifest whitelist holds 14 of the 21
+  commands: render, sign, verify, inspect, merge, split, extract, extract-text, fill,
   encrypt, decrypt, annotate, metadata, doc-timestamp (ltv and compare need
   positional arguments and are not yet manifest-callable).
 - `govern` — AI-governance / Human-in-the-Loop contract (`rules`, `policy`,
@@ -81,18 +96,21 @@ machine-readable JSON manifest run `pdfnative schema manifest`.
   (bash|zsh|fish|powershell).
 - `doctor` — offline environment/capability preflight (`--format json`): CLI /
   Node / pdfnative versions, Web Crypto CSPRNG (required by `encrypt`), command
-  count. Exit 0/1 — run it as an agent pre-flight before `encrypt`.
+  count, font inventory (31 font modules / 27 scripts), Unicode version, conformance
+  targets. Exit 0/1 — run it as an agent pre-flight.
 
 ## Governance (read before autonomous use)
 
 Agents are **draftsmen, never autonomous submitters**: no runtime dependencies,
 a local reproduction for every bug, and a mandatory human review before anything
 is submitted under a human identity. `pdfnative govern verify-issue <draft>`
-gates drafts (exit `1` / `E_POLICY` on violation). See AGENTS.md.
+gates drafts (exit `1` / `E_POLICY` on violation). See docs/AGENT_CONTRACT.md §6.
 
 ## Docs
 
 - README.md — features, examples, command reference.
-- AGENTS.md — the full agent-automation contract.
+- docs/AGENT_CONTRACT.md — the full agent-automation contract (consumers).
+- AGENTS.md — rules for agents working on the repository itself.
 - docs/KNOWLEDGE_BASE.md — deep reference.
+- release-notes/v1.5.0.md — what changed in this release.
 - Requires Node ≥ 22 (also runs on Bun and Deno). MIT licensed.

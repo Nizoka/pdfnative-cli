@@ -7,6 +7,213 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] – 2026-09-17
+
+Built on **pdfnative 1.8.0**. Exposes every 1.8.0 engine feature — the typography engine,
+CMYK colours and colour bars, PDF/X-4 output with a structural validator, five more scripts
+(27 Unicode scripts in all) with `latin` aliases, custom fonts from disk, UTC and pinnable
+creation dates — and delivers every roadmap item the engine unblocked: global flags before
+the command, `annotate link`, `sign --timestamp-timeout`, a weak-digest note in `verify`,
+`inspect --iso-dates`, richer `doctor` checks, three more SSRF-blocked ranges, a size cap on
+`--layout`, table-variant font embedding and CHANGELOG compare links. The repository adopts
+the engine's engineering: one quality gate, a byte-exact sample baseline, a PDF/A + PDF/X
+conformance corpus, hardened CI with Trusted Publishing and attestations, a documentation
+verifier, and a committed Claude Code layer. 21 commands, 19 schema subjects and 12 stable
+error codes are unchanged; the global flag count grows to 10 (`--creation-date`). 100 %
+backward-compatible command surface — every envelope field is additive.
+
+### Added
+
+#### `render`
+
+- **Typography** — `layout.typography` (`widows`, `orphans`, `keepWithNext`,
+  `splitParagraphs`, `keepHeadingsWithNext`, `justify`, `opticalMargins`, `softHyphens`,
+  `punctuationSpacing: "fr" | {…}`, `unitBinding`, `kerning`, `features`, `metrics`),
+  paragraph `align: "justify"`, block-level `keepWithNext` / `splittable`, plus the flags
+  `--split-paragraphs`, `--keep-headings-with-next`, `--kerning` and
+  `--font-features <tag,…>` (four-character OpenType tags, validated). Nested `typography`
+  and `outputIntent` objects now merge one level deep between the document, `--layout` and
+  the flags (`mergeNestedLayout`); previously the whole object was replaced.
+- **CMYK colours** everywhere a colour is accepted (`"c m y k"` 0–1 or `[c,m,y,k]` percent),
+  and `layout.print.marks.colourBars: true | { tints, size }`.
+- **PDF/X-4** — `--pdfx pdfx4`, `--output-intent-icc <file.icc>` (16 MiB cap, `acsp`
+  signature checked; merged into `layout.outputIntent`), `--output-intent-id <s>` (default:
+  the profile's basename) and `--trapped true|false|unknown` (document and table variants).
+  Pre-checks refuse `--pdfx` with `--tagged` / `--conformance` or any encryption flag
+  (exit 2); every PDF/X and print coherence message the engine throws maps to `E_INPUT`
+  (`src/utils/build-errors.ts`, fixture `tests/fixtures/pdfnative-build-errors.json`);
+  `PDFX_NO_FONT_ENTRIES`, `PDFX_DEVICE_CMYK`, `PDFX_ANNOTATIONS` and
+  `TYPOGRAPHY_FEATURE_INEFFECTIVE` join the `--strict` diagnostics (9 codes); the `--json`
+  envelope carries `pdfx`.
+- **27 Unicode scripts** — `--font` / `--lang` accept `lo` (Lao), `nod` (Tai Tham), `khb`
+  (New Tai Lue), `tdd` (Tai Le) and `cjm` (Cham); `ha`, `yo`, `ig` and `sw` resolve to
+  `latin` (`src/utils/fonts.ts`, 31 bundled font modules).
+- **`--font-file <path.ttf>[:name]`** (repeatable) — register a TrueType/OpenType font from
+  disk: path-traversal check, 32 MiB cap, magic bytes (`00 01 00 00`, `true`, `OTTO`;
+  collections and WOFF refused), `parseFontData` + `validateFontData` (errors → `E_INPUT`,
+  warnings → stderr), name from the file stem (`[a-z0-9-]`), added to `--lang`; a name
+  colliding with the bundled allow-list is a usage error. Never loadable from a JSON payload.
+- **`--variant table` embeds fonts** — `--lang` codes now feed `PdfParams.fontEntries`, so a
+  table render can claim PDF/A (the former negative canary became a positive corpus entry).
+- **Layout revival** — `--layout` files and inline `layout` objects revive `creationDate`
+  (ISO string → `Date`) and `outputIntent.iccProfile` (`number[]` → bytes); `--layout` files
+  share the 50 MB JSON cap.
+
+#### Global flags and reproducible output
+
+- **`--creation-date <iso8601>`** (10th global flag) — pins the creation instant of every PDF
+  written in the run through `setDefaultCreationDate()` (process-wide, so `batch` tasks
+  inherit it): `/CreationDate`, `xmp:CreateDate`, the `{date}` placeholder and the trailer
+  `/ID` derive from it, in UTC. Falls back to `$SOURCE_DATE_EPOCH` (integer seconds); an
+  invalid value is a usage error. The envelope carries `creationDate`. `sign --signing-time`
+  and `metadata --mod-date` stay separate instants; encrypted output is never reproducible.
+- **Global flags before the command** — `pdfnative --json --dry-run render …` works:
+  `parseArgs` takes a boolean-flag table (`GLOBAL_BOOLEAN_FLAGS`) and `splitCommandArgv()`
+  finds the command wherever the global flags sit.
+
+#### `inspect`, `annotate`, `sign`, `verify`, `doctor`
+
+- `inspect --pdfx` (PDF/X-4 validation report), `--check pdfx`, `pdfxConformance` (XMP
+  `pdfxid:GTS_PDFXVersion`, always present), `--iso-dates` (PDF dates → ISO 8601 via
+  `src/utils/pdfdate.ts`), `--summary` gains `pdfx`; the text report prints `PDF/X:` and
+  `PDF/X check:` lines.
+- `annotate` type **`link`** — `rect` + `url` (`validateURL`: `http`, `https`, `mailto`;
+  `E_INPUT` otherwise), emitted as a `/Link` annotation with a `/URI` action; colours accept
+  CMYK.
+- `sign --timestamp-timeout <ms>` — bound on the TSA round-trip (positive integer; usage error
+  without `--timestamp`), passed to `createTsaProvider` and reported as `timestamp.timeoutMs`.
+- `verify` reports each timestamp's `timestampDigest`; a SHA-1 `messageImprint` adds the note
+  `weak digest: RFC 3161 messageImprint uses SHA-1 (refused under --strict)` and fails the
+  timestamp under `--strict` (`E_VERIFY_FAILED`).
+- `doctor` checks `fonts` (`31 modules / 27 scripts`, each module probed on disk), `unicode`
+  (`USE_UNICODE_VERSION`) and `conformance` (`pdfa1b,pdfa2b,pdfa2u,pdfa3b,pdfx4`).
+
+#### Agent surface
+
+- `schema`: `render` describes `layout.typography`, `layout.pdfx`, CMYK colours and
+  `colourBars`; `inspect` requires `pdfxConformance` and pins `pdfx`; `inspect-summary`
+  requires `pdfx`; `status` pins `pdfx`, `creationDate` and `timestamp.timeoutMs`; `annotate`
+  gains the `link` type and `url`; `verify` gains `timestampDigest`. `SUBJECTS` is exported.
+- `completion`: `--creation-date` in every shell; the new `render`, `inspect` and `sign` flags.
+- `govern policy` now prints the full `.github/ai-governance.json` (1.1.0, `claude_code`
+  block included); the embedded copy is held identical by `verify:docs`.
+- `docs/AGENT_CONTRACT.md` — the consumer contract moved out of AGENTS.md (which now holds
+  the repository rules for agents, under the 16 KiB Claude Code budget with `CLAUDE.md`).
+
+#### Tooling, CI and repository hardening (ported from pdfnative 1.8.0)
+
+- **`npm run gate`** (`scripts/gate.ts`) — one quality gate with `--fast`, CI (default) and
+  `--publish` profiles, `--only <step>`, `--json`, `--require-all` (a skipped step fails);
+  steps: typecheck:all, lint, test / test:coverage, build, dist-check, smoke (the built
+  binary), bundle-size (`declared.bundleBudgetBytes`), verify:docs, test:generate,
+  verify:samples, corpus:pdfa, validate:pdfx, validate:pdfa.
+- **Reproducible samples** — `scripts/generate-samples.ts` drives the BUILT CLI under
+  `TZ=UTC` with the creation instant pinned twice (`--creation-date` and
+  `SOURCE_DATE_EPOCH`); `samples/run-all.js` is removed (`npm run test:generate` replaces
+  it, `PDFNATIVE_CLI` points it at a global install). `scripts/verify-samples.ts` holds the
+  79 generated PDFs to `tests/regression/baselines/samples.sha256.json` — 69 byte-exact, 10
+  semantic (encrypted: CSPRNG keys; signed: per-revision `/ID`) — as a chain with `since`
+  per entry; `tests/regression/samples.test.ts` mirrors it.
+- **Conformance corpus** — `scripts/generate-pdfa-corpus.ts` + `validate-pdfa.ts` +
+  `validate-pdfx.ts` (TypeScript, shared cores in `scripts/lib/`): 16 files, 13 PDF/A
+  (2 negative canaries) validated by veraPDF 1.30.2, 3 PDF/X-4 (1 negative canary) validated
+  in-process; reproducible (fixture key pair, pinned dates, per-file SHA-256 in the manifest).
+- **`npm run verify:docs`** (`scripts/verify-docs.ts`, 25 rules) over
+  `docs/assets/ecosystem.json`: counts derived from the source constants (commands, subjects,
+  codes, flags, corpus, fonts, samples, baseline), stale/version/count tokens, command / flag /
+  schema / error parity, governance embed, dual-shell samples, Claude Code budgets, agent
+  config, generated rules, PR template, EOL, skills, links, stamps, English-only prose.
+- **`scripts/release-prepare.ts`** — one-pass version bump (manifests, ecosystem, stamps,
+  CITATION, SECURITY table, README banner, KB footer, llms.txt, release-note scaffold).
+- **Workflows** — `ci.yml` (Node 22/24 matrix, `npm audit`, the gate with `--require-all`),
+  `publish.yml` (Trusted Publishing with npm 11.19.1, tag/version check, veraPDF composite
+  action, publish gate, `npm sbom` + build attestations, release upload), `verapdf.yml`,
+  `sample-regression.yml`, `dependency-review.yml`, `audit.yml`, `docs.yml` (offline on PR,
+  weekly `--online --strict`), `codeql.yml`, `scorecard.yml` — all under harden-runner with
+  SHA-pinned actions, `persist-credentials: false` and `npm ci --ignore-scripts`;
+  `.github/actions/setup-verapdf` with the installer's SHA-256; `.github/rulesets/`
+  (main: required checks `ci (22)`, `ci (24)`, `sample-regression`; tags: `v*` immutable).
+- **Repository hygiene** — `.npmrc` (`ignore-scripts`, `audit-level=high`), `.nvmrc` /
+  `.node-version` = 22, `.gitattributes` (`eol=lf`, binaries, generated files), opt-in git
+  hooks (`npm run hooks:install`), `tsconfig.scripts.json`, vitest under `TZ=UTC` with
+  `pool: 'forks'` and a JSON report for the gate, `.vscode/settings.json`.
+- **Claude Code layer** — `CLAUDE.md` = `@AGENTS.md` + addendum, `.claude/settings.json`
+  (Read deny list, HITL Bash denies, no attribution), `.claude/hooks/guard.mjs` (fail-closed
+  PreToolUse hook refusing publish / push / tag / GitHub writes in every shell segment and
+  interpreter payload; `tests/tools/guard.test.ts`), `.claude/rules/` generated from
+  `.github/instructions/` (`npm run agents:rules`), the `/release-audit` skill,
+  `.github/prompts/quality-gate.prompt.md`, `.github/ai-governance.json` 1.1.0.
+- **Samples** — typography (4), print (CMYK colours, colour bars, PDF/X-4 with a synthetic
+  CMYK profile), multilang (Lao; Tai Tham / New Tai Lue / Tai Le / Cham; Hausa / Yoruba / Igbo /
+  Swahili), font (the five 1.8.0 scripts, `--font-file`), reproducible (pinned date twice; the
+  double-render script proves byte identity across timezones), `inspect --check pdfx` and
+  `--iso-dates`, `doctor` capabilities, `annotate link`, `verify` weak digest,
+  `sign --timestamp-timeout`, global flags first — each as a dual-shell pair.
+- **Tests** — 1058 tests across 72 files (600 in 1.4.0): every feature above,
+  the tools (gate, validators, fingerprints, sample plan, verify-docs, release-prepare, agent
+  config, guard, workflows), the sample regression suite, an English-only prose scan, a
+  reproducible-build integration test that spawns the built binary under two timezones, and a
+  PDF/X round-trip (render → check → `annotate` breaks the claim → `metadata` drops the
+  identification).
+
+### Changed
+
+- **Inherited from pdfnative 1.8.0** — every date is written in UTC (`+00'00'`) and the
+  `{date}` placeholder follows the pinned creation date; tagged output carries `/ActualText`,
+  so `extract-text` / `compare` return the source text where the typography engine inserted
+  narrow no-break spaces or soft hyphens; TrueType subsets carry hinting tables. Every PDF
+  the CLI writes therefore differs byte-wise from 1.4.0 output; the command surface, the
+  envelopes and the exit codes do not.
+- `schema render` / `schema annotate` descriptions widened for CMYK colours; the `--strict`
+  usage text lists all 9 diagnostic codes.
+- `ltv` and `doc-timestamp` inherit `--creation-date` for nothing (their instants are legal
+  facts); `batch` tasks inherit it for every render.
+- `AGENTS.md` restructured after pdfnative's (mission, gate, where-is-what, architecture,
+  contract in brief, never touch, generated files, counts, releasing, governance, ecosystem);
+  `.github/copilot-instructions.md` and the three instruction files refreshed (the Copilot file
+  had said "eleven commands" and "Node ≥ 20" since 1.2.0).
+- `docs/assets/ecosystem.json` is the single source of every count and version; `README`,
+  `docs/KNOWLEDGE_BASE.md`, `llms.txt` and `docs/AGENT_CONTRACT.md` carry a `Verified on`
+  stamp; `CONTRIBUTING.md` documents the gate, the corpus, the baseline policy and the release
+  procedure; `.github/pull_request_template.md` mirrors its checklist.
+
+### Fixed
+
+- `pdfnative --json render …` (a global boolean flag placed before the command) no longer
+  swallows the command name.
+- `render --layout` no longer replaces a nested `typography` / `outputIntent` object supplied
+  by the document when the file sets a sibling key.
+- `tests/commands/render-enhancements.test.ts` used a 128-byte fake ICC profile that the
+  1.8.0 engine rejects (no `acsp` signature); the suite now uses a real synthetic profile.
+
+### Security
+
+- SSRF guard: the benchmarking range `198.18.0.0/15`, TEST-NET-1 `192.0.2.0/24` and the NAT64
+  prefix `64:ff9b::/96` (incl. their IPv4-mapped forms) are refused.
+- `--layout` files are capped at 50 MB before parsing; ICC profiles at 16 MiB with the `acsp`
+  signature checked; custom fonts at 32 MiB with magic-byte and parser validation; fonts and
+  profiles are only ever loaded from command-line paths.
+- `verify` surfaces SHA-1 timestamp imprints and refuses them under `--strict`.
+- Supply chain: Trusted Publishing (OIDC, npm ≥ 11.5.1), SBOM + build attestations on the
+  release, harden-runner on every job, SHA-pinned actions, `npm ci --ignore-scripts`, weekly
+  `npm audit`, dependency review, committed rulesets, `git` hooks and a Claude Code guard hook.
+
+### Documentation
+
+- README: banner, highlights, feature table (v1.5.0 block), PDF/A & PDF/X status, quick start
+  (typography / PDF/X-4 / reproducible), samples table (every category, agent scripts), command
+  reference (render, sign, inspect, verify, doctor, annotate, global options), agent section,
+  security section.
+- `docs/KNOWLEDGE_BASE.md`: architecture tree, data flow, per-command reference for the 1.5.0
+  surface, agent contract (envelope fields, error-code table), security model, API mapping,
+  development quick reference (the gate), samples, FAQ; `Verified on` footer.
+- `docs/AGENT_CONTRACT.md` (new), `llms.txt`, `SECURITY.md` (supported versions, input
+  validation, SSRF ranges, reproducible builds, supply chain), `CONTRIBUTING.md`,
+  `CITATION.cff`, `samples/README.md`, `tests/fixtures/README.md`, `ROADMAP.md` (v1.5.0 block;
+  the remaining items are upstream-blocked or deferred by posture, incl. the new gaps:
+  `metadata` drops the PDF/X identification, signed output carries a per-revision `/ID`,
+  PDF/X-1a / -3 / -4p, PDF/A + PDF/X in one file, hyphenation dictionaries).
+
 ## [1.4.0] – 2026-08-26
 
 Built on **pdfnative 1.7.0**. Completes the PAdES ladder promised on the roadmap — trusted
@@ -807,3 +1014,14 @@ gains config-file, batch, completion and global-flag ergonomics.
 - Root `README.md` Examples section updated to reflect new categorized sample layout.
 - `docs/KNOWLEDGE_BASE.md` updated with complete block type reference table (all 10 block
   types: heading, paragraph, table, list, barcode, link, toc, formField, spacer, pageBreak).
+
+[Unreleased]: https://github.com/Nizoka/pdfnative-cli/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/Nizoka/pdfnative-cli/compare/v1.4.0...v1.5.0
+[1.4.0]: https://github.com/Nizoka/pdfnative-cli/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/Nizoka/pdfnative-cli/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/Nizoka/pdfnative-cli/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/Nizoka/pdfnative-cli/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/Nizoka/pdfnative-cli/compare/v0.3.0...v1.0.0
+[0.3.0]: https://github.com/Nizoka/pdfnative-cli/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/Nizoka/pdfnative-cli/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Nizoka/pdfnative-cli/releases/tag/v0.1.0

@@ -57,7 +57,7 @@ This document outlines the planned development direction for pdfnative-cli. Prio
   default) and opt-in online fetching via AIA / CDP URLs through an SSRF-guarded
   client. `verify --revocation offline|online|disabled` and
   `--revocation-policy soft-fail|strict`.
-- [x] **Smart tables** — `render` exposes pdfnative 1.2.0 `TableBlock` smarts via both
+- [x] **Smart tables** — `render` exposes the engine's `TableBlock` smarts (pdfnative ≥ 1.2.0) via both
   `--layout` JSON and dedicated flags (`--table-wrap`, `--repeat-header`, `--zebra`,
   `--min-row-height`, `--cell-padding`).
 - [x] **Page-by-page streaming** — `render --stream-page-by-page` (TOC- and
@@ -70,10 +70,15 @@ This document outlines the planned development direction for pdfnative-cli. Prio
 
 ## Recent releases
 
+<!-- The release history below quotes the engine version and the counts of its day; verify-docs:allow version-token / stale-token markers keep it verbatim. -->
+
+<!-- verify-docs:allow version-token -->
 ### v1.1.0 — pdfnative 1.3.0 coverage _(released 2026-06-30)_
 
 - [x] **`pdfnative` bumped** to `^1.3.0` (was `^1.2.0`).
+<!-- verify-docs:allow stale-token -->
 - [x] **22 Unicode scripts + COLRv1 colour emoji** — `render --font` allow-list expanded to
+<!-- verify-docs:allow version-token -->
   every bundled pdfnative font, including the six new 1.3.0 scripts (Telugu `te`, Sinhala
   `si`, Tibetan `bo`, Khmer `km`, Myanmar `my`, Amharic/Ethiopic `am`) and `color-emoji`.
 - [x] **`render --stream-true`** — true constant-memory streaming
@@ -88,10 +93,11 @@ This document outlines the planned development direction for pdfnative-cli. Prio
 - [x] **Supply-chain transparency** — CycloneDX SBOM attached to each release; OpenSSF
   Scorecard badge published.
 
+<!-- verify-docs:allow version-token -->
 ### v1.2.0 — pdfnative 1.5.0: page-tree, annotations & governance _(released 2026-07-06)_
 
 - [x] **`pdfnative` bumped** to `^1.5.0` (was `^1.3.0`).
-- [x] **`merge` command** — concatenate PDFs via pdfnative 1.5.0 `mergePdfs`
+- [x] **`merge` command** — concatenate PDFs via `mergePdfs` (pdfnative ≥ 1.5.0)
   (`--drop-annotations`, `--max-output-size`).
 - [x] **`split` command** — split one PDF into many via `splitPdf` (per-page default or
   per-range `--pages`; `--output-dir`, `--prefix`).
@@ -112,6 +118,7 @@ This document outlines the planned development direction for pdfnative-cli. Prio
   `/PageLabels`.
 - [x] **`schema annotate` / `schema govern-verify`** — new agent-validation subjects.
 
+<!-- verify-docs:allow version-token -->
 ### v1.3.0 — pdfnative 1.6.0: text, forms, encryption & charts _(released 2026-07-24)_
 
 - [x] **`pdfnative` bumped** to `^1.6.0` (was `^1.5.0`).
@@ -121,7 +128,7 @@ This document outlines the planned development direction for pdfnative-cli. Prio
 - [x] **`fill` command** — fill and/or flatten existing AcroForms via `fillForm` /
   `flattenForm` with an incremental save (existing signatures stay valid).
 - [x] **`encrypt` / `decrypt` commands** — AES-128/256 re-encryption and transparent
-  decryption via pdfnative 1.6.0 page-tree re-encryption (Future Consideration, now shipped).
+  decryption via the engine's page-tree re-encryption (pdfnative ≥ 1.6.0; Future Consideration, now shipped).
 - [x] **`render` native charts** — the `chart` document block (bar/barH/line/pie/donut) as
   pure PDF path operators, tagged `/Figure`.
 - [x] **`merge`/`split`/`extract` — `--password` / `--encrypt` / `--stream`** — encrypted
@@ -190,16 +197,49 @@ This document outlines the planned development direction for pdfnative-cli. Prio
 - [x] **Global `--max-inflate-size`** — anti-zip-bomb cap on any single decompressed PDF stream
   (default 100 MiB) via `setMaxInflateOutputSize`.
 - [x] **Page-box preservation** — `merge`/`split`/`extract` now preserve Bleed/Trim/Art boxes
-  and `/UserUnit` (pdfnative 1.7.0).
+  and `/UserUnit` (pdfnative ≥ 1.7.0).
 - [x] **Agent surface** — new stable `E_NETWORK` code; schema subjects `metadata`, `ltv-data`,
   `compare`, `batch-manifest` (19 total).
 - [x] **Offline mock-PKI test infrastructure** — `tests/helpers/mock-pki.ts` runs a real
   RFC 3161 TSA + OCSP/CRL responder in-process, so the network paths are tested without
-  touching the network (600 tests).
+  touching the network.
 - [x] **Blocking veraPDF PDF/A gate** — `npm run validate:pdfa` over a 12-file manifested
   corpus (10 positives + 2 negative canaries with expected ISO 19005 clauses), blocking in
   CI (`verapdf.yml`, pinned installer with verified SHA-256) and again before every
   `npm publish`.
+
+### v1.5.0 — typography, 27 scripts, CMYK & PDF/X-4 _(released 2026-09-17)_
+
+- [x] **`pdfnative` bumped** to `^1.8.0` (was `^1.7.0`) — every 1.8.0 feature exposed.
+- [x] **Typography** — `layout.typography` passthrough (widows/orphans, `keepWithNext`,
+  splittable paragraphs, justify, optical margins, soft hyphens, punctuation spacing + unit
+  binding, kerning, OpenType features, exact base-14 metrics) plus `--split-paragraphs`,
+  `--keep-headings-with-next`, `--kerning`, `--font-features`; nested `typography` /
+  `outputIntent` merge one level between flags, `--layout` and the document.
+- [x] **CMYK & PDF/X-4** — CMYK colours everywhere, printer's `colourBars`, `render --pdfx pdfx4
+  --output-intent-icc --output-intent-id --trapped`, coherence pre-checks, `PDFX_*` diagnostics
+  under `--strict`, envelope `pdfx`; `inspect --pdfx` / `--check pdfx` / `pdfxConformance`;
+  `validate:pdfx` over a 3-file PDF/X corpus (incl. a negative canary) in the gate.
+- [x] **27 Unicode scripts + `--font-file`** — `lo nod khb tdd cjm`, the `ha yo ig sw` aliases,
+  custom TTF/OTF fonts from disk (validated, capped, never from JSON), and font embedding on
+  `--variant table` (closes the table-variant PDF/A gap; the canary became a positive).
+- [x] **Reproducible output** — global `--creation-date` / `SOURCE_DATE_EPOCH` via
+  `setDefaultCreationDate`, applied process-wide (incl. `batch`); envelope `creationDate`;
+  `--layout` revival of `creationDate` / ICC arrays; the 50 MB cap now guards `--layout` too.
+- [x] **Global flags before the command** — `parseArgs` boolean-flag table + `splitCommandArgv`.
+- [x] **`annotate link`** — `/Link` + `/URI` bodies built after `validateURL` (CMYK colours too).
+- [x] **`sign --timestamp-timeout`**, **`verify` weak-digest note** (SHA-1 imprint refused under
+  `--strict`, `timestampDigest` reported), **`inspect --iso-dates`**, **`doctor`** font / Unicode /
+  conformance checks, **fetch-guard** benchmarking / TEST-NET / NAT64 ranges, `E_INPUT`
+  classification of every PDF/X and print coherence message (`utils/build-errors.ts`).
+- [x] **Engineering parity with pdfnative 1.8.0** — `scripts/gate.ts` (fast / CI / publish,
+  `--require-all`), hermetic sample generator over the built binary with a byte/semantic
+  SHA-256 baseline (`verify:samples`, chained `since`), 16-file PDF/A + PDF/X corpus, TypeScript
+  validators, `verify:docs` (25 rules) over `docs/assets/ecosystem.json`, `release-prepare.ts`,
+  hardened workflows (harden-runner, SHA pins, dependency-review, audit, sample-regression,
+  docs, composite veraPDF action, Trusted Publishing + SBOM + attestations), committed rulesets,
+  the Claude Code layer (`CLAUDE.md` = `@AGENTS.md`, settings, guard hook, generated rules,
+  `release-audit` skill), `docs/AGENT_CONTRACT.md` split out of AGENTS.md, CHANGELOG compare links.
 
 ## Future Considerations
 
@@ -215,16 +255,6 @@ Feasibility is called out honestly: some ideas need pdfnative to expose a primit
 - **`modify` standalone command** — **partially delivered** in v1.4.0 via `metadata`
   (incremental `/Info` + XMP edits that keep signatures valid). Arbitrary in-place object
   edits remain blocked on the matching pdfnative primitives.
-- **`render --font-file <ttf>`** — custom (non-bundled) fonts via pdfnative's
-  `validateFontData` / `parseFontData`. Feasible upstream; needs a security posture first
-  (parsing untrusted font binaries from the CLI surface).
-- **`link` annotations on existing PDFs** — `annotate` could gain the `link` type via
-  pdfnative's `buildLinkAnnotation` (today it covers markup types only).
-- **`doctor` — language-pack enumeration** — list the registered/bundled font packs via
-  `getRegisteredLangs` in the capability report.
-- **Dedicated TSA timeout flags** — `sign --timestamp` / `doc-timestamp` / `ltv` share the
-  guarded 10 s default (`--timeout` exists on `ltv` / `doc-timestamp`); a dedicated
-  per-TSA-request timeout flag on `sign` is a candidate refinement.
 - **Category help commands** (`pdfnative page --help`, `pdfnative security --help`) — the global
   `--help` already **groups** commands by category (Create & edit / Page tree / Security /
   Read & extract / Automation & meta); dedicated category dispatch commands are deferred (extra
@@ -234,26 +264,26 @@ Feasibility is called out honestly: some ideas need pdfnative to expose a primit
 - **Positional arguments in manifest tasks** — `batch --manifest` tasks carry only a flat flag
   map today, so `ltv` (subcommand positional) and `compare` (two positional PDF paths) are
   excluded from the manifest whitelist. Supporting positionals would reintroduce both.
-- **`verify` — weak-digest note for RFC 3161 timestamps** — emit a "weak digest" note when a
-  timestamp token's `messageImprint` uses SHA-1, and refuse it under `--strict`.
-- **fetch-guard — additional blocked ranges** — also block the benchmarking range
-  198.18.0.0/15, the documentation range 192.0.2.0/24 (TEST-NET-1), and the NAT64 prefix
-  64:ff9b::/96 in the SSRF guard.
-- **JSON size cap on `--layout`** — apply `assertJsonSizeLimit` to the `--layout` file the way
-  the 50 MB cap already guards the document input.
-- **`inspect` — ISO 8601 date normalisation** — `/Info` dates are emitted as the raw PDF date
-  string (e.g. `D:20260427120000+00'00'`); an opt-in flag could normalise them to ISO 8601.
-- **Global flags before the command name** — `pdfnative --json <cmd> …` currently swallows the
-  command name; the parser could accept global flags placed in front (`llms.txt` documents the
-  workaround: place `--json` after the sub-command).
-- **CHANGELOG compare-link retrofit** — add `[x.y.z]: …/compare/…` reference links across the
-  full historical release list.
-- **`--variant table` cannot embed fonts** — the `--lang` → `fontEntries` merge only exists on
-  the document path, and `PdfParams.fontEntries` needs binary data JSON cannot carry, so a
-  table-variant render under a PDF/A claim is structurally non-conformant (it serves as a
-  negative canary in the veraPDF corpus). Needs a CLI-side embedding path for the table
-  variant.
-- **veraPDF setup as a composite action** — the pinned installer block is duplicated between
-  `verapdf.yml` and `publish.yml`; extract `.github/actions/setup-verapdf` (validate with a
-  real CI run) so the URL/SHA-256 bump happens in one place. Also revisit the failed-rule
-  display regex (attribute-order-dependent, cosmetic) at the next veraPDF version bump.
+- **`metadata` keeps the PDF/X identification** — pdfnative 1.8.0's `PdfModifier.updateMetadata`
+  rewrites the XMP packet without `pdfxid:GTS_PDFXVersion`, `xmpMM` and `pdf:Trapped`, so a
+  `metadata` edit silently drops a PDF/X-4 claim (`inspect --check pdfx` catches it; the
+  integration suite documents it). **Blocked upstream** — needs the modifier to carry the
+  PDF/X identification through the rewrite.
+- **Reproducible signed output** — the incremental revision `sign` appends carries a
+  per-revision trailer `/ID` the engine derives at signing time (both crypto providers), so a
+  signed PDF is never byte-identical across runs even with `--creation-date` and
+  `--signing-time` pinned. The sample baseline fingerprints signed samples semantically.
+  **Blocked upstream** — needs the signing path to honour the pinned creation instant.
+- **PDF/X-1a / PDF/X-3 / PDF/X-4p, spot colours** — pdfnative 1.8.0 validates and emits
+  PDF/X-4 only (`PDF_X_CONFORMANCE_TARGETS`); the older targets need DeviceN / Separation
+  colour spaces and externally referenced profiles the engine does not expose. **Blocked upstream**.
+- **PDF/A and PDF/X in one file** — ISO 19005 and ISO 15930 can be claimed together
+  (PDF/A-2 + PDF/X-4), but the engine refuses `layout.pdfx` with `tagged` and the CLI mirrors
+  that pre-check. **Blocked upstream**.
+- **Hyphenation dictionaries from the CLI** — `layout.typography.softHyphens` breaks at
+  existing U+00AD soft hyphens; a language dictionary or a hyphenation provider (a function in
+  the engine's API) would need the CLI to load code or data from a user path. Deferred by
+  posture (the CLI loads fonts from disk, never code); a bundled dictionary would have to ship
+  upstream first.
+- **Visual (pixel) regression of the sample baseline** — the byte/semantic fingerprints prove
+  identity, not appearance; a rendering comparison stays out of scope without a rasteriser.
