@@ -1,7 +1,12 @@
 ---
-description: "Use when working on the CLI entry point, arg parser, global flags or overall dispatch logic. Covers entry point contract, global-flag placement, usage text parity, help formatting, and exit code conventions."
-applyTo: "src/index.ts,src/utils/args.ts,src/utils/argv.ts,src/utils/reproducible.ts"
+paths:
+  - "src/index.ts"
+  - "src/utils/args.ts"
+  - "src/utils/argv.ts"
+  - "src/utils/reproducible.ts"
 ---
+<!-- GENERATED from .github/instructions/cli-design.instructions.md by scripts/build-claude-rules.ts — do not edit -->
+
 # CLI Design
 
 > Entry-point and arg-parser contracts live in `.github/copilot-instructions.md`. This file only

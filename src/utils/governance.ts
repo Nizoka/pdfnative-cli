@@ -12,14 +12,21 @@
 // port of pdfnative's `scripts/verify-issue.mjs`, so the CLI honours its own
 // zero-dependency contract.
 
-/** Machine-readable governance policy (mirrors `.github/ai-governance.json`). */
+/**
+ * Machine-readable governance policy — a verbatim mirror of
+ * `.github/ai-governance.json` (1.1.0). `pdfnative govern policy` prints this
+ * object, so it must equal the file byte for byte once canonicalised:
+ * `verify:docs` (rule `governance-embed`) and tests/utils/governance-policy.test.ts
+ * both hold the two copies together.
+ */
 export const AI_GOVERNANCE_POLICY = Object.freeze({
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     title: 'pdfnative AI Governance Configuration',
     description:
         'Machine-readable contract governing how AI coding agents may propose issues, '
         + 'contributions, and changes across the pdfnative monorepo. Agents that scan '
-        + 'repository configuration on initialization MUST honour this file.',
+        + 'repository configuration on initialization MUST honour this file. See '
+        + '.github/AGENT_RULES.md for the human-and-agent-readable protocol.',
     version: '1.1.0',
     spec_updated: '2026-09-13',
     applies_to: ['pdfnative', 'pdfnative-cli', 'pdfnative-mcp', 'pdfnative-react'],
@@ -50,6 +57,7 @@ export const AI_GOVERNANCE_POLICY = Object.freeze({
         'environment_captured',
     ],
     compliance_report: {
+        description: 'The structured summary an agent MUST present to the user alongside every draft.',
         required_fields: [
             'zero_dependency_confirmed',
             'reproduction_command',
@@ -60,7 +68,13 @@ export const AI_GOVERNANCE_POLICY = Object.freeze({
         ],
     },
     capability_manifest: {
+        description: 'Authoritative project context an agent SHOULD load before proposing changes.',
         sources: ['AGENTS.md', '.github/AGENT_RULES.md'],
+        $comment:
+            'on_demand: load lazily by topic. sources are loaded on every task and verify-docs '
+            + '(governance-sources) holds their total under 16 KiB; ecosystem.json is the counts '
+            + 'manifest, needed only when a figure or version is touched; docs/AGENT_CONTRACT.md is '
+            + 'the consumer-facing agent contract (envelopes, error codes, token economy).',
         on_demand: [
             'docs/assets/ecosystem.json',
             'docs/AGENT_CONTRACT.md',
@@ -69,10 +83,61 @@ export const AI_GOVERNANCE_POLICY = Object.freeze({
             'SECURITY.md',
             'llms.txt',
         ],
+        claude_code: {
+            description:
+                'How the policy is enforced inside a Claude Code session (settings, hook, rules, '
+                + 'skills); verify-docs rules agent-config-parity, claude-rules-sync, '
+                + 'claude-rules-budget and skills-shape keep these files consistent.',
+            settings: '.claude/settings.json',
+            hooks: [
+                {
+                    event: 'PreToolUse',
+                    matcher: 'Bash',
+                    command: 'node .claude/hooks/guard.mjs',
+                    denies: [
+                        'npm publish|unpublish|deprecate|dist-tag|version <bump>',
+                        'npx npm publish',
+                        'gh pr create|edit|close|merge|comment',
+                        'gh issue create|edit|close|comment',
+                        'gh release *',
+                        'gh api with --method POST|PUT|PATCH|DELETE, --input, -f/-F',
+                        'git push (any form)',
+                        'git add --renormalize',
+                        'git tag (except list forms)',
+                    ],
+                    scope:
+                        'whole command, every shell segment, $( ) and backtick bodies, sh/bash/zsh -c, '
+                        + 'pwsh/powershell -Command, node -e and npx -c payloads; fails closed on unreadable input',
+                    tests: 'tests/tools/guard.test.ts',
+                },
+            ],
+            permissions_deny:
+                'Read on generated and bulk files (dist/**, coverage/**, test-output/**, samples/output/**, '
+                + 'package-lock.json, node_modules/**) and Bash on the HITL commands above',
+            env_limits: {
+                BASH_MAX_OUTPUT_LENGTH: '16000',
+                BASH_DEFAULT_TIMEOUT_MS: '300000',
+                BASH_MAX_TIMEOUT_MS: '1800000',
+                NO_COLOR: '1',
+            },
+            rules: {
+                directory: '.claude/rules/',
+                generated_from: '.github/instructions/*.instructions.md',
+                generator: 'npm run agents:rules',
+                scoped: 'every rule carries paths: (the source applyTo); none loads unconditionally',
+            },
+            skills: [{ name: 'release-audit', path: '.claude/skills/release-audit/SKILL.md', model_invocable: false }],
+        },
     },
     verification: {
         command: 'pdfnative govern verify-issue <draft.md>',
+        validator_covered_by: 'tests/utils/governance.test.ts',
+        advisory_in_ci: true,
         blocks_submission_on_failure: true,
+    },
+    references: {
+        zero_dependency_policy: 'README.md#zero-dependency',
+        issue_templates: ['.github/ISSUE_TEMPLATE'],
     },
 } as const);
 

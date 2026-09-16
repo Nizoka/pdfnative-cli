@@ -1,300 +1,113 @@
-# AGENTS.md — Driving pdfnative-cli from autonomous agents
+# AGENTS.md
 
-`pdfnative-cli` is built so that an autonomous AI agent — or any program — can
-drive it inside a larger automated process **deterministically and safely**.
+Condensed, editor-agnostic guidance for AI coding agents working **on** pdfnative-cli (Cursor, Aider, Claude Code, Copilot, Continue, Zed, Cline, Windsurf, Goose, Gemini CLI, …).
+Canonical detail: [.github/copilot-instructions.md](.github/copilot-instructions.md) + [.github/instructions/](.github/instructions/).
+Claude Code loads [CLAUDE.md](CLAUDE.md), which imports this file. Keep the three consistent.
+Agents that **drive** the CLI from a pipeline read [docs/AGENT_CONTRACT.md](docs/AGENT_CONTRACT.md) (envelopes, error codes, token economy) instead.
 
-There is **no separate runtime** for this: agent support is a thin presentation
-layer over the normal command dispatch. The official [pdfnative MCP server] is a
-different integration; this document is about driving the **CLI** directly (spawn
-a process, pass flags, read stdout/stderr, branch on the exit code).
+## Mission and constraints
 
-[pdfnative MCP server]: https://pdfnative.dev
+pdfnative-cli is the official terminal wrapper of the pdfnative engine: 21 commands over the document lifecycle
+(render, sign/verify/LTV, page tree, forms, metadata, encryption, inspection, batch) with an agent-first process contract.
 
----
+- **Zero extra runtime dependencies.** `pdfnative` is the ONLY runtime dependency; all PDF logic lives there.
+  Proposing another runtime package is a hard block (`pdfnative govern verify-issue` enforces it).
+- **One import point.** Every `pdfnative` symbol enters through `src/core-bridge/index.ts`; commands and utils never import the package directly.
+- **Agent-first.** stdout = artifact, stderr = diagnostics/envelopes, exit 0/1/2, 12 stable error codes.
+  Agent mode (`--json`) is a presentation layer, never a second runtime; every new envelope field is additive and pinned by `schema status`.
+- **Offline by default.** Network I/O only behind explicit opt-ins (`verify --revocation online`, `sign --timestamp`, `doc-timestamp --url`,
+  `ltv --online`, `batch --allow-network`), always through the SSRF guard; `--dry-run` never touches the network.
+- **Native constant-time crypto** (`node:crypto`) for signing by default; `--pure-crypto` opts into the portable path. Never log key material or passwords.
+- **ESM-first TypeScript strict.** Relative imports carry `.js`; no `any`; no `console.log` in `src/`; `const` and `readonly` by default.
+- **Reproducible output.** `--creation-date` / `SOURCE_DATE_EPOCH` pin every date; the sample corpus is byte-stable under `TZ=UTC`
+  and held to `tests/regression/baselines/samples.sha256.json`.
+- **Human-in-the-loop.** Agents draft and verify; the maintainer pushes, opens PRs/issues, tags and publishes (see Governance).
+- **English everywhere.** Code, comments, tests, samples, docs and release notes are English; demonstrated content in another language
+  is marked `demo-language: <tag> (reason)` on or above the line (`verify:docs` rule `prose-language`).
 
-## 1. The process contract
+## The gate
 
-**Prerequisite:** Node.js ≥ 22 (check with `pdfnative doctor`).
+`npm run gate` is THE quality gate (`scripts/gate.ts`; the step list is its `STEPS` table). Logs land in `test-output/.gate/<step>.log`; the summary is at most 20 lines.
 
-| Channel | Carries |
-|---------|---------|
-| **stdout** | The primary artifact: a PDF (`render`, `sign`, `merge`, `extract`, `annotate`, `fill`, `encrypt`, `decrypt`, `metadata`, `ltv embed`/`ltv add`, `doc-timestamp`), extracted text (`extract-text`), a JSON report (`inspect`, `verify`, `compare --format json`, `batch --format json`, `govern verify-issue --json`, `doctor --format json`, `fill --export`, `ltv collect`), a JSON Schema (`schema`), the governance protocol/policy (`govern rules`/`policy`), or a completion script (`completion`). `split` writes its parts to `--output-dir`. |
-| **stderr** | All diagnostics: progress, warnings, and the agent JSON envelopes below. |
-| **exit code** | `0` success · `1` runtime error · `2` usage error. Unchanged in every mode. |
+| Profile | Command | Runs |
+|---|---|---|
+| Fast — before every commit | `npm run gate:fast` | typecheck:all, lint, test, verify:docs |
+| CI — the default | `npm run gate` | + test:coverage, build, dist-check, smoke, bundle-size, test:generate, verify:samples, corpus:pdfa, validate:pdfx |
+| Publish — release branches | `npx tsx scripts/gate.ts --publish --require-all` | everything, incl. validate:pdfa (veraPDF; `--require-all` fails on a skip) |
 
-Keep stdout binary-clean: write PDFs to `--output <file>` or redirect stdout, and
-read the envelope from stderr.
+PowerShell swallows a bare `--`, so pass flags by calling the script: `npx tsx scripts/gate.ts --fast`, `--only <step>`, `--json`.
+One suite: `npx vitest run tests/<path>.test.ts` (dot reporter). Smoke-test the **built** CLI (`node dist/cli.cjs …`) before claiming a change works.
 
----
+## Where is what
 
-## 2. Agent mode — `--json`
+| Path | Purpose | Read first |
+|---|---|---|
+| `src/index.ts` | Entry: USAGE texts, global flags (before or after the command), config merge, `--creation-date` pin, `loadCommand()`, error envelope | `cli-design.instructions.md` |
+| `src/commands/` | One file per command; `completion.ts` = COMMANDS/flags table (completions + capability manifest); `schema.ts` = 19 subjects | `commands.instructions.md` |
+| `src/utils/` | args/argv, io, error codes, envelopes, projection, layout (PDF/X, typography), fonts, reproducible dates, build errors, PKI, fetch-guard | `commands.instructions.md` |
+| `src/core-bridge/index.ts` | The single `pdfnative` import point (selective re-exports, `pdfnative/tools` included) | `copilot-instructions.md` |
+| `scripts/` | gate, sample generator (`generators/`, `helpers/`, `lib/`), baseline, conformance corpus + validators, verify-docs, release-prepare | `testing.instructions.md` |
+| `tests/` | vitest: `commands/`, `utils/`, `integration/`, `tools/`, `regression/` (sample baseline), `docs/`; `helpers/cli-harness.ts`, `fixtures/` | `testing.instructions.md` |
+| `samples/` | Runnable dual-shell demos (`.sh` + `.ps1`, one pair per feature) and the JSON documents the generator renders | `samples/README.md` |
+| `docs/` | `KNOWLEDGE_BASE.md` (deep reference), `AGENT_CONTRACT.md` (consumer contract), `assets/ecosystem.json` (every count and version) | — |
 
-Pass the global `--json` flag to any command to switch on machine-readable
-envelopes (the data on stdout is unchanged; `inspect`/`verify`/`batch` already
-default to JSON on stdout).
+Instruction files live under `.github/instructions/`.
 
-**On failure**, a single JSON object is written to stderr:
+## Architecture
 
-```json
-{ "ok": false, "command": "inspect", "error": { "code": "E_PARSE", "message": "Failed to read PDF: …" } }
-```
+`argv → parseArgs (booleanFlags) → splitCommandArgv → config merge → setDefaultCreationDate → loadCommand() → command → stdout/stderr → exit code`.
+Commands are thin: parse flags, validate paths and sizes, call the bridge, write the artifact, emit the status envelope.
 
-**On success**, the write commands — `render` / `sign` / `merge` / `split` / `extract` /
-`annotate` / `fill` / `encrypt` / `decrypt` / `metadata` / `ltv` / `doc-timestamp` /
-`batch` — write a status line to stderr (schema: `pdfnative schema status`):
+Adding or changing a command touches ALL of these (`verify:docs` rules `command-parity`, `flag-parity`, `schema-parity`, `error-parity` fail on a missed step):
 
-```json
-{ "ok": true, "command": "render", "variant": "document", "dryRun": false, "output": "out.pdf", "bytes": 12345 }
-```
+1. `src/commands/<name>.ts`, and `src/index.ts` (USAGE list, `<NAME>_USAGE`, the `--help` and `loadCommand()` switches).
+2. `src/commands/completion.ts` (flags) and `src/commands/schema.ts` (subject, `status` fields); `utils/error.ts` + `utils/agent.ts` for a new code.
+3. `tests/`, `samples/<name>/` (`.sh` + `.ps1`), and `scripts/lib/sample-plan.ts` or `scripts/generators/` when the output belongs in the baseline.
+4. README command reference, `docs/KNOWLEDGE_BASE.md`, `docs/AGENT_CONTRACT.md`, `llms.txt`, `docs/assets/ecosystem.json`.
 
-Two additive fields can appear in the success envelope: a timestamped signature
-(`sign --timestamp`) adds `timestamp: { url, digest }`, and `render` adds a
-`diagnostics: [{ code, severity, message }]` array when non-strict PDF/A conformance
-diagnostics were found. Both are pinned by the `status` schema.
+## Consumer contract in brief
 
-`inspect`, `verify`, and `batch` put their result document on **stdout** as JSON;
-`--json` only adds the failure envelope on stderr and (for `batch`) forces the
-JSON summary.
+`--json` → `{ ok, command, … }` on stderr, artifact untouched on stdout; failures `{ ok: false, error: { code, message } }` with one of
+`E_USAGE`, `E_INPUT`, `E_PARSE`, `E_IO`, `E_SIGN`, `E_VERIFY_FAILED`, `E_CHECK_FAILED`, `E_POLICY`, `E_UNSUPPORTED`, `E_PASSWORD`, `E_NETWORK`, `E_RUNTIME`.
+`--dry-run` validates without writing; `--summary` / `--fields` shrink stdout JSON; `schema <subject>` and `schema manifest` describe every shape.
 
-### Stable error codes
+## Never touch
 
-Branch on `error.code`, never on the human message:
+- `release-notes/v*.md` of already-shipped versions (read-only history).
+- `dist/`, `coverage/`, `test-output/`, `samples/output/`, `node_modules/`, `package-lock.json` (npm owns it), and the table below: regenerate, never hand-edit.
+- Any figure in `docs/assets/ecosystem.json` without running `npm run verify:docs` afterwards; the `pdfnative` pin without a release note.
 
-| Code | Meaning | Typical exit |
-|------|---------|--------------|
-| `E_USAGE` | Missing/invalid flag or argument | 2 |
-| `E_INPUT` | Input payload wrong shape / failed validation | 1 |
-| `E_PARSE` | Could not parse JSON / PDF / DER input | 1 |
-| `E_IO` | Filesystem or stream I/O failure | 1 |
-| `E_SIGN` | Signing failed (message is always generic — no key material) | 1 |
-| `E_VERIFY_FAILED` | `verify --strict` found an invalid signature | 1 |
-| `E_CHECK_FAILED` | `inspect --check` assertion failed, `compare` found differences, or `render --strict` hit a PDF/A diagnostic | 1 |
-| `E_POLICY` | `govern verify-issue` found a governance violation | 1 |
-| `E_UNSUPPORTED` | Reserved / not-yet-available capability | 2 |
-| `E_PASSWORD` | Encrypted PDF: password missing or incorrect (`extract-text` / `fill` / `encrypt` / `decrypt` / `inspect` / `annotate` / `metadata` / page-tree) | 1 |
-| `E_NETWORK` | Opt-in network operation failed (TSA / OCSP / CRL fetch — `sign --timestamp`, `ltv collect`/`add`, `doc-timestamp`) | 1 |
-| `E_RUNTIME` | Catch-all runtime error | 1 |
+## Generated files
 
----
+| File | Regenerate with |
+|---|---|
+| `.claude/rules/*.md` | `npm run agents:rules` (from `.github/instructions/*.instructions.md`; drift fails `verify:docs`) |
+| `tests/regression/baselines/samples.sha256.json` | `npm run build && npm run test:generate && npx tsx scripts/verify-samples.ts --update` — only with a rebaseline declared in the release note |
+| `test-output/samples/`, `test-output/pdfa/` | `npm run test:generate`, `npm run corpus:pdfa` (git-ignored) |
+| `dist/`, `coverage/` | `npm run build`, `npm run test:coverage` |
 
-## 3. Token economy — compact JSON, `--summary`, `--fields`
+## Counts and versions
 
-The JSON `inspect` / `verify` / `batch` write to **stdout** is the bulk of what an
-agent pays for in tokens. Three composable levers shrink it — typically by ~90 %
-— without losing the fields you branch on. They apply to all three JSON-on-stdout
-commands.
+21 commands, 19 subjects, 12 stable error codes, 10 global flags, 27 Unicode scripts (31 font modules), 1058 tests, 79 sample PDFs in the baseline, 16 corpus files.
+`docs/assets/ecosystem.json` is the source of every count and version quoted in the docs; run `npm run verify:docs` after touching any of them.
+Coverage: ≥ 82 % statements enforced by CI (the thresholds live once in `vitest.config.ts`). Engine: pdfnative 1.8.0 (`^1.8.0`); Node ≥ 22.
 
-**Compact by default under `--json`.** In agent mode the stdout JSON is minified
-(no indentation, no padding) instead of the human 2-space form. Pass `--pretty`
-to force indentation back on. Outside `--json` the output stays pretty for humans.
+## Releasing
 
-**`--summary` — the canonical minimal verdict.** Collapses the full report to the
-handful of fields an orchestrator actually gates on:
+Follow CONTRIBUTING.md §Release and `scripts/release-prepare.ts`; Conventional Commits (`feat(scope):`, `fix(scope):`, `docs:`, `chore:`), never with a `Co-Authored-By` trailer.
+Every runtime change gets a ROADMAP.md entry, a CHANGELOG line and a line in the next `release-notes/vX.Y.Z.md`.
+`/release-audit` (Claude Code skill) runs the pre-release audit; the maintainer merges, tags and publishes.
 
-| Command | `--summary` shape |
-|---------|-------------------|
-| `inspect` | `{ "pages": <int>, "encrypted": <bool>, "signatures": <int>, "pdfa": <string\|null> }` |
-| `verify`  | `{ "valid": <bool>, "signatures": <int>, "invalid": <int> }` |
-| `batch`   | `{ "total": <int>, "succeeded": <int>, "failed": <int> }` (drops the per-file `results` array) |
+## Governance
 
-**`--fields a,b.c` — dot-path projection.** Keep only the paths you name. A
-segment landing on an array maps over every element; unknown paths are silently
-omitted (so a conditionally-absent field never crashes the run). Precedence:
-`--summary` is applied first, then `--fields` projects the result.
+Human-in-the-loop, enforced: agents never push, never open PRs/issues/releases, never publish, never tag, and never add `Co-Authored-By` trailers.
+Protocol: [.github/AGENT_RULES.md](.github/AGENT_RULES.md); machine-readable policy: [.github/ai-governance.json](.github/ai-governance.json) (also `pdfnative govern policy`).
+Issue drafts go to `.github/drafts/` and are validated with `pdfnative govern verify-issue` before a human submits them.
 
-```bash
-# Smallest possible "is this PDF signed and valid?" probe:
-pdfnative verify --input doc.pdf --json --summary            # → {"valid":false,"signatures":0,"invalid":0}
-pdfnative verify --input doc.pdf --json --fields allValid     # → {"allValid":false}
-pdfnative inspect --input doc.pdf --json --fields pageCount,signatures
-pdfnative batch  --input-dir in --output-dir out --json --summary
-```
+## Ecosystem
 
-The compact shapes are schema-pinned — validate them with
-`schema inspect-summary`, `schema verify-summary`, `schema batch-summary`.
+- [pdfnative](https://github.com/Nizoka/pdfnative) — the zero-dependency engine this CLI wraps; every PDF feature is upstream (`ROADMAP.md` lists what is upstream-blocked).
+- [pdfnative-mcp](https://github.com/Nizoka/pdfnative-mcp) — Model Context Protocol server exposing the engine to conversational assistants.
+- [pdfnative-react](https://github.com/Nizoka/pdfnative-react) — React renderer (JSX → pdfnative blocks).
 
----
-
-## 4. Validate first — `--dry-run`
-
-`render`, `sign`, `batch`, `merge`, `split`, `extract`, `annotate`, `fill`, `encrypt`,
-`decrypt`, `metadata`, `ltv`, and `doc-timestamp` accept `--dry-run`:
-inputs are fully validated (JSON parsed, document/table shape checked, layout assembled,
-signing credentials loaded and the PDF prepared, page ranges and annotation specs
-bounds-checked) but **no output is produced or written**. `--dry-run` **never performs
-network I/O**, even when a network flag (`--timestamp`, `--url`, `--online`) is present.
-Combine with `--json` for a `{ "ok": true, "dryRun": true, … }` envelope.
-
-```bash
-pdfnative render --input doc.json --dry-run --json
-```
-
----
-
-## 5. Discover shapes — `schema`
-
-Fetch a versioned JSON Schema (Draft 2020-12) and validate input with your own
-tooling before invoking a command. Each schema carries a `$id` embedding the CLI
-version so you can detect drift.
-
-```bash
-pdfnative schema list             # → { "subjects": [ …all subjects… ] }
-pdfnative schema render           # input accepted by `render`
-pdfnative schema inspect          # output of `inspect --format json`
-pdfnative schema verify-summary   # output of `verify --summary`
-pdfnative schema annotate         # annotation-spec accepted by `annotate --annotations`
-pdfnative schema extract-text     # output of `extract-text --format json`
-pdfnative schema fill             # values map accepted by `fill --data`
-pdfnative schema form-export      # output of `fill --export`
-pdfnative schema metadata         # JSON accepted by `metadata --from-json` (v1.4.0)
-pdfnative schema doctor           # output of `doctor --format json`
-pdfnative schema govern-verify    # output of `govern verify-issue --json`
-pdfnative schema ltv-data         # replayable JSON from `ltv collect` / input of `ltv embed` (v1.4.0)
-pdfnative schema compare          # output of `compare --format json` (v1.4.0)
-pdfnative schema batch-manifest   # pipeline file accepted by `batch --manifest` (v1.4.0)
-pdfnative schema status           # the --json success envelope (write commands)
-pdfnative schema manifest         # capability manifest: commands, flags, error codes (DATA, not a schema)
-```
-
-**Tool discovery.** `pdfnative schema manifest` emits a single JSON document listing every
-command, its flags, the global flags, and the stable error codes — enough to register the CLI
-as a tool set at runtime. A prose/LLM-facing version lives in `llms.txt` at the repo root.
-
-**Text extraction for RAG.** `extract-text --format ndjson` emits one JSON object per page
-(`{ pageIndex, text, runs? }`), which streams cleanly into a retrieval pipeline; add `--runs`
-for positioned runs, `--password` for encrypted PDFs. No OCR — image-only pages yield empty text.
-
----
-
-## 6. Governance & Human-in-the-Loop — `govern`
-
-pdfnative's monorepo governance model treats AI agents as **draftsmen**, never
-autonomous submitters. The `govern` command makes that contract actionable from any
-agent pipeline — entirely offline, no GitHub or network access:
-
-```bash
-pdfnative govern rules                  # the human/agent protocol (AGENT_RULES) on stdout
-pdfnative govern policy --json          # machine-readable policy JSON on stdout
-pdfnative govern verify-issue draft.md  # gate a draft: exit 1 / E_POLICY on a violation
-```
-
-Rules an agent MUST honour:
-
-- **No autonomous GitHub writes.** Never open, edit, label, close, comment on, or submit
-  issues / PRs / releases. Produce a **local draft** plus a compliance report and hand it
-  to the human.
-- **Zero runtime dependencies.** Never propose adding an npm runtime package — this is a
-  hard block that `verify-issue` enforces.
-- **Local reproduction required.** A bug draft must include a minimal, executed repro
-  inside a fenced code block; `verify-issue` fails the draft otherwise.
-- **Identity integrity.** Anything submitted is published under the **human's** GitHub
-  identity; remind them of their shared responsibility.
-
-`govern verify-issue` returns `{ ok, errors, warnings }` under `--json`. A passing check is
-**necessary but not sufficient** — the human review gate always applies. Recommended flow:
-draft locally → `govern verify-issue` → present to the human → the **human** submits.
-
----
-
-## 7. Recommended agent loop
-
-1. `pdfnative --version --json` → confirm the CLI is present and pin the version.
-2. `pdfnative schema render` → validate the document you intend to render.
-3. `pdfnative render --input doc.json --output out.pdf --dry-run --json` → pre-flight.
-4. `pdfnative render --input doc.json --output out.pdf --json` → produce the PDF;
-   read the status envelope from stderr.
-5. On any non-zero exit, parse the stderr envelope and branch on `error.code`.
-
-For `verify`/`inspect`, read the JSON result on stdout and use `--strict` /
-`--check` to turn findings into exit codes for unattended gating. Add
-`--summary` (or `--fields`) to keep that stdout JSON token-cheap — see §3.
-
-**PDF/A changes → veraPDF gate.** An agent working **on this repository** must run
-`npm run validate:pdfa` for any change touching PDF/A behaviour (render, fonts,
-metadata/XMP, signing over claiming files, the `samples/render/pdfa/` inputs): it
-builds the CLI, generates a 12-file corpus (including negative canaries veraPDF must
-reject) and validates every file against the profile it claims. Mind the skip
-semantics — **without veraPDF installed the script exits 0 as a SKIP, not a pass**;
-set `VERAPDF_REQUIRED=1` to fail closed. The same gate runs blocking in CI and
-pre-publish. For rendering, the conformance recipe is
-`--tagged pdfa<level> --font latin --lang latin` (ISO 19005 requires embedded fonts).
-
-**Assert with `compare` (v1.4.0).** `compare a.pdf b.pdf` is a ready-made CI/agent
-assertion: identical documents exit `0`; any text or structure difference exits `1`
-with `E_CHECK_FAILED` (the diff report lands on stdout first — add `--format json`
-and, e.g., `--tolerance 1 --ignore-whitespace` to absorb benign drift). Use it to
-gate "did my edit change only what I intended?" without parsing anything.
-
-**Orchestrate with `batch --manifest` (v1.4.0).** Instead of shelling out N times,
-declare the whole pipeline once and run it fail-fast in a single process:
-
-```json
-{ "version": 1, "tasks": [
-  { "id": "r", "command": "render",  "flags": { "input": "doc.json", "output": "doc.pdf" } },
-  { "id": "s", "command": "sign",    "flags": { "input": "@r", "output": "signed.pdf" } },
-  { "id": "v", "command": "verify",  "flags": { "input": "@s", "strict": true } }
-] }
-```
-
-`"@<id>"` references the output of an earlier task; relative paths resolve against
-the manifest's directory; 14 commands are whitelisted — `render`, `sign`, `verify`,
-`inspect`, `merge`, `split`, `extract`, `extract-text`, `fill`, `encrypt`, `decrypt`,
-`annotate`, `metadata`, `doc-timestamp` (`ltv` and `compare` need positional arguments
-and are not yet manifest-callable; never `govern` / `schema` / `completion` / `doctor` /
-`batch`). Validate the file with `schema batch-manifest`, pre-flight with `--dry-run`,
-and remember: any network flag inside the manifest additionally requires
-`--allow-network` on the command line. A manifest has the filesystem access of the user
-who invokes `batch` — the same trust level as command-line flags; only network access is
-additionally gated behind `--allow-network`. Manifests are size-capped (50 MB) and
-bounded to 1 000 tasks, and path values undergo the same anti-traversal check as direct
-CLI flags.
-
-### The PAdES ladder (long-term signatures)
-
-```bash
-pdfnative sign --input doc.pdf --output bt.pdf \
-  --profile pades --timestamp https://tsa.example/tsr   # B-T   (network: --timestamp)
-pdfnative ltv add --input bt.pdf --output blt.pdf --online   # B-LT  (network: --online)
-pdfnative doc-timestamp --input blt.pdf --output blta.pdf \
-  --url https://tsa.example/tsr                              # B-LTA (network: --url)
-pdfnative ltv add --input blta.pdf --output final.pdf --online
-pdfnative verify --input final.pdf --strict                  # offline gate
-```
-
-Air-gapped variant: `ltv collect --online` on a connected machine emits a replayable
-JSON (`schema ltv-data`); `ltv embed --data ltv.json` applies it fully offline.
-
----
-
-## 8. Safety notes for unattended use
-
-- **Offline by default.** The ONLY network opt-ins are `verify --revocation online`,
-  `sign --timestamp <url>`, `ltv collect|add --online`, `doc-timestamp --url <url>`, and
-  `batch --allow-network` (which gates network flags inside a manifest). Every request
-  goes through an SSRF guard and never follows redirects; a failed opt-in fetch maps to
-  the stable `E_NETWORK` code — never a silent fallback to an unprotected result.
-  Nothing else touches the network — including `govern` — and `--dry-run` never does,
-  even when a network flag is present.
-- **No secrets in output.** `sign` never emits key material — errors are the fixed
-  `E_SIGN` / "Failed to sign PDF." Pass keys via `PDFNATIVE_SIGN_KEY` /
-  `PDFNATIVE_SIGN_CERT` (env wins over `--key` / `--cert`). Native `node:crypto` signing is
-  the default; `--pure-crypto` selects the portable pure-JS path. Passwords come from env
-  (a **non-empty** value wins over the flag) and are never logged.
-- **One password per `merge`.** `merge` applies a single `--password` to *every* source, so
-  merging encrypted sources with **different** passwords fails with `E_PASSWORD`. Decrypt the
-  outliers first, then merge. (`split` / `extract` take a single input — no ambiguity.)
-- **Bounded input.** JSON input is capped at 50 MB; paths are checked against
-  traversal. `merge` / `split` / `extract` also honour `--max-output-size`, and the
-  global `--max-inflate-size <bytes>` caps the decompressed size of any single PDF
-  stream while parsing untrusted input (anti zip-bomb; default 100 MiB). Prefer
-  `--output <file>` over shell redirection for large PDFs.
-- **Incremental, signature-safe edits.** `annotate`, `metadata`, `ltv embed`/`add`, and
-  `doc-timestamp` use incremental saves, so existing signatures on the input stay valid
-  (`doc-timestamp` keeps earlier revisions byte-identical).
-- **Human-in-the-loop for governance.** `govern` never submits anything; it only drafts and
-  verifies. A human must review and submit under their own identity (see §6).
-- **One process per task.** The CLI is stateless; run it per unit of work and let
-  the exit code drive your orchestration.
-
-See [SECURITY.md](SECURITY.md) for the full security model and
-[docs/KNOWLEDGE_BASE.md](docs/KNOWLEDGE_BASE.md) for the deep reference.
+See also: [ROADMAP.md](ROADMAP.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [llms.txt](llms.txt).

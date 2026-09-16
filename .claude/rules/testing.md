@@ -1,7 +1,13 @@
 ---
-description: "Use when writing tests, adding test coverage, or debugging test failures in pdfnative-cli. Covers the vitest suites, the CLI test harness, the built-binary and sample-baseline gates, timezone pinning and coverage thresholds."
-applyTo: "tests/**,vitest.config.ts,scripts/generators/**,scripts/lib/sample-plan.ts,scripts/lib/sample-fingerprint.ts"
+paths:
+  - "tests/**"
+  - "vitest.config.ts"
+  - "scripts/generators/**"
+  - "scripts/lib/sample-plan.ts"
+  - "scripts/lib/sample-fingerprint.ts"
 ---
+<!-- GENERATED from .github/instructions/testing.instructions.md by scripts/build-claude-rules.ts — do not edit -->
+
 # Testing
 
 ## Framework and suites

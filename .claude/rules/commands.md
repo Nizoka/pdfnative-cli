@@ -1,7 +1,11 @@
 ---
-description: "Use when implementing or modifying any of the 21 commands (render, fill, annotate, metadata, merge, split, extract, sign, verify, ltv, doc-timestamp, encrypt, decrypt, inspect, extract-text, compare, batch, doctor, schema, completion, govern) or the utils they share. Covers flag conventions, stdin/stdout, envelopes, error codes, PDF/X, typography, fonts, reproducible dates, secrets and page-tree ops."
-applyTo: "src/commands/**,src/utils/**,src/core-bridge/**"
+paths:
+  - "src/commands/**"
+  - "src/utils/**"
+  - "src/core-bridge/**"
 ---
+<!-- GENERATED from .github/instructions/commands.instructions.md by scripts/build-claude-rules.ts — do not edit -->
+
 # Command Implementation
 
 > Shared conventions and security constraints are in `.github/copilot-instructions.md`
