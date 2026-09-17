@@ -134,7 +134,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
   `tests/regression/baselines/samples.sha256.json`), a PDF/A + PDF/X conformance corpus,
   hardened workflows (egress-audited runners, SHA-pinned actions, Trusted Publishing, SBOM +
   build attestations), a documentation verifier (`npm run verify:docs`) and a committed
-  Claude Code layer with a human-in-the-loop guard hook — 1058 tests.
+  Claude Code layer with a human-in-the-loop guard hook — 1074 tests.
 - **AI-governance / HITL** — the **`govern`** command surfaces pdfnative's Human-in-the-Loop
   contract to agents: they act as *draftsmen*, never autonomous submitters. `govern
   verify-issue` gates a local draft; a human always reviews and submits.
@@ -1179,7 +1179,7 @@ Global options may be placed **before or after** the command name (v1.5.0):
 | `--quiet`, `-q` | Suppress progress output on stderr |
 | `--no-color` | Disable ANSI colour (also respects the `NO_COLOR` env var) |
 | `--json` | Agent mode: emit a JSON status/error envelope on stderr (data stays on stdout) |
-| `--dry-run` | Validate inputs and exit without writing output (`render` / `sign` / `batch` / `merge` / `split` / `extract` / `annotate` / `fill` / `encrypt` / `decrypt` / `metadata` / `ltv` / `doc-timestamp`). Never performs network I/O, even when a network flag is present |
+| `--dry-run` | Validate inputs and exit without writing output (`render` / `sign` / `batch` / `merge` / `split` / `extract` / `annotate` / `fill` / `encrypt` / `decrypt` / `metadata` / `ltv` / `doc-timestamp`). `render` pre-flights the real build in memory and discards the bytes, so every engine coherence error (`E_INPUT`), `--strict` escalation (`E_CHECK_FAILED`) and diagnostic surfaces exactly as on a real run (v1.5.0). Never performs network I/O, even when a network flag is present |
 | `--max-inflate-size <bytes>` | Cap the decompressed size of any single PDF stream while parsing untrusted input (anti zip-bomb; default 100 MiB) — v1.4.0 |
 | `--creation-date <iso8601>` | (v1.5.0) Pin the creation instant of every PDF written in this run (`render`, `batch`): `/CreationDate`, `xmp:CreateDate`, the `{date}` placeholder and the trailer `/ID` derive from it, in UTC, so output is byte-identical on every host. Falls back to `$SOURCE_DATE_EPOCH` (integer seconds); an invalid value is a usage error. Encrypted output is never byte-reproducible (CSPRNG keys); `sign --signing-time` and `metadata --mod-date` are separate instants. The envelope carries `creationDate` |
 | `--version --json` | Machine-readable version output |

@@ -29,8 +29,10 @@ applyTo: "src/commands/**,src/utils/**,src/core-bridge/**"
   write commands; it is a no-op outside `--json`. stdout stays artifact-only. Every new status
   field is additive and pinned in `schema.ts` (`status`).
 - **`--dry-run`:** read `hasFlag(args.flags, 'dry-run') || isDryRun()`; validate fully (files read,
-  ICC/fonts parsed, credentials loaded), then short-circuit before producing output. Never
-  touches the network.
+  ICC/fonts parsed, credentials loaded), then short-circuit before producing output. `render`
+  pre-flights the real buffered build in memory (`preflight()` → `mapBuildError`, bytes discarded,
+  never a stream variant) so engine errors and diagnostics match the real run. Never touches
+  the network.
 - In `--json` mode, do NOT pre-print a detail to stderr that the envelope already carries.
 - **Output projection (`inspect`/`verify`/`batch`):** route the JSON-on-stdout branch through
   `utils/projection.ts`: `out = --summary ? toSummary(full) : full`, then `--fields`, then

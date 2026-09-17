@@ -141,9 +141,14 @@ The compact shapes are schema-pinned — validate them with
 inputs are fully validated (JSON parsed, document/table shape checked, layout assembled,
 ICC profiles and custom fonts read and validated, signing credentials loaded and the
 PDF prepared, page ranges and annotation specs bounds-checked) but **no output is
-produced or written**. `--dry-run` **never performs network I/O**, even when a network
-flag (`--timestamp`, `--url`, `--online`) is present. Combine with `--json` for a
-`{ "ok": true, "dryRun": true, … }` envelope.
+produced or written**. `render --dry-run` goes one step further (v1.5.0): it runs the
+real buffered build in memory and discards the bytes, so every engine coherence error
+(`E_INPUT` — a missing PDF/X output intent, an `acsp`-less ICC profile, an attachment
+without PDF/A-3b, …), every `--strict` escalation (`E_CHECK_FAILED`) and every
+diagnostic (`diagnostics` in the envelope) is exactly what the real run would produce;
+the envelope carries `dryRun: true` and no `bytes`. `--dry-run` **never performs
+network I/O**, even when a network flag (`--timestamp`, `--url`, `--online`) is
+present. Combine with `--json` for a `{ "ok": true, "dryRun": true, … }` envelope.
 
 ```bash
 pdfnative render --input doc.json --dry-run --json

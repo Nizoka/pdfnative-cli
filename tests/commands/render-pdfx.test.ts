@@ -80,6 +80,13 @@ describe('render --pdfx pdfx4', () => {
         await expect(fs.stat(output)).rejects.toThrow();
     });
 
+    it('--dry-run pre-flights the engine: an unknown trapping state under --pdfx is E_INPUT before anything is written', async () => {
+        const input = await tmp.json('in.json', PRINT_DOC);
+        const output = tmp.path('out.pdf');
+        await expectCliError(() => render(parseArgs(['--input', input, '--output', output, '--dry-run', '--pdfx', '--output-intent-icc', SYNTHETIC_CMYK_ICC, '--font', 'latin', '--lang', 'latin', '--trapped', 'unknown'])), 1, ErrorCode.INPUT, 'trapping');
+        await expect(fs.stat(output)).rejects.toThrow();
+    });
+
     it('--pdfx with --tagged is a usage error (one conformance claim per file)', async () => {
         const input = await tmp.json('in.json', PRINT_DOC);
         await expectCliError(() => render(parseArgs(['--input', input, '--output', tmp.path('x.pdf'), ...PDFX_FLAGS, '--tagged', 'pdfa2b'])), 2, ErrorCode.USAGE, 'mutually exclusive');

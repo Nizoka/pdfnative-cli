@@ -84,6 +84,17 @@ describe('render typography (layout.typography, pdfnative 1.8.0)', () => {
         }
     });
 
+    it('--font-features tnum --dry-run reports TYPOGRAPHY_FEATURE_INEFFECTIVE in the dry-run envelope (v1.5.0 pre-flight)', async () => {
+        const doc = { title: 'Figures', blocks: [{ type: 'paragraph', text: 'Figures 0123456789' }] };
+        const input = await tmp.json('in.json', doc);
+        const output = tmp.path('never.pdf');
+        const { envelope } = await withJsonEnvelope(() => render(parseArgs(['--input', input, '--output', output, '--dry-run', '--font', 'latin', '--lang', 'latin', '--font-features', 'tnum'])));
+        expect(envelope).toMatchObject({ ok: true, dryRun: true });
+        const diagnostics = envelope.diagnostics as { code: string }[];
+        expect(diagnostics.some((d) => d.code === 'TYPOGRAPHY_FEATURE_INEFFECTIVE')).toBe(true);
+        await expect(fs.stat(output)).rejects.toThrow();
+    });
+
     it('--font-features onum renders old-style figures with Noto Sans (no diagnostic)', async () => {
         const doc = { title: 'Figures', blocks: [{ type: 'paragraph', text: 'Figures 0123456789' }] };
         const { stderr, bytes } = await renderTo(tmp, doc, ['--font', 'latin', '--lang', 'latin', '--font-features', 'onum,smcp']);

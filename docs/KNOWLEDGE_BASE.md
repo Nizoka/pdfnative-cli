@@ -982,6 +982,15 @@ even when a network flag is present. Commands read
 `hasFlag(args.flags, 'dry-run') || isDryRun()` so a direct command call and the
 global flag both work.
 
+`render --dry-run` (v1.5.0) pre-flights the **real build in memory**: `preflight()` in
+[`src/commands/render.ts`](../src/commands/render.ts) calls the buffered builder
+(`buildDocumentPDFBytes` / `buildPDFBytes`, never a stream variant) and discards the
+bytes, through the same `mapBuildError` as a real run. A dry run therefore fails with
+`E_INPUT` on every engine coherence error (missing PDF/X output intent, `acsp`-less ICC
+profile, attachment without PDF/A-3b, translucent watermark under PDF/A-1b, print marks
+without a TrimBox), with `E_CHECK_FAILED` under `--strict`, and its envelope carries the
+`diagnostics` array (`dryRun: true`, no `bytes`). `batch --dry-run` inherits this per task.
+
 ### Token economy — output projection
 
 The JSON `inspect` / `verify` / `batch` write to stdout is the bulk of an agent's

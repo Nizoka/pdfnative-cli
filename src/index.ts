@@ -61,8 +61,10 @@ Global options (any command; may be placed before or after the command name):
                     (data stays on stdout). Errors carry a stable code.
   --dry-run         Validate inputs and exit without writing output (render,
                     sign, batch, merge, split, extract, annotate, fill,
-                    encrypt, decrypt, metadata, ltv, doc-timestamp). Never
-                    performs network I/O, even when a network flag is present.
+                    encrypt, decrypt, metadata, ltv, doc-timestamp). render
+                    pre-flights the real build in memory (engine errors and
+                    diagnostics surface as on a real run). Never performs
+                    network I/O, even when a network flag is present.
   --max-inflate-size <bytes>
                     Cap the decompressed size of any single PDF stream while
                     parsing untrusted input (anti zip-bomb; default 100 MiB).

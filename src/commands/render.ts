@@ -127,6 +127,23 @@ function mapBuildError(e: unknown, strict: boolean): never {
     throw e instanceof Error ? e : new Error(message);
 }
 
+/**
+ * `--dry-run` pre-flight (v1.5.0): run the real buffered builder in memory
+ * and discard the bytes. The engine's coherence errors (`E_INPUT`), the
+ * strict-mode escalations (`E_CHECK_FAILED`) and the diagnostics therefore
+ * surface exactly as they would on a real render — a dry run that passes is
+ * a render that would have passed. Always the buffered builder, never a
+ * stream variant: nothing is written, so there is nothing to stream, and the
+ * stream builders are byte-identical to the buffered ones by contract.
+ */
+function preflight(build: () => Uint8Array, strict: boolean): void {
+    try {
+        build();
+    } catch (e) {
+        mapBuildError(e, strict);
+    }
+}
+
 // ── Image-block payload resolution (CLI JSON convenience) ────────────────
 
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
@@ -476,7 +493,13 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
         tableParams = await withFontEntries(tableParams, cfg.langs);
         const tableLayout: Partial<PdfLayoutOptions> = { ...cfg.layout, onDiagnostic };
         if (cfg.dryRun) {
-            emitStatus({ command: 'render', variant: 'table', dryRun: true, output: cfg.outputPath ?? '-', ...conformanceFields(tableLayout) });
+            preflight(() => buildPDFBytes(tableParams, tableLayout), tableLayout.strict === true);
+            emitStatus({
+                command: 'render', variant: 'table', dryRun: true,
+                output: cfg.outputPath ?? '-',
+                ...conformanceFields(tableLayout),
+                ...diagnosticsField(),
+            });
             return;
         }
         let bytes: number | null = null;
@@ -590,7 +613,13 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
     }
 
     if (cfg.dryRun) {
-        emitStatus({ command: 'render', variant: 'document', dryRun: true, output: cfg.outputPath ?? '-', ...conformanceFields(effectiveLayout) });
+        preflight(() => buildDocumentPDFBytes(params, effectiveLayout), effectiveLayout.strict === true);
+        emitStatus({
+            command: 'render', variant: 'document', dryRun: true,
+            output: cfg.outputPath ?? '-',
+            ...conformanceFields(effectiveLayout),
+            ...diagnosticsField(),
+        });
         return;
     }
 
