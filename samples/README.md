@@ -670,9 +670,9 @@ operations: metadata editing, PDF comparison, manifest pipelines, and print prod
 | File | Description |
 |------|-------------|
 | [01-paragraph-breaking.json](render/typography/01-paragraph-breaking.json) | `layout.typography.widows` / `orphans`, `keepWithNext` on headings, `splittable` paragraphs — long paragraphs break across pages without a stranded line |
-| [02-justify-optical-hyphenation.json](render/typography/02-justify-optical-hyphenation.json) | `align: "justify"`, `opticalMargins`, `softHyphens` (U+00AD break opportunities) |
+| [02-justify-optical-hyphenation.json](render/typography/02-justify-optical-hyphenation.json) | `align: "justify"`, `opticalMargins`, `hyphenationLanguage`, soft hyphens (U+00AD break opportunities, always honoured) |
 | [03-french-spacing-units-short-words.json](render/typography/03-french-spacing-units-short-words.json) | `punctuationSpacing: "fr"` (narrow no-break space before `; : ! ?`, inside guillemets), `unitBinding` (`150 €`, `20 %` never break), short-word rules — the demonstrated content is French (`demo-language: fr`) |
-| [04-kerning-features-metrics.json](render/typography/04-kerning-features-metrics.json) | `kerning`, OpenType `features` (`onum`, `smcp`, `liga`), `metrics: "exact"` base-14 widths |
+| [04-kerning-features-metrics.json](render/typography/04-kerning-features-metrics.json) | `kerning`, OpenType `fontFeatures` (`onum`, `smcp`), `metrics: "exact"` base-14 widths |
 | [01-typography.sh](render/typography/01-typography.sh) | Renders all four with `--font latin --lang latin`, then re-renders `01` with the flags `--split-paragraphs --keep-headings-with-next --kerning --font-features onum,liga` and shows `--inspect-layout` |
 | [01-typography.ps1](render/typography/01-typography.ps1) | PowerShell equivalent |
 

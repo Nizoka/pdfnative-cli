@@ -26,9 +26,10 @@ backward-compatible command surface — every envelope field is additive.
 
 #### `render`
 
-- **Typography** — `layout.typography` (`widows`, `orphans`, `keepWithNext`,
-  `splitParagraphs`, `keepHeadingsWithNext`, `justify`, `opticalMargins`, `softHyphens`,
-  `punctuationSpacing: "fr" | {…}`, `unitBinding`, `kerning`, `features`, `metrics`),
+- **Typography** — `layout.typography` (`widows`, `orphans`, `splitParagraphs`,
+  `keepHeadingsWithNext`, `opticalMargins`, `punctuationSpacing: "fr" | "fr-CA" | rules[]`,
+  `unitBinding`, `bindShortWords`, `hyphenationLanguage`, `kerning`, `fontFeatures`,
+  `metrics`; soft hyphens U+00AD are honoured unconditionally),
   paragraph `align: "justify"`, block-level `keepWithNext` / `splittable`, plus the flags
   `--split-paragraphs`, `--keep-headings-with-next`, `--kerning` and
   `--font-features <tag,…>` (four-character OpenType tags, validated). Nested `typography`
@@ -149,7 +150,7 @@ backward-compatible command surface — every envelope field is additive.
   double-render script proves byte identity across timezones), `inspect --check pdfx` and
   `--iso-dates`, `doctor` capabilities, `annotate link`, `verify` weak digest,
   `sign --timestamp-timeout`, global flags first — each as a dual-shell pair.
-- **Tests** — 1074 tests across 73 files (600 in 1.4.0): every feature above,
+- **Tests** — 1109 tests across 74 files (600 in 1.4.0): every feature above,
   the tools (gate, validators, fingerprints, sample plan, verify-docs, release-prepare, agent
   config, guard, workflows), the sample regression suite, an English-only prose scan, a
   reproducible-build integration test that spawns the built binary under two timezones, and a

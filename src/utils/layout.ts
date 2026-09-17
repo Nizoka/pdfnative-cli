@@ -484,13 +484,39 @@ async function loadAttachmentsFromFlags(
     return out;
 }
 
+/** ICC.1 §7.2.9: the profile file signature `acsp` occupies bytes 36–39 of the header. */
+const ICC_SIGNATURE_OFFSET = 36;
+const ICC_SIGNATURE = 'acsp';
+
+/**
+ * Refuse a `--output-intent-icc` file that is not an ICC profile before the
+ * engine sees it (v1.5.0, audit A-23): the 128-byte header must carry the
+ * `acsp` signature at byte 36. The engine re-checks the header (size field,
+ * profile class, colour space) at build time — this is the CLI's own gate,
+ * so the refusal is the same on a real run and a `--dry-run`.
+ */
+export function assertIccSignature(bytes: Uint8Array, source: string): void {
+    const end = ICC_SIGNATURE_OFFSET + ICC_SIGNATURE.length;
+    const sig = bytes.length >= end
+        ? String.fromCharCode(...bytes.subarray(ICC_SIGNATURE_OFFSET, end))
+        : '';
+    if (sig !== ICC_SIGNATURE) {
+        throw new CliError(
+            `${source} is not an ICC profile (no \`${ICC_SIGNATURE}\` signature at byte ${ICC_SIGNATURE_OFFSET}).`,
+            1,
+            ErrorCode.INPUT,
+        );
+    }
+}
+
 /**
  * Build `layout.outputIntent` from `--output-intent-icc <file.icc>` and
  * `--output-intent-id <string>` (pdfnative 1.8.0: RGB, CMYK or Gray
  * profiles; PDF/X-4 needs a `prtr` output profile). The ICC bytes are
- * size-capped here and header-validated by the engine (`acsp` signature,
- * size field, colour space). Merges into an outputIntent inherited from the
- * layout file: only the fields given as flags are replaced.
+ * size-capped and `acsp`-checked here ({@link assertIccSignature}); the
+ * engine validates the rest of the header (size field, class, colour space)
+ * at build time. Merges into an outputIntent inherited from the layout
+ * file: only the fields given as flags are replaced.
  */
 async function buildOutputIntentFromFlags(
     args: ParsedArgs,
@@ -507,6 +533,7 @@ async function buildOutputIntentFromFlags(
     };
     if (iccPath !== undefined) {
         out.iccProfile = await readBinaryFileCapped(iccPath, MAX_ICC_PROFILE_BYTES, 'ICC profile');
+        assertIccSignature(out.iccProfile, iccPath);
         if (id === undefined && (existing?.outputConditionIdentifier === undefined || existing.outputConditionIdentifier === '')) {
             out.outputConditionIdentifier = basename(iccPath, extname(iccPath));
         }

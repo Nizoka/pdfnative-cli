@@ -210,6 +210,11 @@ function inspectSchema(): JsonSchema {
                         description: 'The raw PDF date string (D:YYYYMMDDHHmmSS+HH\'mm\'), or '
                             + 'ISO 8601 with --iso-dates (v1.5.0).',
                     },
+                    modDate: {
+                        type: ['string', 'null'],
+                        description: '/Info /ModDate — the raw PDF date string, or ISO 8601 '
+                            + 'with --iso-dates (v1.5.0, additive).',
+                    },
                     subject: { type: ['string', 'null'] },
                     producer: { type: ['string', 'null'] },
                     trapped: { type: 'string', enum: ['True', 'False', 'Unknown'] },
@@ -684,16 +689,91 @@ function statusSchema(): JsonSchema {
         title: 'pdfnative-cli agent status envelope',
         description: 'The success envelope written to stderr under --json by the write '
             + 'commands (render, sign, merge, split, extract, annotate, fill, encrypt, '
-            + 'decrypt, batch, metadata, ltv, doc-timestamp, compare). Additional '
-            + 'command-specific fields may be present.',
+            + 'decrypt, metadata, ltv, doc-timestamp, compare; batch prints its own '
+            + 'summary on stdout). Every field any command emits is pinned here — the '
+            + 'command-specific ones are optional and say which command emits them '
+            + '(tests/commands/schema-status-parity.test.ts holds the sources to this list); '
+            + 'new fields are additive.',
         type: 'object',
         required: ['ok', 'command'],
         properties: {
             ok: { type: 'boolean', const: true },
             command: { type: 'string' },
             dryRun: { type: 'boolean' },
-            output: { type: 'string' },
-            bytes: { type: 'integer', minimum: 0 },
+            output: {
+                type: 'string',
+                description: 'The output path, or "-" for stdout. split emits outputDir instead.',
+            },
+            bytes: {
+                type: 'integer', minimum: 0,
+                description: 'Size of the artifact written. Absent under --dry-run, when the '
+                    + 'output was streamed (streamed: true) and for compare.',
+            },
+            variant: {
+                type: 'string', enum: ['document', 'table'],
+                description: 'render: the input shape rendered (--variant).',
+            },
+            inspectLayout: {
+                type: 'boolean',
+                description: 'render --inspect-layout: true when the JSON layout report was '
+                    + 'written instead of a PDF.',
+            },
+            algorithm: {
+                type: 'string',
+                description: 'sign: the signature algorithm (rsa-sha256, ecdsa-sha256, …); '
+                    + 'encrypt: the cipher (aes128 | aes256).',
+            },
+            digest: {
+                type: 'string', enum: ['sha256', 'sha384', 'sha512'],
+                description: 'doc-timestamp: the message-imprint digest requested from the TSA.',
+            },
+            annotations: {
+                type: 'integer', minimum: 0,
+                description: 'annotate: number of annotation specs applied (validated under --dry-run).',
+            },
+            pages: {
+                type: 'integer', minimum: 0,
+                description: 'extract: pages selected; encrypt / decrypt: page count of the document.',
+            },
+            sources: { type: 'integer', minimum: 2, description: 'merge: number of source files.' },
+            parts: { type: 'integer', minimum: 0, description: 'split: number of parts written to outputDir.' },
+            outputDir: {
+                type: 'string',
+                description: 'split: the directory the parts were written to (split has no single output).',
+            },
+            streamed: {
+                type: 'boolean',
+                description: 'merge / split / extract / encrypt / decrypt --stream: the output was '
+                    + 'streamed, so bytes is absent.',
+            },
+            encrypted: {
+                type: 'boolean',
+                description: 'merge / split / extract: true when --encrypt was applied to the output.',
+            },
+            fields: {
+                description: 'fill --dry-run: the number of form fields found (integer); '
+                    + 'metadata: the names of the /Info fields updated (string[]).',
+                anyOf: [
+                    { type: 'integer', minimum: 0 },
+                    { type: 'array', items: { type: 'string' } },
+                ],
+            },
+            values: { type: 'integer', minimum: 0, description: 'fill: number of values applied from --data.' },
+            flatten: { type: 'boolean', description: 'fill: whether the form was flattened.' },
+            mode: {
+                type: 'string', enum: ['collect', 'embed', 'add'],
+                description: 'ltv: the sub-command run.',
+            },
+            certificates: { type: 'integer', minimum: 0, description: 'ltv: certificates collected or embedded into the DSS.' },
+            ocspResponses: { type: 'integer', minimum: 0, description: 'ltv: OCSP responses collected or embedded.' },
+            crls: { type: 'integer', minimum: 0, description: 'ltv: CRLs collected or embedded.' },
+            vri: { type: 'integer', minimum: 0, description: 'ltv: per-signature VRI entries collected or embedded.' },
+            equal: { type: 'boolean', const: true, description: 'compare: the documents are equal (a difference is E_CHECK_FAILED, never a success envelope).' },
+            modes: {
+                type: 'array', items: { type: 'string', enum: ['structure', 'text'] },
+                description: 'compare: the comparison modes run (--mode).',
+            },
+            differences: { type: 'integer', minimum: 0, description: 'compare: number of differences (0 on success).' },
             timestamp: {
                 type: 'object',
                 description: 'sign --timestamp: the TSA that produced the embedded token.',

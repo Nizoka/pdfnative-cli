@@ -3,6 +3,7 @@
 import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest';
 import { inspect } from '../../src/commands/inspect.js';
 import { annotate } from '../../src/commands/annotate.js';
+import { metadata } from '../../src/commands/metadata.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { CliError, ErrorCode } from '../../src/utils/error.js';
 import { TempFiles, SYNTHETIC_CMYK_ICC, MINIMAL_DOC, renderTo, captured } from '../helpers/cli-harness.js';
@@ -102,5 +103,19 @@ describe('inspect --iso-dates (v1.5.0)', () => {
         expect((raw.metadata as { creationDate: string }).creationDate).toBe("D:20260615123045+00'00'");
         const iso = await inspectJson(['--input', plainPdf, '--iso-dates']);
         expect((iso.metadata as { creationDate: string }).creationDate).toBe('2026-06-15T12:30:45Z');
+    });
+
+    it('emits metadata.modDate (null when absent) and normalises it under --iso-dates (v1.5.0, additive)', async () => {
+        const raw = await inspectJson(['--input', plainPdf]);
+        expect(raw.metadata).toHaveProperty('modDate');
+        // A freshly rendered document carries no /ModDate; stamp one with `metadata`.
+        const stamped = tmp.path('stamped.pdf');
+        await captured(() => metadata(parseArgs(['--input', plainPdf, '--output', stamped, '--title', 'Stamped', '--mod-date', '2026-07-01T08:09:10Z'])));
+        const rawStamped = await inspectJson(['--input', stamped]);
+        expect((rawStamped.metadata as { modDate: string }).modDate).toMatch(/^D:20260701080910/);
+        const iso = await inspectJson(['--input', stamped, '--iso-dates']);
+        expect((iso.metadata as { modDate: string }).modDate).toBe('2026-07-01T08:09:10Z');
+        const { stdout } = await captured(() => inspect(parseArgs(['--input', stamped, '--format', 'text'])));
+        expect(stdout).toContain('Modified:');
     });
 });

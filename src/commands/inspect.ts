@@ -88,6 +88,8 @@ interface InspectResult {
         readonly title: string | null;
         readonly author: string | null;
         readonly creationDate: string | null;
+        /** `/Info /ModDate` — raw PDF date, or ISO 8601 under --iso-dates (v1.5.0, additive). */
+        readonly modDate: string | null;
         readonly subject: string | null;
         readonly producer: string | null;
         /** `/Info /Trapped` (ISO 32000-1 §14.11.6) — omitted when absent. */
@@ -490,6 +492,7 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     const info = reader.getInfo();
     const trapped = readTrapped(info);
     const rawCreationDate = info !== null ? safeInfoString(info.get('CreationDate')) : null;
+    const rawModDate = info !== null ? safeInfoString(info.get('ModDate')) : null;
     const baseResult: InspectResult = {
         version: extractVersion(reader),
         pageCount: reader.pageCount,
@@ -501,6 +504,7 @@ export async function inspect(args: ParsedArgs): Promise<void> {
             title: info !== null ? safeInfoString(info.get('Title')) : null,
             author: info !== null ? safeInfoString(info.get('Author')) : null,
             creationDate: rawCreationDate !== null && isoDates ? pdfDateToIso(rawCreationDate) : rawCreationDate,
+            modDate: rawModDate !== null && isoDates ? pdfDateToIso(rawModDate) : rawModDate,
             subject: info !== null ? safeInfoString(info.get('Subject')) : null,
             producer: info !== null ? safeInfoString(info.get('Producer')) : null,
             ...(trapped !== undefined ? { trapped } : {}),
@@ -573,6 +577,7 @@ export async function inspect(args: ParsedArgs): Promise<void> {
             `Title:          ${result.metadata.title ?? '—'}`,
             `Author:         ${result.metadata.author ?? '—'}`,
             `Created:        ${result.metadata.creationDate ?? '—'}`,
+            `Modified:       ${result.metadata.modDate ?? '—'}`,
             `Subject:        ${result.metadata.subject ?? '—'}`,
             `Producer:       ${result.metadata.producer ?? '—'}`,
         ];

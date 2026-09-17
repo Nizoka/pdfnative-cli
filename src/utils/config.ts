@@ -24,10 +24,17 @@ import { dirname, join, resolve } from 'node:path';
 import type { ParsedArgs } from './args.js';
 import { validatePath } from './io.js';
 import { CliError } from './error.js';
+import { COMMANDS } from '../commands/completion.js';
 
 const CONFIG_FILENAME = '.pdfnativerc.json';
 const CONFIG_SIZE_LIMIT = 1024 * 1024; // 1 MB — config files are small.
-const KNOWN_COMMANDS = ['render', 'sign', 'verify', 'inspect', 'batch'];
+/**
+ * Every command name may head a scoped section (v1.5.0, audit A-44 — five
+ * names were hard-coded before). Derived from the completion table so a new
+ * command is configurable the day it exists. `completion.ts` is a static
+ * table with no import back into `utils/`, so there is no cycle.
+ */
+export const KNOWN_COMMANDS: readonly string[] = COMMANDS.map((c) => c.name);
 
 type ConfigValue = string | boolean | number | readonly (string | number)[];
 type ConfigDefaults = Record<string, string | boolean | string[]>;

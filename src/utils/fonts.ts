@@ -23,8 +23,9 @@ import { readBinaryFileCapped } from './io.js';
 /**
  * Allow-list of bundled font shortcuts exposed via `--font <name>`.
  * Each maps to a Noto-* data module shipped with pdfnative under its `fonts/`
- * directory (which is not part of the package `exports` map, so we resolve it
- * via the main entry and import a `file://` URL).
+ * directory (exported as `pdfnative/fonts/*` since 1.8.0; we resolve the
+ * package root through `pdfnative/package.json` and import a `file://` URL,
+ * so the directory is probed on disk — see `doctor`).
  *
  * Adding to this list is intentional (no auto-discovery) so the CLI surface
  * stays predictable and free from path-based RCE vectors. 31 modules:
@@ -112,11 +113,10 @@ let cachedFontsDir: string | null = null;
 export function resolveFontsDir(): string {
     if (cachedFontsDir !== null) return cachedFontsDir;
     const require = createRequire(import.meta.url);
-    // pdfnative's package.json is not exported, but the main entry is. Resolve
-    // the main entry (.../dist/index.js) and walk up two levels to the package
-    // root, which contains the `fonts/` directory.
-    const main = require.resolve('pdfnative');
-    cachedFontsDir = joinPath(dirname(dirname(main)), 'fonts');
+    // pdfnative exports `./package.json` (and `./fonts/*`) since 1.8.0: the
+    // package root is its directory, and `fonts/` sits next to it. No
+    // assumption about where the main entry lives inside the package.
+    cachedFontsDir = joinPath(dirname(require.resolve('pdfnative/package.json')), 'fonts');
     return cachedFontsDir;
 }
 

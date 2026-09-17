@@ -269,7 +269,7 @@ pdfnative render [--input <file.json>] [--output <out.pdf>] [--stream|--stream-p
 | `--output-intent-id` | string | ICC basename | (v1.5.0) `outputIntent.outputConditionIdentifier` |
 | `--trapped` | `true`\|`false`\|`unknown` | — | (v1.5.0) `metadata.trapped` (`/Trapped`, `pdf:Trapped`); PDF/X-4 requires `true` or `false` |
 | `--split-paragraphs` / `--keep-headings-with-next` / `--kerning` | boolean | false | (v1.5.0) `layout.typography.splitParagraphs` / `keepHeadingsWithNext` / `kerning` |
-| `--font-features` | `tag,tag` | — | (v1.5.0) `layout.typography.features` — OpenType tags, each `/^[a-z0-9]{4}$/i` (invalid → exit 2) |
+| `--font-features` | `tag,tag` | — | (v1.5.0) `layout.typography.fontFeatures` — OpenType tags, each `/^[a-z0-9]{4}$/i` (invalid → exit 2) |
 | `--outline` | `auto`\|`<file.json>` | — | PDF bookmarks: `auto` from headings, or an explicit `OutlineItem[]` tree |
 | `--inspect-layout` | boolean | false | Emit a `LayoutInspection` JSON report instead of a PDF (document variant only) |
 | `--debug-layout` | `[margins,content,cells]` | — | Overlay layout debug guides on the PDF (bare flag = all) |
@@ -331,9 +331,9 @@ pdfnative render [--input <file.json>] [--output <out.pdf>] [--stream|--stream-p
 - `params.metadata.trapped` — `/Trapped` flag (`True` \| `False` \| `Unknown`; `--trapped` since v1.5.0).
 
 **Typography (v1.5.0, pdfnative ≥ 1.8.0 — `layout.typography`):**
-- Paragraph breaking — `widows`, `orphans`, `keepWithNext`, `splitParagraphs`, `keepHeadingsWithNext`; block-level `keepWithNext` / `splittable`.
-- Line composition — `justify` (with `align: "justify"`), `opticalMargins`, `softHyphens` (breaks at existing U+00AD), `punctuationSpacing: "fr" | { … }` (narrow no-break spaces before `; : ! ?` and inside guillemets), `unitBinding` (a number never separates from its unit or currency), short-word rules.
-- Glyphs — `kerning` (GPOS pairs of embedded fonts), `features` (OpenType tags such as `onum`, `smcp`, `tnum`, `liga`), `metrics: "exact"` (base-14 widths from the real metrics).
+- Paragraph breaking — `widows`, `orphans`, `splitParagraphs`, `keepHeadingsWithNext: true | { minLines }`; block-level `keepWithNext` / `splittable`.
+- Line composition — paragraph `align: "justify"` (a block property, not a typography key), `opticalMargins`, soft hyphens (an existing U+00AD is always a break opportunity — there is no switch), `hyphenationLanguage`, `punctuationSpacing: "fr" | "fr-CA" | [{ char, side, space }]` (narrow no-break spaces before `; : ! ?` and inside guillemets; the presets or an explicit rules array — an object is not a valid form), `unitBinding` (a number never separates from its unit or currency), `bindShortWords: { maxLength, words }`.
+- Glyphs — `kerning` (GPOS pairs of embedded fonts), `fontFeatures` (OpenType tags such as `onum`, `smcp`, `tnum`, `liga`), `metrics: "exact"` (base-14 widths from the real metrics). These are the engine's `TypographyOptions` keys verbatim (`schema render` describes them); an unknown key is silently ignored by the engine.
 - Flags: `--split-paragraphs`, `--keep-headings-with-next`, `--kerning`, `--font-features <tag,…>`. Precedence: flags > `--layout` file > document `layout`; `typography` and `outputIntent` merge one level deep (`mergeNestedLayout`), every other layout key is replaced whole.
 - A feature the font cannot honour emits `TYPOGRAPHY_FEATURE_INEFFECTIVE` (warning, or `E_CHECK_FAILED` under `--strict`). Tagged output carries `/ActualText`, so `extract-text` returns the source text.
 
@@ -936,9 +936,14 @@ Global `--json` sets `PDFNATIVE_JSON=1` (in `index.ts`). In that mode:
 - `inspect` / `verify` / `batch` already put their result document on stdout as
   JSON; `--json` only adds the stderr failure envelope (and forces `batch`'s
   JSON summary).
-- Additive success fields, all pinned by `schema status`: `diagnostics[]` (`render`),
-  `timestamp: { url, digest, timeoutMs? }` (`sign --timestamp`), `pdfx` (`render --pdfx`,
-  v1.5.0) and `creationDate` (`render` / `batch` under a pinned date, v1.5.0).
+- Every emitted field is pinned by `schema status` — the command-specific ones
+  (`variant`, `pages`, `parts`, `outputDir`, `sources`, `streamed`, `encrypted`, `algorithm`,
+  `digest`, `mode`, the `ltv` counters, `fields`, `values`, `flatten`, `annotations`,
+  `equal` / `modes` / `differences`, `inspectLayout`) as optional properties that name their
+  command, held to the sources by `tests/commands/schema-status-parity.test.ts` — plus the
+  1.5.0 additive fields: `diagnostics[]` (`render`), `timestamp: { url, digest, timeoutMs? }`
+  (`sign --timestamp`), `pdfx` (`render --pdfx`) and `creationDate` (`render` under a pinned
+  date, including the `render` envelopes a `batch` run forwards).
 - Global flags (`--json`, `--dry-run`, `--quiet`, `--no-color`, `--config`, `--no-config`,
   `--max-inflate-size`, `--creation-date`, `--help`, `--version`) may precede or follow the
   command name (v1.5.0).
@@ -1459,7 +1464,7 @@ heading, paragraph, list, table, spacer, pageBreak, barcode, link, toc, formFiel
 - ✅ `compress` (FlateDecode stream compression)
 - ✅ Custom `pageWidth`, `pageHeight`, `margins`, `colors`, `fontSizes`
 - ✅ (v1.4.0) `print` (bleed/trim/art/crop boxes, printer's marks, `userUnit`), `outputIntent` (ICC RGB), `viewerPreferences` (duplex, copies, print range, tray)
-- ✅ (v1.5.0) `typography` (widows/orphans, keep-with-next, justify, optical margins, soft hyphens, punctuation spacing, unit binding, kerning, OpenType features, metrics), `print.marks.colourBars`, `pdfx: "pdfx4"` with a CMYK `outputIntent`, `creationDate`, CMYK colours everywhere
+- ✅ (v1.5.0) `typography` (widows/orphans, keep-headings-with-next, split paragraphs, optical margins, punctuation spacing, unit binding, short words, hyphenation language, kerning, OpenType `fontFeatures`, metrics), `print.marks.colourBars`, `pdfx: "pdfx4"` with a CMYK `outputIntent`, `creationDate`, CMYK colours everywhere
 
 **Full example with layout options:**
 ```json

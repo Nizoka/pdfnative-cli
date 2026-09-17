@@ -54,20 +54,26 @@ default to JSON on stdout).
 
 **On success**, the write commands — `render` / `sign` / `merge` / `split` / `extract` /
 `annotate` / `fill` / `encrypt` / `decrypt` / `metadata` / `ltv` / `doc-timestamp` /
-`batch` — write a status line to stderr (schema: `pdfnative schema status`):
+`compare` — write a status line to stderr (schema: `pdfnative schema status`); `batch`
+prints its own summary document on stdout instead (§3) and forwards the per-task
+envelopes of the commands it runs:
 
 ```json
 { "ok": true, "command": "render", "variant": "document", "dryRun": false, "output": "out.pdf", "bytes": 12345 }
 ```
 
-Additive fields can appear in the success envelope, all pinned by the `status`
-schema:
+Every field any command emits is pinned by the `status` schema — the base fields
+(`ok`, `command`, `dryRun`, `output`, `bytes`), the command-specific ones (`variant`,
+`pages`, `parts`, `outputDir`, `sources`, `streamed`, `encrypted`, `algorithm`, `digest`,
+`mode`, `certificates` / `ocspResponses` / `crls` / `vri`, `fields`, `values`, `flatten`,
+`annotations`, `equal` / `modes` / `differences`, `inspectLayout`; each described with the
+command that emits it) and the additive fields below:
 
 | Field | Emitted by | Meaning |
 |-------|------------|---------|
 | `diagnostics: [{ code, severity, message }]` | `render` | Non-strict conformance and typography diagnostics (PDF/A `PDFA_*`, PDF/X `PDFX_*`, `TYPOGRAPHY_FEATURE_INEFFECTIVE`); `--strict` turns them into `E_CHECK_FAILED` |
 | `pdfx: "pdfx4"` | `render --pdfx` | The PDF/X conformance level the output claims (v1.5.0) |
-| `creationDate: "<ISO 8601>"` | `render`, `batch` | The pinned creation instant when `--creation-date` or `SOURCE_DATE_EPOCH` is active (v1.5.0) |
+| `creationDate: "<ISO 8601>"` | `render` (also on the `render` envelopes inside a `batch` run) | The pinned creation instant when `--creation-date` or `SOURCE_DATE_EPOCH` is active (v1.5.0) |
 | `timestamp: { url, digest, timeoutMs? }` | `sign --timestamp` | The RFC 3161 TSA used, the digest algorithm and, when set, `--timestamp-timeout` (v1.5.0) |
 
 `inspect`, `verify`, and `batch` put their result document on **stdout** as JSON;

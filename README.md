@@ -134,7 +134,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
   `tests/regression/baselines/samples.sha256.json`), a PDF/A + PDF/X conformance corpus,
   hardened workflows (egress-audited runners, SHA-pinned actions, Trusted Publishing, SBOM +
   build attestations), a documentation verifier (`npm run verify:docs`) and a committed
-  Claude Code layer with a human-in-the-loop guard hook — 1074 tests.
+  Claude Code layer with a human-in-the-loop guard hook — 1109 tests.
 - **AI-governance / HITL** — the **`govern`** command surfaces pdfnative's Human-in-the-Loop
   contract to agents: they act as *draftsmen*, never autonomous submitters. `govern
   verify-issue` gates a local draft; a human always reviews and submits.
@@ -285,7 +285,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 | Anti zip-bomb cap | ✅ | Global `--max-inflate-size <bytes>` — cap on any decompressed stream while parsing (default 100 MiB) |
 | Network error code | ✅ | Stable `E_NETWORK` — opt-in network operation failed (TSA / OCSP / CRL fetch) |
 | **Typography, PDF/X-4, CMYK & reproducible output (v1.5.0, pdfnative ≥ 1.8.0)** | | |
-| Typography engine | ✅ | `layout.typography` — widows/orphans, `keepWithNext`, splittable paragraphs, `align: "justify"`, optical margins, soft hyphens, punctuation spacing (`fr` preset + unit binding), kerning, OpenType `features`, exact base-14 `metrics` |
+| Typography engine | ✅ | `layout.typography` — widows/orphans, `keepWithNext`, splittable paragraphs, paragraph `align: "justify"`, optical margins, soft hyphens (U+00AD, always honoured), punctuation spacing (`"fr"` / `"fr-CA"` preset or a rules array + unit binding), kerning, OpenType `fontFeatures`, exact base-14 `metrics` |
 | Typography flags | ✅ | `render --split-paragraphs`, `--keep-headings-with-next`, `--kerning`, `--font-features <tag,…>` (merged into `layout.typography`; flags win over `--layout`) |
 | CMYK colours | ✅ | Every colour field and flag accepts `"c m y k"` (0–1) or `[c,m,y,k]` (percent) beside hex / RGB; `DeviceCMYK` operators emitted |
 | Printer's colour bars | ✅ | `layout.print.marks.colourBars: true \| { tints, size }` |
@@ -695,7 +695,7 @@ The 21 commands are grouped by purpose (the global `pdfnative --help` shows the 
 | `--split-paragraphs` | false | (v1.5.0) `layout.typography.splitParagraphs` — long paragraphs may break across pages (widow/orphan rules apply) |
 | `--keep-headings-with-next` | false | (v1.5.0) `layout.typography.keepHeadingsWithNext` — a heading never ends a page alone |
 | `--kerning` | false | (v1.5.0) `layout.typography.kerning` — GPOS pair kerning for embedded fonts |
-| `--font-features <tag,…>` | — | (v1.5.0) `layout.typography.features` — OpenType feature tags (`onum`, `smcp`, `tnum`, `liga`, …; four alphanumerics each) |
+| `--font-features <tag,…>` | — | (v1.5.0) `layout.typography.fontFeatures` — OpenType feature tags (`onum`, `smcp`, `tnum`, `liga`, …; four alphanumerics each) |
 | `--conformance <1b\|2b\|3b>` | — | **Deprecated** — use `--tagged pdfa<level>` |
 | `--watermark-text <s>` / `--watermark-image <path>` | — | Text or image watermark |
 | `--watermark-opacity <0-1>` / `--watermark-angle <deg>` / `--watermark-color <#hex>` / `--watermark-font-size <pt>` / `--watermark-position background\|foreground` | — | Watermark styling |
@@ -716,10 +716,11 @@ The 21 commands are grouped by purpose (the global `pdfnative --help` shows the 
 | `--debug-layout [margins,content,cells]` | — | Overlay layout debug guides on the rendered PDF (bare flag = all) |
 
 **Document & layout JSON (v1.5.0, pdfnative ≥ 1.8.0)** — `layout.typography`
-(`widows`, `orphans`, `keepWithNext`, `splitParagraphs`, `keepHeadingsWithNext`,
-`justify`, `opticalMargins`, `softHyphens`, `punctuationSpacing: "fr" | {…}`,
-`unitBinding`, `kerning`, `features`, `metrics: "exact"`), paragraph `align: "justify"`,
-block-level `keepWithNext` / `splittable`; every colour accepts CMYK (`"c m y k"` 0–1 or
+(`widows`, `orphans`, `splitParagraphs`, `keepHeadingsWithNext: true | { minLines }`,
+`opticalMargins`, `punctuationSpacing: "fr" | "fr-CA" | [{ char, side, space }]`,
+`unitBinding`, `bindShortWords`, `hyphenationLanguage`, `kerning`, `fontFeatures: [tag, …]`,
+`metrics: "exact"`; soft hyphens U+00AD are honoured unconditionally), paragraph
+`align: "justify"`, block-level `keepWithNext` / `splittable`; every colour accepts CMYK (`"c m y k"` 0–1 or
 `[c,m,y,k]` percent) beside hex / RGB; `layout.print.marks.colourBars: true | { tints, size }`;
 `layout.pdfx: "pdfx4"` with a `prtr` CMYK `layout.outputIntent` (`iccProfile` as a number
 array in JSON); `layout.creationDate` (ISO string) — flags win over the file, nested

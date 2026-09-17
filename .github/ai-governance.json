@@ -86,7 +86,7 @@
     "blocks_submission_on_failure": true
   },
   "references": {
-    "zero_dependency_policy": "README.md#zero-dependency",
+    "zero_dependency_policy": "AGENTS.md#mission-and-constraints",
     "issue_templates": [".github/ISSUE_TEMPLATE"]
   }
 }

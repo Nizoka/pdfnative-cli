@@ -35,8 +35,8 @@ pdfnative <command> [...flags]
 ## Environment
 
 - **pdfnative-cli version:**
-- **pdfnative version:** <!-- run: node -e "import('pdfnative').then(m => console.log(m))" -->
-- **Runtime:** <!-- Node.js 20/22, Bun 1.x, Deno 2.x -->
+- **pdfnative version:** <!-- run: pdfnative doctor --format json (reports the CLI, Node and engine versions) -->
+- **Runtime:** <!-- Node.js 22/24 (the CLI needs Node ≥ 22), Bun 1.x, Deno 2.x -->
 - **OS:**
 
 ## Minimal Reproduction

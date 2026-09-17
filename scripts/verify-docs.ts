@@ -70,7 +70,7 @@ import {
     usageCommandList,
 } from './lib/cli-surface.js';
 import { CORPUS } from './lib/pdfa-corpus.js';
-import { AI_GOVERNANCE_POLICY } from '../src/utils/governance.js';
+import { AI_GOVERNANCE_POLICY, AGENT_RULES_TEXT } from '../src/utils/governance.js';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -140,7 +140,7 @@ export const OFFLINE_RULES = [
     'flag-parity', // every flag a <NAME>_USAGE text names is in the completion table, and vice versa
     'schema-parity', // every schema subject is named in the knowledge base's schema section
     'error-parity', // ErrorCode == agent.ts DEFAULT_MESSAGE; every E_* in the docs exists; every code is listed in the contract docs
-    'governance-embed', // .github/ai-governance.json equals the policy embedded in src/utils/governance.ts
+    'governance-embed', // .github/ai-governance.json equals the policy and .github/AGENT_RULES.md the rules text embedded in src/utils/governance.ts
     'sample-shell-parity', // every samples/**/*.sh has its .ps1 twin and vice versa
     'claude-md-budget', // CLAUDE.md imports AGENTS.md; both ≤ 120 lines, Copilot file ≤ 16 KiB, no line > 240 chars
     'governance-sources', // ai-governance.json sources/on_demand exist; always-loaded sources < 16 KiB
@@ -681,6 +681,13 @@ export async function verifyDocs(root: string, options: VerifyOptions = {}): Pro
             } catch (err) {
                 fail('.github/ai-governance.json', 1, 'governance-embed', `not valid JSON — ${(err as Error).message}`);
             }
+        }
+        // The protocol text `pdfnative govern rules` prints is the file, verbatim.
+        const rules = readOr('.github/AGENT_RULES.md');
+        if (rules === null) {
+            fail('.github/AGENT_RULES.md', 1, 'governance-embed', 'missing — `pdfnative govern rules` embeds it and agents read it');
+        } else if (rules.replace(/\r\n/g, '\n') !== AGENT_RULES_TEXT) {
+            fail('.github/AGENT_RULES.md', 1, 'governance-embed', 'differs from AGENT_RULES_TEXT in src/utils/governance.ts — the file and the text `pdfnative govern rules` prints must be identical');
         }
     }
 

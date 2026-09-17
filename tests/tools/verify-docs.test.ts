@@ -93,6 +93,8 @@ describe('verify-docs — a corrupted sandbox', () => {
         // A stray sample directory and an unpaired script.
         writeFileSync(join(sandbox, 'samples', 'render', 'zz-orphan.sh'), 'echo orphan\n');
         writeFileSync(join(sandbox, 'README.md'), `${readFileSync(join(sandbox, 'README.md'), 'utf8')}\n\nStale: pdfnative-cli v0.0.1 has 12 commands and E_NOPE.\n`);
+        // The protocol text drifts from the embedded copy `govern rules` prints.
+        writeFileSync(join(sandbox, '.github', 'AGENT_RULES.md'), `${readFileSync(join(sandbox, '.github', 'AGENT_RULES.md'), 'utf8')}\n- Drifted rule.\n`);
         problems = (await verifyDocs(sandbox)).problems;
     }, 120_000);
 
@@ -116,6 +118,10 @@ describe('verify-docs — a corrupted sandbox', () => {
 
     it('fails sample-shell-parity on the unpaired script', () => {
         expect(messages('sample-shell-parity')).toEqual([expect.stringContaining('samples/render/zz-orphan.sh')]);
+    });
+
+    it('fails governance-embed when AGENT_RULES.md drifts from the text `govern rules` prints', () => {
+        expect(messages('governance-embed')).toEqual([expect.stringContaining('.github/AGENT_RULES.md:1 differs from AGENT_RULES_TEXT')]);
     });
 
     it('never runs eol-lf outside a git checkout', () => {

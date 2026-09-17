@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { buildLayoutOptions, loadLayoutFile, assertStreamingCompatible } from '../../src/utils/layout.js';
+import { buildLayoutOptions, loadLayoutFile, assertStreamingCompatible, assertIccSignature } from '../../src/utils/layout.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { CliError } from '../../src/utils/error.js';
 
@@ -324,5 +324,38 @@ describe('layout — attachment flag parsing (Windows path regression)', () => {
         expect(att.mimeType).toBe('application/xml');
         expect(att.relationship).toBe('Source');
         expect(att.description).toBe('Structured invoice payload');
+    });
+});
+
+describe('--output-intent-icc: the CLI checks the acsp signature itself (v1.5.0, audit A-23)', () => {
+    const tmp: string[] = [];
+    afterEach(async () => {
+        for (const p of tmp.splice(0)) await fs.rm(p, { force: true }).catch(() => undefined);
+    });
+
+    it('refuses a file without `acsp` at byte 36 with E_INPUT before the engine sees it', async () => {
+        const bogus = path.join(os.tmpdir(), `not-icc-${Date.now()}.icc`);
+        tmp.push(bogus);
+        await fs.writeFile(bogus, Buffer.alloc(256, 0));
+        const err = await buildLayoutOptions(parseArgs(['--output-intent-icc', bogus])).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(CliError);
+        expect((err as CliError).exitCode).toBe(1);
+        expect((err as CliError).code).toBe('E_INPUT');
+        expect((err as CliError).message).toContain('acsp');
+    });
+
+    it('refuses a file shorter than the 128-byte header', async () => {
+        const short = path.join(os.tmpdir(), `short-${Date.now()}.icc`);
+        tmp.push(short);
+        await fs.writeFile(short, Buffer.from('acsp'));
+        await expect(buildLayoutOptions(parseArgs(['--output-intent-icc', short]))).rejects.toMatchObject({ code: 'E_INPUT' });
+    });
+
+    it('accepts the synthetic prtr CMYK fixture (acsp at byte 36)', async () => {
+        const fixture = path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..', 'fixtures', 'synthetic-cmyk.icc');
+        const bytes = await fs.readFile(fixture);
+        assertIccSignature(new Uint8Array(bytes), fixture);
+        const layout = await buildLayoutOptions(parseArgs(['--output-intent-icc', fixture]));
+        expect(layout.outputIntent?.iccProfile.length).toBe(bytes.length);
     });
 });
