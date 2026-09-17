@@ -47,14 +47,31 @@ describe('gate: step table', () => {
         expect(skippable).toEqual(['validate:pdfa']);
     });
 
-    it('builds before every step that drives dist/cli.cjs', () => {
+    it('builds before every step that drives dist/cli.cjs — the coverage run included', () => {
         const order = STEPS.map((s) => s.id);
         const build = order.indexOf('build');
-        for (const id of ['dist-check', 'smoke', 'bundle-size', 'test:generate', 'corpus:pdfa', 'validate:pdfx', 'validate:pdfa']) {
+        for (const id of ['dist-check', 'smoke', 'bundle-size', 'bundle-check', 'test:generate', 'test:coverage', 'corpus:pdfa', 'validate:pdfx', 'validate:pdfa']) {
             expect(order.indexOf(id), id).toBeGreaterThan(build);
         }
         expect(order.indexOf('corpus:pdfa')).toBeLessThan(order.indexOf('validate:pdfx'));
         expect(order.indexOf('test:generate')).toBeLessThan(order.indexOf('verify:samples'));
+        expect(order.indexOf('bundle-check')).toBe(order.indexOf('bundle-size') + 1);
+    });
+
+    it('generates the samples before the coverage run, so the regression suite runs on CI (audit A-08)', () => {
+        const order = STEPS.map((s) => s.id);
+        expect(order.indexOf('test:generate')).toBeLessThan(order.indexOf('test:coverage'));
+    });
+
+    it('the fast profile runs the tests without a build; the coverage run requires the artifacts', () => {
+        expect(STEPS.find((s) => s.id === 'test')?.env).toEqual({ GATE: '1' });
+        expect(STEPS.find((s) => s.id === 'test:coverage')?.env).toEqual({ GATE: '1', GATE_REQUIRE_ARTIFACTS: '1' });
+    });
+
+    it('bundle-check is an inline step of the ci and publish profiles', () => {
+        const step = STEPS.find((s) => s.id === 'bundle-check');
+        expect(step?.inline).toBeTypeOf('function');
+        expect(step?.profiles).toEqual(['ci', 'publish']);
     });
 
     it('test steps write the JSON report the gate reads the count from', () => {
@@ -97,6 +114,9 @@ describe('gate: argument parsing and step selection', () => {
         const opts = parseArgs(['--fast', '--from', 'build']);
         if ('error' in opts) throw new Error(opts.error);
         expect(selectSteps(opts).map((s) => s.id)).toEqual(['verify:docs']);
+        const fromTest = parseArgs(['--fast', '--from', 'test']);
+        if ('error' in fromTest) throw new Error(fromTest.error);
+        expect(selectSteps(fromTest).map((s) => s.id)).toEqual(['test', 'verify:docs']);
     });
 
     it('--require-all and --json are recognised', () => {

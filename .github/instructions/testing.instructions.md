@@ -11,9 +11,14 @@ applyTo: "tests/**,vitest.config.ts,scripts/generators/**,scripts/lib/sample-pla
 - Suites mirror the tree: `tests/commands/` (one file per command, plus feature files such as
   `render-pdfx`, `render-typography`, `inspect-pdfx`), `tests/utils/`, `tests/integration/`
   (round-trips; the reproducible-build suite spawns the BUILT binary and is `describe.runIf`
-  on `dist/cli.cjs`), `tests/tools/` (gate, validators, verify-docs, release-prepare, guard,
-  workflows), `tests/regression/` (the sample baseline, `runIf` on `test-output/samples/`),
-  `tests/docs/` (English-only prose scan).
+  on `dist/cli.cjs`), `tests/tools/` (gate, validators, verify-docs, markdown-anchors,
+  bundle-probe, release-prepare, guard, workflows), `tests/regression/` (the sample baseline,
+  `runIf` on `test-output/samples/`), `tests/fuzz/` (hostile input over `tests/helpers/fuzz.ts`:
+  seeded PRNG, "only a CliError with a stable code" invariant, PDF byte builders past the engine
+  limits), `tests/docs/` (English-only prose scan). The two `runIf` suites skip in a plain
+  local run only: the gate's ci / publish profiles build and generate the samples first and
+  set `GATE_REQUIRE_ARTIFACTS=1`, under which a missing input fails the file instead of
+  skipping it.
 - `vitest.config.ts` pins `TZ=UTC`, `pool: 'forks'`, no shuffle, the dot reporter locally and
   a JSON report under `test-output/.gate/` when `GATE=1`.
 

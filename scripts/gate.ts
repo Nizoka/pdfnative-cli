@@ -7,11 +7,12 @@
  * list of commands, so the list cannot drift between them. Ported from
  * pdfnative's scripts/gate.ts (1.8.0) with the CLI's own step table.
  *
- * Every step is an existing npm script, plus four inline checks: that
+ * Every step is an existing npm script, plus five inline checks: that
  * `dist/` is complete, that the BUILT binary answers (`smoke` — the bundle
  * gotcha: tsup flattens src/ into one file, so a path that resolves in
  * source can fail in dist/), that the bundle stays under its byte budget,
- * and nothing else. The gate runs them in order, captures each one's full
+ * that it keeps the engine external and carries nothing it should not
+ * (`bundle-check`), and nothing else. The gate runs them in order, captures each one's full
  * output to `test-output/.gate/<id>.log`, and prints ONE line per step — a
  * passing run is under twenty lines, which is what makes it usable from an
  * agent loop where every line of output costs tokens. On the first failure
@@ -57,6 +58,7 @@ import { fileURLToPath } from 'node:url';
 import { COMMANDS } from '../src/commands/completion.js';
 import { SUBJECTS } from '../src/commands/schema.js';
 import { locateVeraPdf } from './lib/verapdf.js';
+import { probeBundle, REQUIRED_EXTERNALS } from './lib/bundle-probe.js';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const LOG_DIR = join(REPO_ROOT, 'test-output', '.gate');
@@ -94,9 +96,12 @@ function testCount(): string | null {
     if (!existsSync(VITEST_JSON)) return null;
     // The whole suite, skipped tests included — the figure `declared.tests`
     // in docs/assets/ecosystem.json is held to it.
-    const report = JSON.parse(readFileSync(VITEST_JSON, 'utf8')) as { numTotalTests?: number; numPassedTests?: number };
+    const report = JSON.parse(readFileSync(VITEST_JSON, 'utf8')) as { numTotalTests?: number; numPassedTests?: number; numPendingTests?: number };
     const total = report.numTotalTests ?? report.numPassedTests;
-    return typeof total === 'number' ? `${total} tests` : null;
+    if (typeof total !== 'number') return null;
+    // A skipped suite is visible in the summary line, never silent (audit A-08).
+    const pending = report.numPendingTests ?? 0;
+    return pending > 0 ? `${total} tests, ${pending} skipped` : `${total} tests`;
 }
 
 function coverageFigure(): string | null {
@@ -210,8 +215,25 @@ function bundleBudget(): readonly string[] {
     return size <= budget ? [] : [`dist/cli.cjs is ${size} bytes, over the ${budget}-byte budget (declared.bundleBudgetBytes)`];
 }
 
+/**
+ * The bundle keeps the engine external and carries nothing it should not
+ * (engine markers, font data, PEM blocks, console.log, undeclared requires,
+ * a stray shebang) — scripts/lib/bundle-probe.ts (v1.5.0).
+ */
+function bundleCheck(): readonly string[] {
+    if (!existsSync(CLI)) return ['dist/cli.cjs is missing (run build first)'];
+    return probeBundle(readFileSync(CLI, 'utf8'));
+}
+
 // ── The gate ────────────────────────────────────────────────────────
 
+// Order matters in the ci / publish profiles: `build` and `test:generate`
+// run BEFORE `test:coverage`, because two suites need what they produce —
+// tests/integration/reproducible-build (spawns dist/cli.cjs) and
+// tests/regression/samples (reads test-output/samples/). Before v1.5.0 the
+// tests ran first and both suites skipped silently on every CI runner
+// (audit A-08); now `GATE_REQUIRE_ARTIFACTS=1` makes them fail loudly when
+// their input is missing. The fast profile keeps `test` first (no build).
 export const STEPS: readonly Step[] = [
     { id: 'typecheck:all', npmScript: 'typecheck:all', profiles: ['fast', 'ci', 'publish'] },
     { id: 'lint', npmScript: 'lint', profiles: ['fast', 'ci', 'publish'] },
@@ -219,16 +241,17 @@ export const STEPS: readonly Step[] = [
         id: 'test', npmScript: 'test', profiles: ['fast'],
         env: { GATE: '1' }, note: testCount,
     },
-    {
-        id: 'test:coverage', npmScript: 'test:coverage', profiles: ['ci', 'publish'],
-        env: { GATE: '1' }, note: () => joinNotes(testCount(), coverageFigure()),
-    },
     { id: 'build', npmScript: 'build', profiles: ['ci', 'publish'] },
     { id: 'dist-check', profiles: ['ci', 'publish'], inline: distCheck },
     { id: 'smoke', profiles: ['ci', 'publish'], inline: smoke, note: () => `${COMMANDS.length} commands` },
     { id: 'bundle-size', profiles: ['ci', 'publish'], inline: bundleBudget, note: bundleSize },
-    { id: 'verify:docs', npmScript: 'verify:docs', profiles: ['fast', 'ci', 'publish'] },
+    { id: 'bundle-check', profiles: ['ci', 'publish'], inline: bundleCheck, note: () => `${REQUIRED_EXTERNALS.length} externals` },
     { id: 'test:generate', npmScript: 'test:generate', profiles: ['ci', 'publish'], note: samplePdfCount },
+    {
+        id: 'test:coverage', npmScript: 'test:coverage', profiles: ['ci', 'publish'],
+        env: { GATE: '1', GATE_REQUIRE_ARTIFACTS: '1' }, note: () => joinNotes(testCount(), coverageFigure()),
+    },
+    { id: 'verify:docs', npmScript: 'verify:docs', profiles: ['fast', 'ci', 'publish'] },
     { id: 'verify:samples', npmScript: 'verify:samples', profiles: ['ci', 'publish'] },
     { id: 'corpus:pdfa', npmScript: 'corpus:pdfa', profiles: ['ci', 'publish'] },
     { id: 'validate:pdfx', npmScript: 'validate:pdfx', profiles: ['ci', 'publish'] },

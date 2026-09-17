@@ -13,13 +13,18 @@ import {
 //
 // The sample corpus lives in the git-ignored `test-output/samples/`, which
 // only `npm run test:generate` populates (it drives the BUILT CLI, so
-// `npm run build` comes first). This suite therefore SKIPS when the corpus
-// is absent (mirroring how `validate:pdfa` skips when veraPDF is not
-// installed) and is blocking in the dedicated CI workflow
-// (sample-regression.yml), which builds and generates the samples first.
+// `npm run build` comes first). This suite SKIPS when the corpus is absent
+// in a plain local run; under the gate's ci / publish profiles, which run
+// build → test:generate before test:coverage and set GATE_REQUIRE_ARTIFACTS=1,
+// a missing corpus FAILS this file instead (audit A-08). The dedicated
+// workflow (sample-regression.yml) additionally holds the baseline through
+// scripts/verify-samples.ts.
 
 const samples = [...walkPdfs(OUTPUT_DIR)];
 const haveCorpus = samples.length > 0;
+if (!haveCorpus && process.env.GATE_REQUIRE_ARTIFACTS === '1') {
+    throw new Error('test-output/samples/ is empty but GATE_REQUIRE_ARTIFACTS=1: the gate generates the samples before test:coverage — run `npm run build && npm run test:generate`');
+}
 
 // Fingerprinting the whole corpus parses every sample, encrypted ones
 // included: well past the 5 s default under coverage instrumentation.

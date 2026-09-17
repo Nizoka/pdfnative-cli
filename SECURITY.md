@@ -199,7 +199,9 @@ as *"Won't fix"* in code scanning with this rationale.
   attestation for the tarball and the SBOM are attached to the GitHub release. Verify an
   install with `npm audit signatures`.
 - **One release gate** — `npx tsx scripts/gate.ts --publish --require-all` runs typecheck,
-  lint, tests with coverage, the built-binary smoke test, the bundle-size budget, the docs
+  lint, the build, the built-binary smoke test, the bundle-size budget, the bundle probe
+  (the engine stays external; no font data, PEM block, `console.log` or undeclared
+  `require` in `dist/cli.cjs`), the sample generation, the tests with coverage, the docs
   verifier, the sample baseline, the PDF/A corpus (veraPDF 1.30.2, installer SHA-256
   verified) and the PDF/X corpus; a skipped step fails the publish.
 - **Branch and tag protection** — `.github/rulesets/main.json` and `tags.json` are the

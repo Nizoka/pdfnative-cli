@@ -32,7 +32,7 @@ pdfnative-cli is the official terminal wrapper of the pdfnative engine: 21 comma
 | Profile | Command | Runs |
 |---|---|---|
 | Fast — before every commit | `npm run gate:fast` | typecheck:all, lint, test, verify:docs |
-| CI — the default | `npm run gate` | + test:coverage, build, dist-check, smoke, bundle-size, test:generate, verify:samples, corpus:pdfa, validate:pdfx |
+| CI — the default | `npm run gate` | typecheck:all, lint, build, dist-check, smoke, bundle-size, bundle-check, test:generate, test:coverage, verify:docs, verify:samples, corpus:pdfa, validate:pdfx — build and samples precede the tests |
 | Publish — release branches | `npx tsx scripts/gate.ts --publish --require-all` | everything, incl. validate:pdfa (veraPDF; `--require-all` fails on a skip) |
 
 PowerShell swallows a bare `--`, so pass flags by calling the script: `npx tsx scripts/gate.ts --fast`, `--only <step>`, `--json`.
@@ -88,7 +88,7 @@ Adding or changing a command touches ALL of these (`verify:docs` rules `command-
 
 ## Counts and versions
 
-21 commands, 19 subjects, 12 stable error codes, 10 global flags, 27 Unicode scripts (31 font modules), 1190 tests, 79 sample PDFs in the baseline, 16 corpus files.
+21 commands, 19 subjects, 12 stable error codes, 10 global flags, 27 Unicode scripts (31 font modules), 1210 tests, 79 sample PDFs in the baseline, 16 corpus files.
 `docs/assets/ecosystem.json` is the source of every count and version quoted in the docs; run `npm run verify:docs` after touching any of them.
 Coverage: ≥ 82 % statements enforced by CI (the thresholds live once in `vitest.config.ts`). Engine: pdfnative 1.8.0 (`^1.8.0`); Node ≥ 22.
 

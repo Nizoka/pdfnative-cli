@@ -1191,9 +1191,14 @@ dictGetArray(dict, key)  // PdfArray | undefined
 
 `npm run gate` is THE quality gate (`scripts/gate.ts`; the `STEPS` table is the source of
 truth): `npm run gate:fast` (typecheck:all, lint, test, verify:docs), `npm run gate` (the CI
-profile: + coverage, build, dist-check, smoke on the built binary, bundle-size, test:generate,
-verify:samples, corpus:pdfa, validate:pdfx) and `npx tsx scripts/gate.ts --publish
---require-all` (+ validate:pdfa; a skipped step fails). Logs go to `test-output/.gate/`.
+profile: typecheck:all, lint, build, dist-check, smoke on the built binary, bundle-size,
+bundle-check — `scripts/lib/bundle-probe.ts`: the engine stays external, no font data, PEM
+block, `console.log` or undeclared require in the bundle —, test:generate, test:coverage,
+verify:docs, verify:samples, corpus:pdfa, validate:pdfx; the build and the samples precede
+the coverage run so the reproducible-build and sample-regression suites run under
+`GATE_REQUIRE_ARTIFACTS=1` and fail loudly when their input is missing) and
+`npx tsx scripts/gate.ts --publish --require-all` (+ validate:pdfa; a skipped step fails).
+Logs go to `test-output/.gate/`.
 
 ```bash
 # Install (what CI runs)

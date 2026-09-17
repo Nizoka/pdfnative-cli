@@ -105,9 +105,12 @@ backward-compatible command surface — every envelope field is additive.
 
 - **`npm run gate`** (`scripts/gate.ts`) — one quality gate with `--fast`, CI (default) and
   `--publish` profiles, `--only <step>`, `--json`, `--require-all` (a skipped step fails);
-  steps: typecheck:all, lint, test / test:coverage, build, dist-check, smoke (the built
-  binary), bundle-size (`declared.bundleBudgetBytes`), verify:docs, test:generate,
-  verify:samples, corpus:pdfa, validate:pdfx, validate:pdfa.
+  steps: typecheck:all, lint, test (fast) / build, dist-check, smoke (the built binary),
+  bundle-size (`declared.bundleBudgetBytes`), bundle-check (the engine stays external; no
+  font data, PEM block, `console.log` or undeclared require), test:generate, test:coverage
+  (after the build and the samples, so the reproducible-build and sample-regression suites
+  run on CI and fail loudly when their input is missing), verify:docs, verify:samples,
+  corpus:pdfa, validate:pdfx, validate:pdfa.
 - **Reproducible samples** — `scripts/generate-samples.ts` drives the BUILT CLI under
   `TZ=UTC` with the creation instant pinned twice (`--creation-date` and
   `SOURCE_DATE_EPOCH`); `samples/run-all.js` is removed (`npm run test:generate` replaces
@@ -150,7 +153,7 @@ backward-compatible command surface — every envelope field is additive.
   double-render script proves byte identity across timezones), `inspect --check pdfx` and
   `--iso-dates`, `doctor` capabilities, `annotate link`, `verify` weak digest,
   `sign --timestamp-timeout`, global flags first — each as a dual-shell pair.
-- **Tests** — 1190 tests across 83 files (600 in 1.4.0): every feature above,
+- **Tests** — 1210 tests across 84 files (600 in 1.4.0): every feature above,
   the tools (gate, validators, fingerprints, sample plan, verify-docs, release-prepare, agent
   config, guard, workflows), the sample regression suite, an English-only prose scan, a
   reproducible-build integration test that spawns the built binary under two timezones, and a

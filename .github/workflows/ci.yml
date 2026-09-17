@@ -1,9 +1,9 @@
 name: CI
 
 # The job runs `scripts/gate.ts --ci`, the single definition of "green": the
-# step list lives in that file's STEPS table (typecheck:all, lint,
-# test:coverage, build, dist-check, smoke, bundle-size, verify:docs,
-# test:generate, verify:samples, corpus:pdfa, validate:pdfx) and is not
+# step list lives in that file's STEPS table (typecheck:all, lint, build,
+# dist-check, smoke, bundle-size, bundle-check, test:generate, test:coverage,
+# verify:docs, verify:samples, corpus:pdfa, validate:pdfx) and is not
 # repeated here, so CI and the contributor loop cannot drift apart.
 # `--require-all` turns any SKIP into a FAIL: a runner missing a tool goes
 # red instead of quietly passing.

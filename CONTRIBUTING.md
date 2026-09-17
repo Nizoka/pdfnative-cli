@@ -29,7 +29,7 @@ pass script flags by calling the script directly (`npx tsx scripts/gate.ts --fas
 | Profile | Command | Steps |
 |---|---|---|
 | Fast — before every commit | `npm run gate:fast` | `typecheck:all`, `lint`, `test`, `verify:docs` |
-| CI — the default | `npm run gate` | + `test:coverage`, `build`, `dist-check`, `smoke`, `bundle-size`, `test:generate`, `verify:samples`, `corpus:pdfa`, `validate:pdfx` |
+| CI — the default | `npm run gate` | `typecheck:all`, `lint`, `build`, `dist-check`, `smoke`, `bundle-size`, `bundle-check`, `test:generate`, `test:coverage`, `verify:docs`, `verify:samples`, `corpus:pdfa`, `validate:pdfx` — the build and the samples come before the coverage run so the `runIf` suites execute (and fail, not skip, when their input is missing) |
 | Publish — release branches | `npx tsx scripts/gate.ts --publish --require-all` | + `validate:pdfa` (veraPDF); `--require-all` turns any skipped step into a failure |
 
 `--only <step>` runs one step, `--json` emits a machine-readable result. The individual

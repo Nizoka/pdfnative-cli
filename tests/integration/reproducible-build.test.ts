@@ -2,8 +2,10 @@
 // time zones. Source tests import the command functions; this suite spawns
 // the bundle the way CI and users run it, so the tsup flattening and the
 // dispatcher's env handling are covered too. Skipped when dist/ is absent
-// (the gate builds before it runs the tests with coverage — see
-// scripts/gate.ts — and `npm run build` is a one-off locally).
+// in a plain local run (`npm run build` is a one-off) — but under the gate's
+// ci / publish profiles, which build first and set GATE_REQUIRE_ARTIFACTS=1,
+// a missing dist/ FAILS this file instead of skipping it (audit A-08: the
+// suite used to skip silently on every CI runner).
 
 import { describe, it, expect, afterAll } from 'vitest';
 import { spawnSync } from 'node:child_process';
@@ -16,6 +18,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CLI = join(ROOT, 'dist', 'cli.cjs');
 const haveDist = existsSync(CLI);
+if (!haveDist && process.env.GATE_REQUIRE_ARTIFACTS === '1') {
+    throw new Error('dist/cli.cjs is missing but GATE_REQUIRE_ARTIFACTS=1: the gate builds before test:coverage — run `npm run build`');
+}
 const dir = mkdtempSync(join(tmpdir(), 'pdfcli-repro-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
