@@ -38,7 +38,9 @@ describe('fuzz: page selectors', () => {
         const t0 = performance.now();
         const r = onlyCliError(() => parsePageList(spec, 5), [ErrorCode.USAGE]);
         expect(r.outcome).toBe('error');
-        expect(performance.now() - t0).toBeLessThan(500);
+        if (r.outcome === 'error') expect(r.error.message).toMatch(/too many segments/);
+        // A loose bound: it only has to catch quadratic behaviour, not a busy CI runner.
+        expect(performance.now() - t0).toBeLessThan(5_000);
     });
 
     it.each(['1-99999999999999', '9007199254740993', '1e2', '٣', '1--3', '-', ',', ' '])('"%s" is a usage error', (spec) => {

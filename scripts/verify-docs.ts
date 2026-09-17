@@ -71,6 +71,7 @@ import {
 } from './lib/cli-surface.js';
 import { CORPUS } from './lib/pdfa-corpus.js';
 import { AI_GOVERNANCE_POLICY, AGENT_RULES_TEXT } from '../src/utils/governance.js';
+import { markdownAnchors, fragmentLinks } from './lib/markdown-anchors.js';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -153,6 +154,7 @@ export const OFFLINE_RULES = [
     'eol-lf', // (git checkouts only) tracked text blobs are LF — warn until the renormalisation commit flips EOL_LF_MODE
     'skills-shape', // every .claude/skills/*/SKILL.md names its directory, has a description, and its referenced files exist
     'internal-links', // every relative Markdown link resolves on disk
+    'anchor-parity', // every `#fragment` a Markdown link (or a governance reference) targets is a heading anchor of its target
     'verified-on-parity', // every "Verified on" stamp equals manifest.verifiedOn
     'prose-language', // docs, samples README and release notes are English unless marked demo-language
 ] as const;
@@ -917,6 +919,67 @@ export async function verifyDocs(root: string, options: VerifyOptions = {}): Pro
                 const line = lineOf(text, m.index);
                 if (isSuppressed(lines, line, 'internal-links')) continue;
                 fail(rel(file), line, 'internal-links', `"${href}" does not resolve on disk`);
+            }
+        }
+    }
+
+    // ── Rule: anchor-parity ───────────────────────────────────────
+    // Shipped release notes (release-notes/v*.md below the current version)
+    // are frozen history: their links were right against the tree of their
+    // day and are never rewritten. The current note, the PR drafts and the
+    // templates are live documents.
+    {
+        const corpus = new Set([
+            ...DOC_FILES.filter((f) => f.endsWith('.md')),
+            ...['CHANGELOG.md', '.github/pull_request_template.md', 'release-notes/TEMPLATE.md', 'release-notes/PR_TEMPLATE.md']
+                .map((p) => join(root, p)).filter(existsSync),
+            ...(existsSync(join(root, 'release-notes', 'draft')) ? walk(join(root, 'release-notes', 'draft'), (p) => p.endsWith('.md')) : []),
+        ]);
+        const anchorCache = new Map<string, ReadonlySet<string>>();
+        const anchorsOf = (file: string): ReadonlySet<string> => {
+            let set = anchorCache.get(file);
+            if (set === undefined) {
+                set = markdownAnchors(texts.get(file) ?? read(file));
+                anchorCache.set(file, set);
+            }
+            return set;
+        };
+        const check = (from: string, line: number, target: string, fragment: string, lines: readonly string[]): void => {
+            // A missing file is internal-links' finding; a non-Markdown target has no heading anchors to check.
+            if (!existsSync(target) || !target.endsWith('.md')) return;
+            if (isSuppressed(lines, line, 'anchor-parity')) return;
+            if (!anchorsOf(target).has(fragment.toLowerCase())) {
+                fail(rel(from), line, 'anchor-parity', `"#${fragment}" is not a heading anchor of ${rel(target)}`);
+            }
+        };
+        for (const file of corpus) {
+            const text = texts.get(file) ?? read(file);
+            const lines = text.split(/\r?\n/);
+            for (const link of fragmentLinks(text)) {
+                const target = link.path === '' ? file : resolve(dirname(file), link.path);
+                check(file, lineOf(text, link.index), target, link.fragment, lines);
+            }
+        }
+        // The governance policy's `references.*` are read by agents as links: same rule.
+        const policyText = readOr('.github/ai-governance.json');
+        if (policyText !== null) {
+            try {
+                const policy = JSON.parse(policyText) as { references?: Record<string, unknown> };
+                const policyLines = policyText.split(/\r?\n/);
+                for (const [key, value] of Object.entries(policy.references ?? {})) {
+                    if (typeof value !== 'string' || !value.includes('#')) continue;
+                    const [path, fragment] = value.split('#', 2) as [string, string];
+                    const at = policyText.indexOf(value);
+                    const line = at >= 0 ? lineOf(policyText, at) : 1;
+                    const target = join(root, path);
+                    if (!existsSync(target)) {
+                        fail('.github/ai-governance.json', line, 'anchor-parity', `references.${key} names "${path}", which does not exist`);
+                        continue;
+                    }
+                    check(join(root, '.github', 'ai-governance.json'), line, target, fragment, policyLines);
+                }
+            } catch {
+                // governance-embed reports invalid JSON.
             }
         }
     }

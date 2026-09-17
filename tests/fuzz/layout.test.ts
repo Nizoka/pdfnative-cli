@@ -66,7 +66,9 @@ describe('fuzz: layout JSON', () => {
         const t0 = performance.now();
         const r = onlyCliError(() => reviveLayoutJson({ outputIntent: { iccProfile: declared, outputConditionIdentifier: 'x' } }), [ErrorCode.INPUT]);
         expect(r.outcome).toBe('error');
-        expect(performance.now() - t0).toBeLessThan(200);
+        if (r.outcome === 'error') expect(r.error.message).toMatch(/exceeds the 16 MiB/);
+        // A loose bound: copying 16 Mi elements would take far longer; a busy runner must not fail it.
+        expect(performance.now() - t0).toBeLessThan(5_000);
         const ok = onlyCliError(() => reviveLayoutJson({ outputIntent: { iccProfile: [0, 1, 2], outputConditionIdentifier: 'x' } }));
         expect(ok.outcome).toBe('ok');
     });

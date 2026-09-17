@@ -92,7 +92,10 @@ describe('verify-docs — a corrupted sandbox', () => {
         writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
         // A stray sample directory and an unpaired script.
         writeFileSync(join(sandbox, 'samples', 'render', 'zz-orphan.sh'), 'echo orphan\n');
-        writeFileSync(join(sandbox, 'README.md'), `${readFileSync(join(sandbox, 'README.md'), 'utf8')}\n\nStale: pdfnative-cli v0.0.1 has 12 commands and E_NOPE.\n`);
+        writeFileSync(join(sandbox, 'README.md'), `${readFileSync(join(sandbox, 'README.md'), 'utf8')}\n\nStale: pdfnative-cli v0.0.1 has 12 commands and E_NOPE.\n\nBroken anchors: [same](#no-such-heading), [cross](docs/KNOWLEDGE_BASE.md#nope-either), [fine](#installation).\n\n[allowed](#also-missing) <!-- verify-docs:allow anchor-parity -->\n`);
+        // A governance reference whose fragment does not exist.
+        const policyPath = join(sandbox, '.github', 'ai-governance.json');
+        writeFileSync(policyPath, readFileSync(policyPath, 'utf8').replace('AGENTS.md#mission-and-constraints', 'AGENTS.md#no-such-section'));
         // The protocol text drifts from the embedded copy `govern rules` prints.
         writeFileSync(join(sandbox, '.github', 'AGENT_RULES.md'), `${readFileSync(join(sandbox, '.github', 'AGENT_RULES.md'), 'utf8')}\n- Drifted rule.\n`);
         problems = (await verifyDocs(sandbox)).problems;
@@ -120,8 +123,22 @@ describe('verify-docs — a corrupted sandbox', () => {
         expect(messages('sample-shell-parity')).toEqual([expect.stringContaining('samples/render/zz-orphan.sh')]);
     });
 
-    it('fails governance-embed when AGENT_RULES.md drifts from the text `govern rules` prints', () => {
-        expect(messages('governance-embed')).toEqual([expect.stringContaining('.github/AGENT_RULES.md:1 differs from AGENT_RULES_TEXT')]);
+    it('fails anchor-parity on a same-file, a cross-file and a governance-reference fragment, and honours the allow marker', () => {
+        const found = messages('anchor-parity');
+        expect(found).toEqual(expect.arrayContaining([
+            expect.stringMatching(/README\.md:\d+ "#no-such-heading" is not a heading anchor of README\.md/),
+            expect.stringMatching(/README\.md:\d+ "#nope-either" is not a heading anchor of docs\/KNOWLEDGE_BASE\.md/),
+            expect.stringMatching(/ai-governance\.json:\d+ "#no-such-section" is not a heading anchor of AGENTS\.md/),
+        ]));
+        expect(found.some((m) => m.includes('#installation'))).toBe(false);
+        expect(found.some((m) => m.includes('#also-missing'))).toBe(false);
+    });
+
+    it('fails governance-embed when AGENT_RULES.md drifts from the text `govern rules` prints (and the edited policy from `govern policy`)', () => {
+        expect(messages('governance-embed')).toEqual(expect.arrayContaining([
+            expect.stringContaining('.github/AGENT_RULES.md:1 differs from AGENT_RULES_TEXT'),
+            expect.stringContaining('.github/ai-governance.json:1 differs from AI_GOVERNANCE_POLICY'),
+        ]));
     });
 
     it('never runs eol-lf outside a git checkout', () => {

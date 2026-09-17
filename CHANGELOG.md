@@ -119,7 +119,7 @@ backward-compatible command surface — every envelope field is additive.
   `validate-pdfx.ts` (TypeScript, shared cores in `scripts/lib/`): 16 files, 13 PDF/A
   (2 negative canaries) validated by veraPDF 1.30.2, 3 PDF/X-4 (1 negative canary) validated
   in-process; reproducible (fixture key pair, pinned dates, per-file SHA-256 in the manifest).
-- **`npm run verify:docs`** (`scripts/verify-docs.ts`, 25 rules) over
+- **`npm run verify:docs`** (`scripts/verify-docs.ts`, 26 rules) over
   `docs/assets/ecosystem.json`: counts derived from the source constants (commands, subjects,
   codes, flags, corpus, fonts, samples, baseline), stale/version/count tokens, command / flag /
   schema / error parity, governance embed, dual-shell samples, Claude Code budgets, agent
@@ -150,7 +150,7 @@ backward-compatible command surface — every envelope field is additive.
   double-render script proves byte identity across timezones), `inspect --check pdfx` and
   `--iso-dates`, `doctor` capabilities, `annotate link`, `verify` weak digest,
   `sign --timestamp-timeout`, global flags first — each as a dual-shell pair.
-- **Tests** — 1168 tests across 82 files (600 in 1.4.0): every feature above,
+- **Tests** — 1190 tests across 83 files (600 in 1.4.0): every feature above,
   the tools (gate, validators, fingerprints, sample plan, verify-docs, release-prepare, agent
   config, guard, workflows), the sample regression suite, an English-only prose scan, a
   reproducible-build integration test that spawns the built binary under two timezones, and a

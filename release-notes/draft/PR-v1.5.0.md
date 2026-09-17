@@ -21,7 +21,7 @@ Counts: 21 commands, 19 schema subjects, 12 stable error codes and 14 manifest c
 unchanged; global flags 9 → 10 (`--creation-date`); `render` flags 44 → 57; `inspect`
 14 → 16; `sign` 21 → 23; `--font` 22 → 27 scripts (+ 4 aliases); `--strict` diagnostics
 3 → 9; `doctor` checks 5 → 8; conformance corpus 12 → 16 files; workflows 5 → 9;
-tests 600 → 1168 across 82 files.
+tests 600 → 1190 across 83 files.
 
 ## Changes
 
@@ -72,7 +72,7 @@ tests 600 → 1168 across 82 files.
 - `generate-samples.ts` + `generators/{render,drivers,derived}.ts` + `lib/sample-plan.ts`
   (replaces `samples/run-all.js`), `lib/sample-fingerprint.ts` + `verify-samples.ts`
   (chained baseline, semantic mode for encrypted and signed samples, identical groups).
-- `verify-docs.ts` (25 rules) + `lib/{cli-surface,agent-config,prose-language}.ts`,
+- `verify-docs.ts` (26 rules) + `lib/{cli-surface,agent-config,prose-language}.ts`,
   `release-prepare.ts`, `build-claude-rules.ts`, `install-git-hooks.mjs`.
 - `docs/assets/ecosystem.json` — the single source of every count and version.
 
@@ -101,7 +101,7 @@ tests 600 → 1168 across 82 files.
   `render/reproducible/`, `inspect/09-10`, `doctor/02`, `annotate/02`, `verify/07`,
   `sign/10`, `agent/05`; multilang drivers honour `PDFNATIVE_SAMPLES_OUT` /
   `SOURCE_DATE_EPOCH`; `tests/regression/baselines/samples.sha256.json` (79 entries).
-- Tests: 1168 across 82 files (was 600) — `tests/helpers/cli-harness.ts`, per-feature
+- Tests: 1190 across 83 files (was 600) — `tests/helpers/cli-harness.ts`, per-feature
   command suites, utils, `integration/{pdfx-roundtrip,reproducible-build}`,
   `tools/{gate,verapdf,pdfx,workflows,sample-plan,verify-docs,cli-surface,agent-config,
   build-claude-rules,release-prepare,guard}`, `regression/samples`, `docs/prose-language`.
@@ -122,10 +122,10 @@ Claude Code before merge; the ledger lands under `test-output/.audit/1.5.0/`).
 ## Validation (what actually ran on the release branch, Windows 11, Node 22.17.0)
 
 - `npm run typecheck:all` → clean (three configs). `npm run lint` → clean.
-- `npm run test:coverage` → **1168 / 1168 passing across 82 files**; coverage
+- `npm run test:coverage` → **1190 / 1190 passing across 83 files**; coverage
   statements 84.97 % / branches 74.45 % / functions 92.38 % / lines 86.81 %
   (thresholds raised 79/68/83/79 → 82/71/86/82, `min(measured − 2, current + 3)`).
-- `npm run verify:docs` → 25 rules across the documentation corpus, 0 errors
+- `npm run verify:docs` → 26 rules across the documentation corpus, 0 errors
   (171 `eol-lf` warnings: CRLF blobs pending the maintainer's renormalisation commit).
 - `npm run build && npm run test:generate` → 79 PDFs, byte-identical across two runs;
   `npx tsx scripts/verify-samples.ts --strict` → green.
@@ -133,7 +133,7 @@ Claude Code before merge; the ledger lands under `test-output/.audit/1.5.0/`).
 - `npm run validate:pdfa` with veraPDF 1.30.2 (portable) + JDK 13 (`JAVACMD`) →
   11 PASS + 2 XFAIL + 3 SKIP (the PDF/X files), exit 0.
 - `npx tsx scripts/gate.ts --publish --require-all` → **13 passed, 0 skipped in 308 s**
-  (typecheck:all 24 s, lint 14 s, test:coverage 114 s — 1168 tests, 85.0 % stmts —, build
+  (typecheck:all 24 s, lint 14 s, test:coverage 114 s — 1190 tests, 85.0 % stmts —, build
   21 s, dist-check, smoke — 21 commands —, bundle-size 357 KiB of the 448 KiB budget,
   verify:docs 6 s, test:generate 31 s — 79 PDFs —, verify:samples 5 s, corpus:pdfa 9 s,
   validate:pdfx 4 s, validate:pdfa 77 s).
