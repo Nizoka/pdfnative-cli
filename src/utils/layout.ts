@@ -69,8 +69,51 @@ const NAMED_PAGE_SIZES: Readonly<Record<string, readonly [number, number]>> = {
     a5:      [419.53, 595.28],
 };
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
+/**
+ * Keys a JSON document may carry but the CLI never copies into an object it
+ * builds: assigning any of them through `obj[key] = …` reaches the prototype
+ * chain (`__proto__` is a setter; `constructor` / `prototype` shadow lookups
+ * every `in` / `=== undefined` check relies on). Skipped by {@link deepMerge},
+ * `config.ts` and rejected by `manifest.ts` / `args.ts` (v1.5.0 hardening).
+ */
+export const FORBIDDEN_OBJECT_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
+
+/** Deepest object nesting {@link deepMerge} walks before refusing the input (CWE-674). */
+export const MAX_JSON_DEPTH = 64;
+
+/** A plain data object: not null, not an array, not a class instance. */
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+    const proto: unknown = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
+}
+
+/**
+ * Deep-merge `override` on top of `base`. Plain objects merge recursively;
+ * arrays and primitives are replaced wholesale (override wins). Used by
+ * `render --template` to layer stdin / `--input` JSON over a template file.
+ *
+ * Hardened (v1.5.0): only own keys are read (`Object.hasOwn`), the keys in
+ * {@link FORBIDDEN_OBJECT_KEYS} are skipped on both sides, and nesting deeper
+ * than {@link MAX_JSON_DEPTH} is refused with `E_INPUT` instead of recursing
+ * until the stack overflows.
+ */
+export function deepMerge(base: unknown, override: unknown, depth = 0): unknown {
+    if (depth > MAX_JSON_DEPTH) {
+        throw new CliError(`JSON input nests deeper than ${MAX_JSON_DEPTH} levels.`, 1, ErrorCode.INPUT);
+    }
+    if (!isPlainObject(base) || !isPlainObject(override)) return override;
+    const result: Record<string, unknown> = {};
+    for (const key of Object.keys(base)) {
+        if (!FORBIDDEN_OBJECT_KEYS.has(key)) result[key] = base[key];
+    }
+    for (const key of Object.keys(override)) {
+        if (FORBIDDEN_OBJECT_KEYS.has(key)) continue;
+        result[key] = Object.hasOwn(base, key)
+            ? deepMerge(base[key], override[key], depth + 1)
+            : override[key];
+    }
+    return result;
 }
 
 /**
@@ -98,6 +141,16 @@ export function reviveLayoutJson(input: Record<string, unknown>): Record<string,
     }
     const oi = obj.outputIntent;
     if (isPlainObject(oi) && Array.isArray(oi.iccProfile)) {
+        // The same cap as --output-intent-icc, checked on the array length
+        // before a single byte is allocated (a JSON `[0, 0, …]` can declare
+        // any length it likes).
+        if (oi.iccProfile.length > MAX_ICC_PROFILE_BYTES) {
+            throw new CliError(
+                `outputIntent.iccProfile exceeds the ${MAX_ICC_PROFILE_BYTES / (1024 * 1024)} MiB ICC profile limit (${oi.iccProfile.length} bytes).`,
+                1,
+                ErrorCode.INPUT,
+            );
+        }
         obj.outputIntent = { ...oi, iccProfile: Uint8Array.from(oi.iccProfile as readonly number[]) };
     }
     if (typeof obj.creationDate === 'string') {

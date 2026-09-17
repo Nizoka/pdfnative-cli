@@ -48,6 +48,8 @@ import {
     mergeNestedLayout,
     reviveLayoutJson,
     parseTrapped,
+    deepMerge,
+    isPlainObject,
 } from '../utils/layout.js';
 import { classifyBuildError } from '../utils/build-errors.js';
 import {
@@ -333,29 +335,6 @@ function applyTableDefaults(params: DocumentParams, defaults: TableDefaults): Do
     });
     if (!touched) return params;
     return { ...params, blocks: blocks as DocumentParams['blocks'] };
-}
-
-/**
- * Deep-merge `override` on top of `base`. Plain objects merge recursively;
- * arrays and primitives are replaced wholesale (override wins). Used by
- * `--template` to layer stdin / `--input` JSON over a template file.
- */
-function deepMerge(base: unknown, override: unknown): unknown {
-    if (!isPlainObject(base) || !isPlainObject(override)) return override;
-    const result: Record<string, unknown> = { ...base };
-    for (const key of Object.keys(override)) {
-        result[key] = key in base
-            ? deepMerge(base[key], override[key])
-            : override[key];
-    }
-    return result;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object'
-        && value !== null
-        && !Array.isArray(value)
-        && Object.getPrototypeOf(value) === Object.prototype;
 }
 
 /** `--trapped` flag wins over the JSON's metadata.trapped (the CLI stays authoritative). */

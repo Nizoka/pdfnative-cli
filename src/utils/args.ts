@@ -23,6 +23,9 @@ export const GLOBAL_BOOLEAN_FLAGS: ReadonlySet<string> = new Set([
     'help', 'h', 'version', 'V', 'json', 'dry-run', 'quiet', 'q', 'no-color', 'no-config',
 ]);
 
+/** Flag names that reach the prototype chain of the flags object (v1.5.0 hardening). */
+const FORBIDDEN_FLAG_NAMES: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
+
 /**
  * Zero-dependency argument parser.
  *
@@ -45,7 +48,15 @@ export function parseArgs(argv: readonly string[], options: ParseArgsOptions = {
     let i = 0;
 
     const setFlag = (key: string, value: string | boolean): void => {
-        const existing = flags[key];
+        // `--__proto__ x` would write through the prototype setter and
+        // `--constructor` would shadow a lookup every `=== undefined` check
+        // relies on. Neither is a flag of any command: a usage error.
+        if (FORBIDDEN_FLAG_NAMES.has(key)) {
+            throw new CliError(`Invalid flag name "--${key}".`, 2);
+        }
+        // Own keys only: `--toString x` must not read the inherited function
+        // as "an existing value" (found by tests/fuzz/argv.test.ts).
+        const existing = Object.hasOwn(flags, key) ? flags[key] : undefined;
         if (existing === undefined || typeof existing === 'boolean') {
             flags[key] = value;
             return;

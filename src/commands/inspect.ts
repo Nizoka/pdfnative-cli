@@ -489,27 +489,36 @@ export async function inspect(args: ParsedArgs): Promise<void> {
         throw mapPdfError(e, 'Failed to read PDF');
     }
 
-    const info = reader.getInfo();
-    const trapped = readTrapped(info);
-    const rawCreationDate = info !== null ? safeInfoString(info.get('CreationDate')) : null;
-    const rawModDate = info !== null ? safeInfoString(info.get('ModDate')) : null;
-    const baseResult: InspectResult = {
-        version: extractVersion(reader),
-        pageCount: reader.pageCount,
-        encrypted: extractEncrypted(reader),
-        pdfaConformance: extractPdfaConformance(reader),
-        pdfxConformance: extractPdfxConformance(reader),
-        signatures: countSignatures(reader),
-        metadata: {
-            title: info !== null ? safeInfoString(info.get('Title')) : null,
-            author: info !== null ? safeInfoString(info.get('Author')) : null,
-            creationDate: rawCreationDate !== null && isoDates ? pdfDateToIso(rawCreationDate) : rawCreationDate,
-            modDate: rawModDate !== null && isoDates ? pdfDateToIso(rawModDate) : rawModDate,
-            subject: info !== null ? safeInfoString(info.get('Subject')) : null,
-            producer: info !== null ? safeInfoString(info.get('Producer')) : null,
-            ...(trapped !== undefined ? { trapped } : {}),
-        },
-    };
+    // The reader parses lazily: the catalog, /Info and page tree are read
+    // here, so a structural error (nesting past MAX_PARSE_DEPTH, a broken
+    // object) surfaces now — map it like the open itself (E_PARSE), never
+    // let it escape as a runtime error (found by tests/fuzz/pdf-bytes.test.ts).
+    let baseResult: InspectResult;
+    try {
+        const info = reader.getInfo();
+        const trapped = readTrapped(info);
+        const rawCreationDate = info !== null ? safeInfoString(info.get('CreationDate')) : null;
+        const rawModDate = info !== null ? safeInfoString(info.get('ModDate')) : null;
+        baseResult = {
+            version: extractVersion(reader),
+            pageCount: reader.pageCount,
+            encrypted: extractEncrypted(reader),
+            pdfaConformance: extractPdfaConformance(reader),
+            pdfxConformance: extractPdfxConformance(reader),
+            signatures: countSignatures(reader),
+            metadata: {
+                title: info !== null ? safeInfoString(info.get('Title')) : null,
+                author: info !== null ? safeInfoString(info.get('Author')) : null,
+                creationDate: rawCreationDate !== null && isoDates ? pdfDateToIso(rawCreationDate) : rawCreationDate,
+                modDate: rawModDate !== null && isoDates ? pdfDateToIso(rawModDate) : rawModDate,
+                subject: info !== null ? safeInfoString(info.get('Subject')) : null,
+                producer: info !== null ? safeInfoString(info.get('Producer')) : null,
+                ...(trapped !== undefined ? { trapped } : {}),
+            },
+        };
+    } catch (e) {
+        throw mapPdfError(e, 'Failed to read PDF structure');
+    }
 
     // --signatures / signature-count checks: enumerate the signature fields via
     // pdfnative 1.7.0 `listSignatures`. Non-placeholder, non-timestamp entries

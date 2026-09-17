@@ -252,6 +252,13 @@ export type { FontDataObject, ParseFontDataOptions } from 'pdfnative/tools';
 // ── Untrusted-input inflate cap (anti zip-bomb, --max-inflate-size) ──
 export { setMaxInflateOutputSize, getMaxInflateOutputSize, DEFAULT_MAX_INFLATE_OUTPUT } from 'pdfnative';
 
+// ── Parser hardening limits (pdfnative 1.8.0) ────────────────────────
+// The xref /Prev chain depth (CWE-400) and the object nesting depth
+// (CWE-674) the engine enforces while parsing untrusted input. Re-exported
+// so tests/fuzz/ can build inputs just past each limit and prove the CLI
+// answers with E_PARSE, never a stack overflow or a hang.
+export { MAX_XREF_CHAIN, MAX_PARSE_DEPTH } from 'pdfnative';
+
 // ── DER / hash / RSA primitives — consumed by tests/helpers/mock-pki
 // (offline TSA + OCSP/CRL responders) and the LTV plumbing. Kept in the
 // bridge so tests never import 'pdfnative' directly.
