@@ -35,7 +35,9 @@ export const CATEGORY_FLAGS: Readonly<Record<string, readonly string[]>> = {
         // The payload path is filled in by the planner (absolute, per checkout).
     ],
     // v1.5.0 — typography needs a registered font for kerning, OpenType
-    // features and the narrow no-break space of the French preset.
+    // features and the narrow no-break space of the French preset. The one
+    // option that acts on the base-14 path instead (`metrics: "exact"`) has
+    // its own flag-less category, base14/.
     typography: ['--font', 'latin', '--lang', 'latin'],
     // v1.5.0 — the reproducible pair prints the pinned {date}.
     reproducible: ['--header-right', '{date}'],
@@ -102,8 +104,38 @@ export const FILE_FLAGS: Readonly<Record<string, readonly string[]>> = {
         '--trapped', 'false',
         '--font', 'latin', '--lang', 'latin',
         '--strict',
-        // --output-intent-icc is filled in by the planner (absolute path).
+        // --output-intent-icc is filled in by the planner (FILE_ICC, absolute path).
     ],
+    // print/ — 06 is the same press file under a Gray output intent: a
+    // monochrome job (pdfnative 1.8.0 accepts RGB, CMYK and Gray intents).
+    '06-gray-pdfx4.json': [
+        '--pdfx', 'pdfx4',
+        '--output-intent-id', 'Synthetic Gray (pdfnative-cli test profile)',
+        '--trapped', 'false',
+        '--font', 'latin', '--lang', 'latin',
+        '--strict',
+    ],
+    // multilang/ — 08-11 are the script families no other sample loads
+    // (v1.5.0): with 01-07 and font/02, font/04 every one of the 27 script
+    // codes is rendered by the corpus (tests/regression/engine-surface.test.ts).
+    '08-european-caucasian.json': [
+        '--font', 'el', '--font', 'ru', '--font', 'ka', '--font', 'hy', '--font', 'pl', '--font', 'tr', '--font', 'vi', '--font', 'latin',
+        '--lang', 'el,ru,ka,hy,pl,tr,vi,latin',
+    ],
+    '09-rtl.json': ['--font', 'ar', '--font', 'he', '--font', 'latin', '--lang', 'ar,he,latin'],
+    '10-indic.json': ['--font', 'hi', '--font', 'bn', '--font', 'ta', '--font', 'latin', '--lang', 'hi,bn,ta,latin'],
+    '11-cjk.json': ['--font', 'zh', '--font', 'ko', '--font', 'latin', '--lang', 'zh,ko,latin'],
+    // font/ — 06 is colour emoji alone: skin tones, ZWJ sequences, flags.
+    '06-color-emoji-sequences.json': ['--font', 'color-emoji', '--font', 'latin', '--lang', 'color-emoji,latin'],
+};
+
+/**
+ * Files whose `--output-intent-icc` the planner fills in: the profile's path
+ * relative to the render directory (absolute per checkout, so not a flag above).
+ */
+export const FILE_ICC: Readonly<Record<string, string>> = {
+    '05-pdfx4.json': 'print/synthetic-cmyk.icc',
+    '06-gray-pdfx4.json': 'print/synthetic-gray.icc',
 };
 
 /**
@@ -177,9 +209,8 @@ export function planRenderJobs(opts: PlanOptions): RenderJob[] {
             if (category === 'attachments') {
                 args.push('--attachment', `${join(opts.renderDir, 'attachments', 'invoice.xml')}:application/xml:Source:Structured invoice payload`);
             }
-            if (file === '05-pdfx4.json') {
-                args.push('--output-intent-icc', join(opts.renderDir, 'print', 'synthetic-cmyk.icc'));
-            }
+            const icc = FILE_ICC[file];
+            if (icc !== undefined) args.push('--output-intent-icc', join(opts.renderDir, ...icc.split('/')));
             if (!ENV_PINNED_FILES.has(file)) args.push('--creation-date', opts.creationDate);
             jobs.push({ category, file, input, output, args, env: CATEGORY_ENV[category] ?? {} });
         }

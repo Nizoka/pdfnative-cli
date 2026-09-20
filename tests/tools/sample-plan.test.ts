@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-    planRenderJobs, CATEGORY_FLAGS, FILE_FLAGS, SKIP_FILES, SKIP_CATEGORIES, ENV_PINNED_FILES, PASSWORDS,
+    planRenderJobs, CATEGORY_FLAGS, FILE_FLAGS, FILE_ICC, SKIP_FILES, SKIP_CATEGORIES, ENV_PINNED_FILES, PASSWORDS,
 } from '../../scripts/lib/sample-plan.js';
 import { ENCRYPTED_SAMPLES, IDENTICAL_SAMPLE_GROUPS } from '../../scripts/lib/sample-fingerprint.js';
 
@@ -44,9 +44,24 @@ describe('sample plan', () => {
     it('fills the absolute paths of the attachment payload and the PDF/X profile', () => {
         const attachment = jobs.find((j) => j.category === 'attachments');
         expect(attachment?.args.join(' ')).toContain('invoice.xml:application/xml:Source');
-        const pdfx = jobs.find((j) => j.file === '05-pdfx4.json');
-        expect(pdfx?.args).toContain('--output-intent-icc');
-        expect(existsSync(join(RENDER_DIR, 'print', 'synthetic-cmyk.icc'))).toBe(true);
+        expect(Object.keys(FILE_ICC).sort()).toEqual(['05-pdfx4.json', '06-gray-pdfx4.json']);
+        for (const [file, profile] of Object.entries(FILE_ICC)) {
+            const job = jobs.find((j) => j.file === file);
+            const at = job?.args.indexOf('--output-intent-icc') ?? -1;
+            expect(at, file).toBeGreaterThan(-1);
+            expect(job!.args[at + 1]).toBe(join(RENDER_DIR, ...profile.split('/')));
+            expect(existsSync(join(RENDER_DIR, ...profile.split('/'))), profile).toBe(true);
+            expect(job!.args, `${file} is a PDF/X-4 render`).toContain('--pdfx');
+        }
+    });
+
+    it('renders base14/ with no font flag at all: that is the point of the category', () => {
+        const base14 = jobs.filter((j) => j.category === 'base14');
+        expect(base14.length).toBeGreaterThan(0);
+        for (const j of base14) {
+            expect(j.args).not.toContain('--font');
+            expect(j.args).not.toContain('--lang');
+        }
     });
 
     it('routes the encryption category through the deterministic passwords', () => {

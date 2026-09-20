@@ -24,7 +24,7 @@ A comprehensive collection of sample files covering every feature of pdfnative-c
 ```bash
 # From the repo root: build the CLI, then render every sample JSON, the multilang
 # drivers and the derived outputs (merge/split/extract, annotate, fill, metadata,
-# encrypt/decrypt, sign) into test-output/samples/ with the BUILT binary — 79 PDFs,
+# encrypt/decrypt, sign) into test-output/samples/ with the BUILT binary — 91 sample PDFs,
 # byte-stable (TZ=UTC, creation date pinned to 2026-01-01T00:00:00Z)
 npm run build && npm run test:generate
 
@@ -84,14 +84,20 @@ samples/
 │   │   ├── 04-multilingual.js    Node.js driver: registerFonts(th,ja,ar,ru) → render 04-multilingual.json
 │   │   ├── 05-lao.json           (v1.5.0) Lao — `--font lo --lang lo`
 │   │   ├── 06-tai-tham-cham.json (v1.5.0) Tai Tham, New Tai Lue, Tai Le, Cham — `nod khb tdd cjm`
-│   │   └── 07-african-latin.json (v1.5.0) Hausa, Yoruba, Igbo, Swahili — the `ha yo ig sw` aliases of `latin`
+│   │   ├── 07-african-latin.json (v1.5.0) Hausa, Yoruba, Igbo, Swahili — the `ha yo ig sw` aliases of `latin`
+│   │   ├── 08-european-caucasian.json (v1.5.0) Greek, Russian, Georgian, Armenian, Polish, Turkish, Vietnamese
+│   │   ├── 09-rtl.json           (v1.5.0) Arabic and Hebrew — bidi, contextual forms, marks
+│   │   ├── 10-indic.json         (v1.5.0) Hindi, Bengali, Tamil — the 1.8.0 Indic OpenType engine
+│   │   ├── 11-cjk.json           (v1.5.0) Chinese and Korean
+│   │   └── 08-language-families.*  (v1.5.0) Renders 08–11 with the --font / --lang list of each family
 │   ├── table-variant/            (v0.2.0) Table-centric PdfParams (--variant table; fonts embedded since v1.5.0)
 │   ├── font/                     (v0.3.0) `--font` / `--lang` flag demo (latin preset)
 │   │   ├── 01-latin.*            Latin preset shortcut
 │   │   ├── 02-new-scripts.*      (v1.1.0) Six 1.3.0 scripts + COLRv1 colour emoji
 │   │   ├── 03-emoji.*            (v1.1.0) Monochrome emoji preset (`--font emoji`)
 │   │   ├── 04-new-scripts-1.8.*  (v1.5.0) The five 1.8.0 scripts (Lao, Tai Tham, New Tai Lue, Tai Le, Cham)
-│   │   └── 05-font-file.*        (v1.5.0) `--font-file <path.ttf>[:name]` — a custom font from disk
+│   │   ├── 05-font-file.*        (v1.5.0) `--font-file <path.ttf>[:name]` — a custom font from disk
+│   │   └── 06-color-emoji-sequences.* (v1.5.0) Colour emoji: skin tones, ZWJ sequences, flags (COLRv1)
 │   ├── template/                 (v0.3.0) `--template` deep-merge demo (base + override)
 │   ├── watch/                    (v0.3.0) `--watch` interactive auto-rebuild demo
 │   ├── table-smart/              (v1.0.0) Smart tables: zebra, caption, repeat-header, wrap
@@ -110,13 +116,23 @@ samples/
 │   │   ├── 03-cmyk-colours.json  (v1.5.0) CMYK colours ("c m y k" / [c,m,y,k]) in headings, tables, charts
 │   │   ├── 04-colour-bars.json   (v1.5.0) layout.print.marks.colourBars — printer's colour bars
 │   │   ├── 05-pdfx4.json + .sh/.ps1 (v1.5.0) PDF/X-4: --pdfx pdfx4 --output-intent-icc, then inspect --check pdfx
-│   │   └── synthetic-cmyk.icc    (v1.5.0) Synthetic prtr CMYK profile — NOT a press profile
+│   │   ├── 06-gray-pdfx4.*       (v1.5.0) PDF/X-4 under a Gray output intent; CMYK content refused by --strict
+│   │   ├── 07-tight-bleed-marks.* (v1.5.0) Marks in a 3 mm bleed — the 1.8.0 marks clearance
+│   │   ├── 03-cmyk-colours.sh/.ps1, 04-colour-bars.sh/.ps1 (v1.5.0) Drivers for 03 and 04
+│   │   ├── synthetic-cmyk.icc    (v1.5.0) Synthetic prtr CMYK profile — NOT a press profile
+│   │   └── synthetic-gray.icc    (v1.5.0) Synthetic prtr Gray profile — NOT a press profile
 │   ├── typography/               (v1.5.0) layout.typography — the 1.8.0 typography engine
 │   │   ├── 01-paragraph-breaking.json        widows/orphans, keepWithNext, splittable paragraphs
 │   │   ├── 02-justify-optical-hyphenation.json  justify, optical margins, soft hyphens
 │   │   ├── 03-french-spacing-units-short-words.json  punctuationSpacing "fr", unitBinding, short words
-│   │   ├── 04-kerning-features-metrics.json  kerning, OpenType features, exact base-14 metrics
-│   │   └── 01-typography.*       Renders all four with --font latin --lang latin (+ the four flags)
+│   │   ├── 04-kerning-features-metrics.json  kerning, OpenType features
+│   │   ├── 05-french-canadian-spacing.json   punctuationSpacing "fr-CA"
+│   │   ├── 06-custom-spacing-rules.json      punctuationSpacing as explicit rules
+│   │   ├── 07-soft-hyphen-keep-with-next.json  soft hyphens, per-block keepWithNext / splittable
+│   │   ├── 01-typography.*       Renders 01–04 with --font latin --lang latin (+ the four flags)
+│   │   └── 05-spacing-and-keep-rules.*  Renders 05–07, extracts the no-break spaces, writes the page map
+│   ├── base14/                   (v1.5.0) The base-14 path: no --font flag on purpose
+│   │   └── 01-exact-metrics.*    layout.typography.metrics "exact" — Adobe Core 14 widths for Helvetica
 │   └── reproducible/             (v1.5.0) Byte-reproducible output
 │       ├── 01-pinned-date.json   Rendered with --creation-date 2026-01-01T00:00:00Z
 │       ├── 02-source-date-epoch.json  Same document, rendered with SOURCE_DATE_EPOCH=1767225600
@@ -124,7 +140,7 @@ samples/
 ├── merge/                        (v1.2.0) Concatenate PDFs (pdfnative page-tree)
 ├── split/                        (v1.2.0) Split one PDF into many (per-page or per-range)
 ├── extract/                      (v1.2.0) Pull selected pages into a new PDF
-├── extract-text/                 (v1.3.0) Reading-order text (text | json | ndjson)
+├── extract-text/                 (v1.3.0) Reading-order text (text | json | ndjson); 02-actualtext.* = v1.5.0 /ActualText
 ├── fill/                         (v1.3.0) Fill, flatten & export AcroForms
 ├── encrypt/                      (v1.3.0) Encrypt / decrypt (AES-128/256, --password, --stream)
 ├── doctor/                       (v1.3.0) Environment / capability preflight (02-capabilities.* = v1.5.0 fonts/unicode/conformance)
@@ -263,6 +279,9 @@ const pdf = buildDocumentPDFBytes(params, {
 | [02-pdfa-2b.json](render/pdfa/02-pdfa-2b.json) | PDF/A-2b | ISO 19005-2 — transparency, JPEG 2000 |
 | [03-pdfa-3b.json](render/pdfa/03-pdfa-3b.json) | PDF/A-3b | ISO 19005-3 — embedded file attachments |
 | [04-pdfa-2u.json](render/pdfa/04-pdfa-2u.json) | PDF/A-2u | ISO 19005-2 — every glyph mapped to Unicode |
+| [05-form-pdfa2b.json](render/pdfa/05-form-pdfa2b.json) | PDF/A-2b | (v1.5.0) An **AcroForm under a PDF/A claim** — the six field types; the fields' default-resources font is the embedded Latin font (pdfnative 1.8.0), so veraPDF accepts the file |
+| [05-form-pdfa2b.sh](render/pdfa/05-form-pdfa2b.sh) | — | (v1.5.0) Renders it with `--font latin --lang latin --strict`, asserts `inspect --check pdfa`, then lists the fields with `fill --export` |
+| [05-form-pdfa2b.ps1](render/pdfa/05-form-pdfa2b.ps1) | — | (v1.5.0) PowerShell equivalent |
 
 PDF/A conformance can also be set from the CLI via the `--tagged` flag (or the deprecated `--conformance` alias) instead of the JSON `layout.tagged` field:
 
@@ -340,13 +359,21 @@ can include their output in the baseline.
 
 | File | Description |
 |------|-------------|
-| [01-thai.json](render/multilang/01-thai.json) | Guide: how to enable Thai rendering via `registerFonts({ th: () => import(...) })` |
-| [02-japanese.json](render/multilang/02-japanese.json) | Guide: how to enable Japanese / CJK rendering |
+| [01-thai.json](render/multilang/01-thai.json) | Thai through the CLI alone — `--font th --font latin --lang th,latin` (the text also explains the `registerFonts` route of the Node drivers) |
+| [02-japanese.json](render/multilang/02-japanese.json) | Japanese through the CLI alone — `--font ja --font latin --lang ja,latin` |
 | [03-thai.json](render/multilang/03-thai.json) | **Real Thai document** — monthly report with headings, paragraphs, list, table (all in Thai) |
 | [04-multilingual.json](render/multilang/04-multilingual.json) | **Real multilingual document** — English + Thai + Japanese + Arabic (RTL) + Russian in one PDF |
 | [05-lao.json](render/multilang/05-lao.json) | (v1.5.0) **Lao** — `--font lo --lang lo` (the 1.8.0 Lao shaper) |
 | [06-tai-tham-cham.json](render/multilang/06-tai-tham-cham.json) | (v1.5.0) **Tai Tham, New Tai Lue, Tai Le, Cham** — `--font nod --font khb --font tdd --font cjm` (USE engine) |
 | [07-african-latin.json](render/multilang/07-african-latin.json) | (v1.5.0) **Hausa, Yoruba, Igbo, Swahili** — `--font ha --font yo --font ig --font sw` resolve to the Latin font |
+| [08-european-caucasian.json](render/multilang/08-european-caucasian.json) | (v1.5.0) **Greek, Russian, Georgian, Armenian, Polish, Turkish, Vietnamese** — one section per language: a native paragraph, a table of the cases its module must draw (ogonek letters, dotted / dotless i, stacked Vietnamese diacritics — the glyphs pdfnative 1.8.0 made every module able to draw), a list |
+| [09-rtl.json](render/multilang/09-rtl.json) | (v1.5.0) **Arabic and Hebrew** — contextual forms, lam-alef, harakat, niqqud, mixed direction, and an ARABIC LETTER MARK (U+061C) the engine strips before measuring |
+| [10-indic.json](render/multilang/10-indic.json) | (v1.5.0) **Hindi, Bengali, Tamil** — the 1.8.0 Indic OpenType engine: reph, rakar, conjuncts, pre-base and two-part vowel signs |
+| [11-cjk.json](render/multilang/11-cjk.json) | (v1.5.0) **Chinese and Korean** — a Simplified Chinese statement table and Hangul with complex finals (Japanese is `02-japanese.json`) |
+| [08-language-families.sh](render/multilang/08-language-families.sh) | (v1.5.0) Renders `08`–`11`, each with the `--font` / `--lang` list of its family |
+| [08-language-families.ps1](render/multilang/08-language-families.ps1) | (v1.5.0) PowerShell equivalent |
+
+The native text of `05`–`11` and of `render/font/04` is demonstration content taken from the language documents of the pdfnative repository (`scripts/data/language-docs-data.ts`, MIT, same author); with `01`–`04`, `render/font/02` and `render/font/04` **every one of the 27 script codes is rendered by the corpus** (`tests/regression/engine-surface.test.ts` holds the plan to it).
 
 #### Node.js driver scripts (Font loader + render)
 
@@ -455,6 +482,9 @@ const pdf = buildDocumentPDFBytes({
 | [04-new-scripts-1.8.ps1](render/font/04-new-scripts-1.8.ps1) | (v1.5.0) PowerShell equivalent |
 | [05-font-file.sh](render/font/05-font-file.sh) | (v1.5.0) `--font-file <path.ttf>[:name]` — registers a TrueType/OpenType file from disk (32 MiB cap, magic bytes, validated by the engine) and uses it as a `--lang` |
 | [05-font-file.ps1](render/font/05-font-file.ps1) | (v1.5.0) PowerShell equivalent |
+| [06-color-emoji-sequences.json](render/font/06-color-emoji-sequences.json) | (v1.5.0) **Colour emoji sequences** — eight gestures and people in the five Fitzpatrick skin tones, ZWJ sequences (rainbow flag, professions, family), regional-indicator flags, and the glyphs of the 1.8.0 alpha-ramp fix; every one a single COLRv1 vector form |
+| [06-color-emoji-sequences.sh](render/font/06-color-emoji-sequences.sh) | (v1.5.0) Renders with `--font color-emoji --font latin --lang color-emoji,latin` |
+| [06-color-emoji-sequences.ps1](render/font/06-color-emoji-sequences.ps1) | (v1.5.0) PowerShell equivalent |
 
 The `--font` and `--lang` flags select a preset (or, repeated, multiple scripts) from pdfnative's bundled font registry without requiring a `registerFonts` driver script. `latin` is the safe baseline; non-Latin presets can be selected directly by code (`te`, `si`, `km`, `my`, `bo`, `am`, `lo`, `nod`, `khb`, `tdd`, `cjm`, `emoji`, `color-emoji`, …), and `--font-file` adds your own font — only from a command-line path, never from a JSON payload.
 
@@ -559,6 +589,8 @@ Page-tree commands (`merge`, `split`, `extract`) also accept `--password` for en
 | [document.json](extract-text/document.json) | A two-page source document |
 | [01-extract-text.sh](extract-text/01-extract-text.sh) | Extracts text as plain text, JSON, and NDJSON (`--runs` for positioned runs) |
 | [01-extract-text.ps1](extract-text/01-extract-text.ps1) | PowerShell equivalent |
+| [02-actualtext.sh](extract-text/02-actualtext.sh) | (v1.5.0) `/ActualText` (pdfnative 1.8.0): renders `render/multilang/10-indic.json` tagged and untagged, then extracts both — the tagged file returns the logical order of reph and pre-base vowel signs, the untagged one the glyph order |
+| [02-actualtext.ps1](extract-text/02-actualtext.ps1) | (v1.5.0) PowerShell equivalent |
 
 No OCR — image-only pages yield empty text. NDJSON (one object per page) streams cleanly into RAG/agent pipelines.
 
@@ -661,9 +693,20 @@ operations: metadata editing, PDF comparison, manifest pipelines, and print prod
 | [05-pdfx4.json](render/print/05-pdfx4.json) | (v1.5.0) A PDF/X-4 brochure body: CMYK text, bleed, trapped |
 | [05-pdfx4.sh](render/print/05-pdfx4.sh) | (v1.5.0) `render --pdfx pdfx4 --output-intent-icc synthetic-cmyk.icc --font latin --lang latin --trapped false --strict`, then `inspect --check pdfx` (exit 0), then an `annotate` link that breaks the claim (exit 1) |
 | [05-pdfx4.ps1](render/print/05-pdfx4.ps1) | (v1.5.0) PowerShell equivalent |
+| [06-gray-pdfx4.json](render/print/06-gray-pdfx4.json) | (v1.5.0) A one-ink press file: **PDF/X-4 under a Gray output intent** (`/N 1`, RGB remapped through `/DefaultRGB`), marks in a 3 mm bleed |
+| [06-gray-pdfx4.sh](render/print/06-gray-pdfx4.sh) | (v1.5.0) `render --pdfx pdfx4 --output-intent-icc synthetic-gray.icc … --strict`, `inspect --check pdfx` (exit 0), then the CMYK sample under the same intent: refused by `--strict` (`PDFX_DEVICE_CMYK`) |
+| [06-gray-pdfx4.ps1](render/print/06-gray-pdfx4.ps1) | (v1.5.0) PowerShell equivalent |
+| [07-tight-bleed-marks.json](render/print/07-tight-bleed-marks.json) | (v1.5.0) Crop marks, registration targets and colour bars in a **3 mm (8.5 pt) bleed** — the 1.8.0 marks clearance: re-centred, shrunk, strokes inside the MediaBox |
+| [07-tight-bleed-marks.sh](render/print/07-tight-bleed-marks.sh) | (v1.5.0) Renders it and prints the page boxes (`inspect --pages`) |
+| [07-tight-bleed-marks.ps1](render/print/07-tight-bleed-marks.ps1) | (v1.5.0) PowerShell equivalent |
+| [03-cmyk-colours.sh](render/print/03-cmyk-colours.sh) | (v1.5.0) Renders `03`, then under `--tagged pdfa2b`: the `PDFA_DEVICE_CMYK_CONTENT` warning, and the `--strict` refusal |
+| [03-cmyk-colours.ps1](render/print/03-cmyk-colours.ps1) | (v1.5.0) PowerShell equivalent |
+| [04-colour-bars.sh](render/print/04-colour-bars.sh) | (v1.5.0) Renders `04` and prints the page boxes |
+| [04-colour-bars.ps1](render/print/04-colour-bars.ps1) | (v1.5.0) PowerShell equivalent |
 | [synthetic-cmyk.icc](render/print/synthetic-cmyk.icc) | (v1.5.0) A synthetic ICC v2 `prtr` CMYK profile (from pdfnative's docs) — valid for the validators, **not a press profile** |
+| [synthetic-gray.icc](render/print/synthetic-gray.icc) | (v1.5.0) A synthetic ICC v2 `prtr` **Gray** profile (408 bytes, generated by `scripts/lib/synthetic-gray-profile.ts`) — valid for the validators, **not a press profile** |
 
-`01`–`04` are plain document samples rendered by the generator; `05-pdfx4.json` is rendered with the PDF/X-4 flags (`scripts/lib/sample-plan.ts`). `layout.print` also accepts explicit `trimBox`/`bleedBox`/`artBox`/`cropBox` and `userUnit`; an `outputIntent` (ICC RGB for PDF/A-style characterisation, ICC `prtr` CMYK for PDF/X) can be declared in the JSON as a number array or passed with `--output-intent-icc`.
+`01`–`04` and `07` are plain document samples rendered by the generator; `05-pdfx4.json` and `06-gray-pdfx4.json` are rendered with the PDF/X-4 flags and their output profile (`scripts/lib/sample-plan.ts`, `FILE_FLAGS` + `FILE_ICC`). `layout.print` also accepts explicit `trimBox`/`bleedBox`/`artBox`/`cropBox` and `userUnit`; an `outputIntent` (ICC RGB for PDF/A-style characterisation, ICC `prtr` CMYK for PDF/X) can be declared in the JSON as a number array or passed with `--output-intent-icc`.
 
 ### `render/typography/` — The Typography Engine (v1.5.0)
 
@@ -672,11 +715,26 @@ operations: metadata editing, PDF comparison, manifest pipelines, and print prod
 | [01-paragraph-breaking.json](render/typography/01-paragraph-breaking.json) | `layout.typography.widows` / `orphans`, `keepWithNext` on headings, `splittable` paragraphs — long paragraphs break across pages without a stranded line |
 | [02-justify-optical-hyphenation.json](render/typography/02-justify-optical-hyphenation.json) | `align: "justify"`, `opticalMargins`, `hyphenationLanguage`, soft hyphens (U+00AD break opportunities, always honoured) |
 | [03-french-spacing-units-short-words.json](render/typography/03-french-spacing-units-short-words.json) | `punctuationSpacing: "fr"` (narrow no-break space before `; : ! ?`, inside guillemets), `unitBinding` (`150 €`, `20 %` never break), short-word rules — the demonstrated content is French (`demo-language: fr`) |
-| [04-kerning-features-metrics.json](render/typography/04-kerning-features-metrics.json) | `kerning`, OpenType `fontFeatures` (`onum`, `smcp`), `metrics: "exact"` base-14 widths |
+| [04-kerning-features-metrics.json](render/typography/04-kerning-features-metrics.json) | `kerning`, OpenType `fontFeatures` (`onum`, `smcp`); the `metrics: "exact"` key it carries is inert here (a registered font measures the text) — see `render/base14/` |
+| [05-french-canadian-spacing.json](render/typography/05-french-canadian-spacing.json) | `punctuationSpacing: "fr-CA"` — the Canadian convention (no-break space before the colon and inside guillemets, nothing before `; ! ?`); a different file from the `"fr"` preset of `03` |
+| [06-custom-spacing-rules.json](render/typography/06-custom-spacing-rules.json) | `punctuationSpacing` as an explicit `PunctuationSpacingRule[]` (`{ char, side, space: "nbsp" \| "narrow" }`) — a house style for `%`, `°`, `§` and the em dash |
+| [07-soft-hyphen-keep-with-next.json](render/typography/07-soft-hyphen-keep-with-next.json) | Soft hyphens (U+00AD) in a justified paragraph, `orphans` / `widows`, `keepHeadingsWithNext: { minLines }`, and the per-block keys `keepWithNext: true` and `splittable: false` |
+| [05-spacing-and-keep-rules.sh](render/typography/05-spacing-and-keep-rules.sh) | (v1.5.0) Renders `05`–`07`, extracts the no-break spaces of `05` (`extract-text --format json`), and writes the page map of `07` (`render --inspect-layout`) |
+| [05-spacing-and-keep-rules.ps1](render/typography/05-spacing-and-keep-rules.ps1) | (v1.5.0) PowerShell equivalent |
 | [01-typography.sh](render/typography/01-typography.sh) | Renders all four with `--font latin --lang latin`, then re-renders `01` with the flags `--split-paragraphs --keep-headings-with-next --kerning --font-features onum,smcp` and shows `--inspect-layout` |
 | [01-typography.ps1](render/typography/01-typography.ps1) | PowerShell equivalent |
 
 Every typography option lives in `layout.typography` (JSON, `--layout` file or the four flags; flags win, nested objects merge one level). Requesting a feature the font cannot honour (`tnum` on a font without the table) emits `TYPOGRAPHY_FEATURE_INEFFECTIVE` — a warning, or `E_CHECK_FAILED` under `--strict`. Tagged output carries `/ActualText`, so `extract-text` returns the source text, not the inserted spaces.
+
+### `render/base14/` — The Base-14 Path (v1.5.0)
+
+| File | Description |
+|------|-------------|
+| [01-exact-metrics.json](render/base14/01-exact-metrics.json) | `layout.typography.metrics: "exact"` — Adobe Core 14 widths for Helvetica. Rendered with **no** `--font` flag: the option only acts where no registered font measures the text |
+| [01-exact-metrics.sh](render/base14/01-exact-metrics.sh) | Renders it as is, then with `--font latin --lang latin` to show the option no longer acts |
+| [01-exact-metrics.ps1](render/base14/01-exact-metrics.ps1) | PowerShell equivalent |
+
+The category has no flags in `scripts/lib/sample-plan.ts` on purpose (`tests/tools/sample-plan.test.ts` holds it to that).
 
 ### `render/reproducible/` — Byte-Reproducible Output (v1.5.0)
 
@@ -916,16 +974,17 @@ npx tsx scripts/verify-samples.ts --update      # rebaseline — declare it in t
 `scripts/generate-samples.ts` (v1.5.0, replaces `run-all.js`) clears `test-output/samples/`
 and drives the **built** CLI (`dist/cli.cjs`, or `PDFNATIVE_CLI`) under `TZ=UTC` with the
 creation instant pinned twice — `--creation-date 2026-01-01T00:00:00Z` and
-`SOURCE_DATE_EPOCH=1767225600` — so every run yields the same 79 PDFs. The plan is
+`SOURCE_DATE_EPOCH=1767225600` — so every run yields the same 91 sample PDFs. The plan is
 `scripts/lib/sample-plan.ts`: per-category flags (`pdfa` / `attachments` → `--font latin
---lang latin --tagged …`, `typography` → the four flags, `print/05-pdfx4.json` → the PDF/X-4
-flags, …), the multilang driver scripts, deterministic passwords for the encryption samples,
+--lang latin --tagged …`, `typography` → `--font latin --lang latin`, `base14` → none on purpose, `print/05-pdfx4.json`
+and `06-gray-pdfx4.json` → the PDF/X-4 flags and their output profile, the `multilang` families
+→ their `--font` / `--lang` lists, …), the multilang driver scripts, deterministic passwords for the encryption samples,
 and the derived steps (`merge` / `split` / `extract`, `annotate`, `fill`, `metadata`,
 `encrypt` / `decrypt`, `sign` with the committed test key pair and `--signing-time`).
 
 **Skipped:** `watch/` (never exits), `template/` (partial payloads), `outline/02-outline-tree.json`
-(not a document), `multilang/01-thai.json` and `02-japanese.json` (guides) — run them with the
-per-script `.sh` / `.ps1` drivers. Network samples (`sign --timestamp`, `doc-timestamp`,
+(not a document), `multilang/03-thai.json` and `04-multilingual.json` (rendered by their Node
+driver scripts, which the generator runs too). Network samples (`sign --timestamp`, `doc-timestamp`,
 `ltv --online`) are out of the corpus by design.
 
 The baseline `tests/regression/baselines/samples.sha256.json` records a SHA-256 per sample —

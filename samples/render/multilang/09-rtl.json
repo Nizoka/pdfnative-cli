@@ -1,0 +1,193 @@
+{
+  "title": "Arabic & Hebrew — right to left",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "Bidirectional text with contextual shaping, marks and mixed direction (pdfnative 1.8.0) — demonstration content",
+    "keywords": "arabic, hebrew, bidi, rtl, shaping"
+  },
+  "blocks": [
+    {
+      "type": "heading",
+      "text": "Arabic & Hebrew — right to left",
+      "level": 1
+    },
+    {
+      "type": "paragraph",
+      "text": "Rendered with --font ar --font he --font latin --lang ar,he,latin. Arabic letters take their contextual forms and lam-alef ligatures, harakat stack on their bases, and runs of Latin text and digits keep their own direction (UAX #9). pdfnative 1.8.0 strips the ARABIC LETTER MARK (U+061C) before measuring, so a bidi control never widens a line."
+    },
+    {
+      "type": "heading",
+      "text": "Arabic (ar) — منشئ المستندات – العربية",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "هذا المستند يوضح قدرات منشئ المستندات في pdfnative للنصوص العربية من اليمين إلى اليسار. يدعم المحرك تشكيل الحروف العربية تلقائياً بما في ذلك الأشكال المعزولة والابتدائية والوسطى والنهائية، والحركات فوق الحروف وتحتها."
+    },
+    {
+      "type": "table",
+      "headers": [
+        "What the row exercises",
+        "Sample"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "Contextual forms",
+            "كتاب مكتبة بيت عين"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Lam-alef",
+            "لا الله سلام إلا"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Harakat",
+            "مُحَمَّدٌ كَتَبَ الوَلَدُ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Stacked marks",
+            "شَدَّةٌ وَكَسْرَةٌ لِلْحَرَكَاتِ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Arabic-Indic digits",
+            "١٢٣٤٥٦٧٨٩٠ ٢٠٢٦"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Persian and Urdu letters",
+            "گ چ پ ژ ک ی ے"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Mixed direction",
+            "معيار ISO 32000-1 و PDF/A-2b"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Hamza and tatweel",
+            "أ إ ؤ ئ كـــتاب"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "ARABIC LETTER MARK (U+061C) around a number — stripped, draws nothing",
+            "\u061C2026\u061C كتاب مكتبة بيت عين"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "دعم ثنائي الاتجاه (BiDi) وفق معيار UAX #9",
+        "تشكيل الحروف العربية (GSUB) مع ربطات لام-ألف",
+        "توافق مع PDF/A-2b (ISO 19005-2)"
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Hebrew (he) — בונה מסמכים – עברית",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "מסמך זה מדגים את יכולות בונה המסמכים של pdfnative עבור טקסט עברי מימין לשמאל. המנוע תומך בזיהוי כיוון דו-כיווני אוטומטי לפי תקן UAX #9, בצורות סופיות ובניקוד."
+    },
+    {
+      "type": "table",
+      "headers": [
+        "What the row exercises",
+        "Sample"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "Final forms",
+            "כ/ך מ/ם נ/ן פ/ף צ/ץ שלום"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Niqqud",
+            "שָׁלוֹם עוֹלָם בְּרֵאשִׁית"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Dagesh and shin dots",
+            "בּ כּ שׁ שׂ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Mixed direction",
+            "תקן ISO 32000-1 ו-PDF/A-2b"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Maqaf and geresh",
+            "בית־ספר צ׳ ג׳"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Numbers and currency",
+            "2026 ₪ 1,000"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "תמיכה בכיוון דו-כיווני (BiDi)",
+        "צורות סופיות אוטומטיות – Sofit",
+        "תאימות PDF/A-2b (ISO 19005-2)"
+      ]
+    }
+  ]
+}

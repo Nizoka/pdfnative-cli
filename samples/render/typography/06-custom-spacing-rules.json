@@ -1,0 +1,36 @@
+{
+  "title": "Custom punctuation spacing rules",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "layout.typography.punctuationSpacing as an explicit PunctuationSpacingRule[] — house style instead of a preset (pdfnative 1.8.0)",
+    "keywords": "typography, punctuation, spacing rules, house style, no-break space"
+  },
+  "layout": {
+    "typography": {
+      "punctuationSpacing": [
+        { "char": "%", "side": "before", "space": "narrow" },
+        { "char": "°", "side": "before", "space": "narrow" },
+        { "char": "§", "side": "after", "space": "nbsp" },
+        { "char": "—", "side": "before", "space": "narrow" },
+        { "char": "—", "side": "after", "space": "narrow" }
+      ]
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "A house style, rule by rule", "level": 1 },
+    { "type": "paragraph", "text": "punctuationSpacing takes a preset name (\"fr\", \"fr-CA\") or a list of rules. Each rule names a character, the side the space goes on (before or after) and its width: narrow is U+202F NARROW NO-BREAK SPACE, nbsp is U+00A0 NO-BREAK SPACE. An existing plain space on that side is replaced; nothing is inserted where no space was typed." },
+    { "type": "heading", "text": "Rules of this document", "level": 2 },
+    {
+      "type": "table",
+      "headers": ["Character", "Side", "Space", "Effect"],
+      "rows": [
+        { "cells": ["%", "before", "narrow", "42 % never breaks between the figure and the sign"], "type": "normal", "pointed": false },
+        { "cells": ["°", "before", "narrow", "21 °C stays together"], "type": "normal", "pointed": false },
+        { "cells": ["§", "after", "nbsp", "§ 6.2.2 keeps its number"], "type": "normal", "pointed": false },
+        { "cells": ["—", "both", "narrow", "a spaced em dash — like this — cannot start a line"], "type": "normal", "pointed": false }
+      ]
+    },
+    { "type": "heading", "text": "In running text", "level": 2 },
+    { "type": "paragraph", "text": "Humidity rose to 42 % while the room stayed at 21 °C — a comfortable reading, as § 6.2.2 of the building code requires — and the margin of error remained below 3 % over the whole period. None of these pairs can be split at the end of a line, however narrow the column.", "align": "justify" }
+  ]
+}

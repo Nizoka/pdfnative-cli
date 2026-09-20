@@ -1,0 +1,23 @@
+{
+  "title": "Canadian French punctuation spacing",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "layout.typography.punctuationSpacing: \"fr-CA\" — the Canadian convention, next to the European one of sample 03 (pdfnative 1.8.0) — demonstration content",
+    "keywords": "typography, punctuation, french, canadian french, fr-CA, no-break space"
+  },
+  "layout": {
+    "typography": {
+      "punctuationSpacing": "fr-CA",
+      "unitBinding": true
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "Canadian French spacing (fr-CA)", "level": 1 },
+    { "type": "paragraph", "text": "Two French conventions exist. European French (\"fr\", sample 03) puts a narrow no-break space before ? ! ; and a no-break space before : and inside « ». Canadian French (\"fr-CA\", OQLF) keeps the no-break space before the colon and inside the guillemets, and sets ? ! ; against the word. The two presets must produce different files: in pdfnative 1.7 they did not, because both no-break spaces were folded to a plain space before reaching the font — 1.8.0 draws the font's own U+00A0 and U+202F." },
+    { "type": "heading", "text": "The same sentences under fr-CA", "level": 2 },
+    { "type": "paragraph", "text": "Vraiment ? Oui ! Ainsi ; Total : 42 $. Et une « citation » pour finir.", "align": "justify" },
+    { "type": "paragraph", "text": "Le colis pèse 10 kg ; la livraison prend 48 h : « rapide », dit-on ! Combien ? 150 $ tout compris.", "align": "justify" },
+    { "type": "heading", "text": "How to check", "level": 2 },
+    { "type": "paragraph", "text": "pdfnative extract-text returns the characters the file carries: under fr-CA the colon is preceded by U+00A0 and the question mark by nothing; under fr it is preceded by U+202F. Both need a registered font (--font latin --lang latin): the base-14 fonts have no such glyphs and fall back to a plain space." }
+  ]
+}

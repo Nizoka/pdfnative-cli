@@ -1,0 +1,31 @@
+{
+  "title": "Printer's Marks in a 3 mm Bleed",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "Crop marks, registration targets and colour bars in the smallest common bleed — 3 mm, 8.5 pt (pdfnative 1.8.0 marks clearance)",
+    "keywords": "print, bleed, crop marks, registration, colour bars, prepress"
+  },
+  "layout": {
+    "print": {
+      "bleed": 8.5,
+      "marks": { "crop": true, "registration": true, "colourBars": { "tints": false, "size": 5 } }
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "Marks that fit their strip", "level": 1 },
+    { "type": "paragraph", "text": "Three millimetres is the bleed most European printers ask for. It leaves an 8.5 pt strip between the trimmed page and the edge of the sheet — less than the default size of a registration target. pdfnative 1.8.0 re-centres and shrinks the marks to the strip, clamps their stroke to at least 0.5 pt from the MediaBox edge, and drops a registration target altogether below 6.6 pt rather than draw it across the trim." },
+    { "type": "paragraph", "text": "Compare with 01-bleed-marks.json (9 pt) and 04-colour-bars.json (5 mm, 14.17 pt): the geometry differs, the trimmed page is identical." },
+    { "type": "heading", "text": "Page boxes", "level": 2 },
+    {
+      "type": "table",
+      "headers": ["Box", "Value (pt)", "Meaning"],
+      "rows": [
+        { "cells": ["MediaBox", "0 0 595.28 841.89", "the sheet: A4 including the bleed strip"], "type": "normal", "pointed": false },
+        { "cells": ["BleedBox", "0 0 595.28 841.89", "ink may run to here"], "type": "normal", "pointed": false },
+        { "cells": ["TrimBox", "8.5 8.5 586.78 833.39", "the finished page after cutting"], "type": "normal", "pointed": false }
+      ],
+      "zebra": "0 0 0 0.06"
+    },
+    { "type": "paragraph", "text": "pdfnative inspect prints the boxes of every page; the marks are drawn in the registration colour (the All separation), so they appear on every plate." }
+  ]
+}

@@ -1,0 +1,194 @@
+{
+  "title": "Chinese & Korean",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "Simplified Chinese and Hangul from the bundled Noto Sans SC / KR modules (pdfnative 1.8.0) — demonstration content",
+    "keywords": "chinese, korean, hangul, cjk, multilingual"
+  },
+  "blocks": [
+    {
+      "type": "heading",
+      "text": "Chinese & Korean",
+      "level": 1
+    },
+    {
+      "type": "paragraph",
+      "text": "Rendered with --font zh --font ko --font latin --lang zh,ko,latin. The CJK modules are the largest of the bundle; only the glyphs a document uses are embedded. pdfnative 1.8.0 reads the GSUB extension lookups these fonts rely on. Japanese has its own sample (02-japanese.json)."
+    },
+    {
+      "type": "heading",
+      "text": "Chinese (zh) — 月度账户对账单",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "余额: ¥ 98,765.43 · 5 笔交易 · 由 pdfnative 生成 – 符合 ISO 32000-1 标准"
+    },
+    {
+      "type": "table",
+      "headers": [
+        "日期",
+        "说明",
+        "类别",
+        "金额",
+        "状态"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "01/01",
+            "期初余额",
+            "系统",
+            "+80,000.00",
+            "已核"
+          ],
+          "type": "credit",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "01/08",
+            "超市购物",
+            "食品",
+            "-520.00",
+            ""
+          ],
+          "type": "debit",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "01/10",
+            "工资到账",
+            "收入",
+            "+22,000.00",
+            "已核"
+          ],
+          "type": "credit",
+          "pointed": true
+        },
+        {
+          "cells": [
+            "01/18",
+            "水电费",
+            "公共",
+            "-1,200.00",
+            ""
+          ],
+          "type": "debit",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "01/31",
+            "储蓄转账",
+            "储蓄",
+            "-1,514.57",
+            "X"
+          ],
+          "type": "debit",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Korean (ko) — 한국어 문서 – 시연",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "이 문서는 pdfnative 라이브러리로 한국어 PDF를 생성하는 예시입니다. 이 페이지에는 제목, 문단, 목록과 표가 있으며, 모든 음절과 받침이 한 페이지에서 확인됩니다. 한글은 완성형 음절로 부호화되므로 재배열이 필요하지 않습니다."
+    },
+    {
+      "type": "table",
+      "headers": [
+        "What the row exercises",
+        "Sample"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "Precomposed syllables",
+            "한국어 안녕하세요 감사합니다"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Complex final consonants",
+            "읽다 흙 값 없다 앉다 젊다 뚫다"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Tense and aspirated onsets",
+            "까 따 빠 싸 짜 카 타 파 하"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Compatibility jamo",
+            "ㄱ ㄴ ㄷ ㅏ ㅑ ㅓ ㅘ ㅢ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Hanja and mixed script",
+            "大韓民國 韓國語 서울特別市"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Punctuation and quotes",
+            "「인용」 『책』 ‘작은’ “큰” ~ … ·"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Line breaking",
+            "띄어쓰기없이이어지는긴문장도글자단위로줄바꿈됩니다"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Digits and currency",
+            "₩ 1,000 2026년 9월 15일"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Mixed with Latin",
+            "PDF/A-2b 표준 ISO 32000-1"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "완성형 한글 음절 (U+AC00–D7A3)",
+        "한자와 라틴 문자 혼용",
+        "PDF/A-2b 지원"
+      ]
+    }
+  ]
+}

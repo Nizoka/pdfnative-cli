@@ -50,9 +50,9 @@
     "pdfaCorpus": 16,
     "fontAliases": 4,
     "testFiles": 95,
-    "renderSamples": 63,
-    "sampleScripts": 75,
-    "samplePdfs": 79
+    "renderSamples": 75,
+    "sampleScripts": 85,
+    "samplePdfs": 91
   },
   "assertions": [
     {

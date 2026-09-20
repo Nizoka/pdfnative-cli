@@ -41,6 +41,12 @@
       "size": 6278,
       "since": "1.5.0"
     },
+    "base14/01-exact-metrics.pdf": {
+      "mode": "bytes",
+      "hash": "71ec4558968a5db642010f07a01c8d65a9dafc6203a143d71cef8fcc0e5f5876",
+      "size": 8847,
+      "since": "1.5.0"
+    },
     "chart/01-bar-chart.pdf": {
       "mode": "bytes",
       "hash": "5f50f6675670a4dde70373516153ab0a822bfd79c12b3cd39dbff0874ebfbabe",
@@ -185,6 +191,12 @@
       "size": 2170553,
       "since": "1.5.0"
     },
+    "font/06-color-emoji-sequences.pdf": {
+      "mode": "bytes",
+      "hash": "f172051f542bb16c8efb6beb21cce766774cb4e0d0a4ffb9fd00ca7aa4f2c930",
+      "size": 1162193,
+      "since": "1.5.0"
+    },
     "form/01-contact-form.pdf": {
       "mode": "bytes",
       "hash": "4b608188b7604c4b6d26586b1c42ee369c7199109301b3afc4a0ab35afeeb3cf",
@@ -281,6 +293,30 @@
       "size": 136542,
       "since": "1.5.0"
     },
+    "multilang/08-european-caucasian.pdf": {
+      "mode": "bytes",
+      "hash": "6ed3bfad001deb89a7c7b676829bb7f2a22b74c877a71ac0c63f21c63869cf74",
+      "size": 2755382,
+      "since": "1.5.0"
+    },
+    "multilang/09-rtl.pdf": {
+      "mode": "bytes",
+      "hash": "ce4ffd140bb65cd27a16f8831cc67c4aa345f26980cfefacf03cc93076fb397a",
+      "size": 228852,
+      "since": "1.5.0"
+    },
+    "multilang/10-indic.pdf": {
+      "mode": "bytes",
+      "hash": "7c78ec6de4456e5abfbf73b7b7e2f975d52271b3fab86b130c13b1bd7ab5c647",
+      "size": 2265210,
+      "since": "1.5.0"
+    },
+    "multilang/11-cjk.pdf": {
+      "mode": "bytes",
+      "hash": "2360dd88671c6c81f57de0b85e193e6b863736699f5f6d37352a9814bdb400f3",
+      "size": 2714796,
+      "since": "1.5.0"
+    },
     "outline/01-headings.pdf": {
       "mode": "bytes",
       "hash": "2436ee74fb88fc2f290ada5e221a2c944abe59f98cf07a168e2b9ddf22d65a53",
@@ -341,6 +377,12 @@
       "size": 129575,
       "since": "1.5.0"
     },
+    "pdfa/05-form-pdfa2b.pdf": {
+      "mode": "bytes",
+      "hash": "c1dc861a8be5ea0bd32e881833cb7f4846328438d7f381e7ee59d264a73b4705",
+      "size": 260642,
+      "since": "1.5.0"
+    },
     "print/01-bleed-marks.pdf": {
       "mode": "bytes",
       "hash": "317a3e9a73b965587859b370b54777acc0bfc1b53d8c5a2816e4df5967e654ab",
@@ -369,6 +411,18 @@
       "mode": "bytes",
       "hash": "114c6658505320345d9d9a26b3b563169169970a9979a07d08933ac0d06b3aea",
       "size": 139018,
+      "since": "1.5.0"
+    },
+    "print/06-gray-pdfx4.pdf": {
+      "mode": "bytes",
+      "hash": "0e7c052b971d39574691f129b3e6bfcc0ed11926448c606f6942d48301f1e63b",
+      "size": 126493,
+      "since": "1.5.0"
+    },
+    "print/07-tight-bleed-marks.pdf": {
+      "mode": "bytes",
+      "hash": "8908874a372431cab80ed746896fd63a173573815bdf73fd70c16d262d525e52",
+      "size": 9363,
       "since": "1.5.0"
     },
     "reproducible/01-pinned-date.pdf": {
@@ -459,6 +513,24 @@
       "mode": "bytes",
       "hash": "ec546d7bf5f96a2a2454ef643b4c702729caacc2fc431f551643e5fdfa125f8a",
       "size": 131778,
+      "since": "1.5.0"
+    },
+    "typography/05-french-canadian-spacing.pdf": {
+      "mode": "bytes",
+      "hash": "d49317857b1e1a424208ce569f0055badb998367d50b59ccf845f81d8901be2e",
+      "size": 124849,
+      "since": "1.5.0"
+    },
+    "typography/06-custom-spacing-rules.pdf": {
+      "mode": "bytes",
+      "hash": "82d712049060b8a49d1c485b7eba71b6c4424ef1b83872ec80f660675cc23f11",
+      "size": 126722,
+      "since": "1.5.0"
+    },
+    "typography/07-soft-hyphen-keep-with-next.pdf": {
+      "mode": "bytes",
+      "hash": "d2abdb4eeee2dcc9ea2213d3eefda3537054a3424cc79dbbd40516511154469b",
+      "size": 130387,
       "since": "1.5.0"
     },
     "watermark/01-draft.pdf": {

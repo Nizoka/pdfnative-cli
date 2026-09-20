@@ -1,0 +1,156 @@
+{
+  "title": "Colour emoji: skin tones, sequences and flags",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "COLRv1 colour glyphs drawn as vector forms: Fitzpatrick skin tones, ZWJ sequences, flags, and the glyphs of the 1.8.0 alpha-ramp fix (pdfnative 1.8.0)",
+    "keywords": "emoji, colour emoji, COLRv1, skin tone, ZWJ, flags"
+  },
+  "blocks": [
+    {
+      "type": "heading",
+      "text": "Colour emoji sequences",
+      "level": 1
+    },
+    {
+      "type": "paragraph",
+      "text": "Rendered with --font color-emoji --font latin --lang color-emoji,latin. Every colour glyph is a PDF Form XObject built from the font's COLRv1 layer graph — solid, linear, radial and sweep paints — with no bitmap anywhere. pdfnative 1.8.0 added COLRv1 transforms, variable paints and masks, and bundles 20 gestures and 10 generic people in all five Fitzpatrick tones: each toned form is ONE colour glyph, never a base emoji followed by a swatch."
+    },
+    {
+      "type": "heading",
+      "text": "Skin tones",
+      "level": 2
+    },
+    {
+      "type": "table",
+      "headers": [
+        "Gesture or person",
+        "Untoned, then the five tones"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "Thumbs up",
+            "👍 👍🏻 👍🏼 👍🏽 👍🏾 👍🏿"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Folded hands",
+            "🙏 🙏🏻 🙏🏼 🙏🏽 🙏🏾 🙏🏿"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Waving hand",
+            "👋 👋🏻 👋🏼 👋🏽 👋🏾 👋🏿"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Flexed biceps",
+            "💪 💪🏻 💪🏼 💪🏽 💪🏾 💪🏿"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Person",
+            "🧑 🧑🏻 🧑🏼 🧑🏽 🧑🏾 🧑🏿"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Woman",
+            "👩 👩🏻 👩🏼 👩🏽 👩🏾 👩🏿"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Older man",
+            "👴 👴🏻 👴🏼 👴🏽 👴🏾 👴🏿"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Baby",
+            "👶 👶🏻 👶🏼 👶🏽 👶🏾 👶🏿"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "ZWJ sequences and flags",
+      "level": 2
+    },
+    {
+      "type": "table",
+      "headers": [
+        "Sequence",
+        "Glyph"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "Rainbow flag (white flag + VS16 + ZWJ + rainbow)",
+            "🏳\uFE0F\u200D🌈"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Woman technologist (woman + ZWJ + laptop)",
+            "👩\u200D💻"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Family",
+            "👨\u200D👩\u200D👧"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Regional-indicator flags",
+            "🇫🇷 🇯🇵 🇧🇷 🇰🇪"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Gradients with transparent stops",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "pdfnative 1.8.0 fixed the alpha ramps of COLRv1 gradients: faces, the globe and the cake no longer show a flat opaque fill over their artwork. 👩 👨 🧑 😊 🌍 🎂"
+    },
+    {
+      "type": "paragraph",
+      "text": "A toned base outside the bundled set draws the untoned emoji and drops the modifier: 🏃🏽 — never a base followed by a colour swatch."
+    }
+  ]
+}

@@ -1,0 +1,356 @@
+{
+  "title": "Hindi, Bengali & Tamil — the Indic OpenType engine",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "Reph, conjuncts, pre-base and two-part vowel signs (pdfnative 1.8.0) — demonstration content",
+    "keywords": "devanagari, hindi, bengali, tamil, indic, opentype, shaping"
+  },
+  "blocks": [
+    {
+      "type": "heading",
+      "text": "Hindi, Bengali & Tamil — the Indic OpenType engine",
+      "level": 1
+    },
+    {
+      "type": "paragraph",
+      "text": "Rendered with --font hi --font bn --font ta --font latin --lang hi,bn,ta,latin. The 1.8.0 Indic engine reorders pre-base vowel signs, forms reph and rakar, and applies the fonts’ conjunct ligatures; its fixes put the Tamil i-matra on the correct side of its base and gave Bengali and Tamil their own script detection. Tagged output (--tagged) carries the source text as /ActualText, so extraction returns the logical order."
+    },
+    {
+      "type": "heading",
+      "text": "Hindi (hi) — हिन्दी दस्तावेज़ – प्रदर्शन",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "यह pdfnative पुस्तकालय के द्वारा हिन्दी (देवनागरी) में PDF निर्माण का नमूना है। इस दस्तावेज़ में शीर्षक, अनुच्छेद, सूची और तालिका शामिल हैं, और हर संयुक्ताक्षर एक ही पृष्ठ पर दिखता है।"
+    },
+    {
+      "type": "table",
+      "headers": [
+        "What the row exercises",
+        "Sample"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "i-matra reordered",
+            "हिन्दी विकिपीडिया किताब"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Above vowel signs",
+            "सेवा वैसे रेल देश"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Reph",
+            "प्रदर्शन समर्थन कर्म पूर्ण"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Rakar",
+            "प्रकार क्रम त्रुटि"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Half forms",
+            "दस्तावेज़ सप्ताह विश्व"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Conjuncts",
+            "क्ष ज्ञ त्र द्य श्र क्त"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Nukta",
+            "ज़रूरी क़लम फ़िल्म पढ़ना"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Post-base vowel signs",
+            "कोई सौ लोग जाओ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Anusvara, candrabindu, visarga",
+            "हैं चाँद अंत दुःख"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Reph with i-matra",
+            "र्कि सर्दी कार्तिक"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Digits and currency",
+            "₹ १,२३,४५६.७८ २०२६"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Punctuation and Latin",
+            "नमस्ते। PDF/A-2b ॥"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "देवनागरी OpenType शेपिंग (GSUB + GPOS)",
+        "संयुक्ताक्षर, रेफ़ और मात्रा पुनर्व्यवस्था",
+        "PDF/A-2b समर्थन"
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Bengali (bn) — বাংলা নথিপত্র – প্রতিবেদন",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "এটি pdfnative লাইব্রেরির বাংলা নথিপত্র নির্মাণের প্রদর্শন। এই পাতায় শিরোনাম, অনুচ্ছেদ, তালিকা এবং সারণি রয়েছে, আর প্রতিটি যুক্তাক্ষর ও স্বরচিহ্ন এক পাতায় দেখা যায়।"
+    },
+    {
+      "type": "table",
+      "headers": [
+        "What the row exercises",
+        "Sample"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "Reph",
+            "কর্ম ধর্ম বর্ণ সূর্য"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Ya-phala",
+            "ব্যবস্থা সাহায্য ব্যাংক"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Ra-phala",
+            "প্রতিবেদন প্রধান গ্রাম"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Conjuncts",
+            "ক্ষ জ্ঞ ষ্ণ ক্ত ন্ত্র স্ট"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Pre-base vowel signs",
+            "কি কে কৈ বিভক্ত দেশ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Two-part vowel signs",
+            "কো কৌ লোক নৌকা"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Nasal and visarga signs",
+            "বাংলা চাঁদ দুঃখ সংযুক্ত"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Nukta and khanda ta",
+            "ড় ঢ় য় ৎ পড়া"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Digits and currency",
+            "১,০০০ টাকা ৳ ২০২৬"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Mixed with Latin",
+            "PDF/A-2b সমর্থন ISO 32000-1"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "বাংলা OpenType শেপিং (GSUB + GPOS)",
+        "রেফ, য-ফলা ও র-ফলা",
+        "PDF/A-2b সমর্থন"
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Tamil (ta) — தமிழ் ஆவணம் – முன்மாதிரி",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "இது pdfnative நூலகத்தின் தமிழ் ஆவண உருவாக்கத்தின் முன்மாதிரியாகும். இந்த பக்கத்தில் தலைப்புகள், பத்திகள், பட்டியல்கள் மற்றும் அட்டவணை உள்ளன; ஒவ்வொரு உயிர்மெய்யும் ஒரே பக்கத்தில் காணலாம்."
+    },
+    {
+      "type": "table",
+      "headers": [
+        "What the row exercises",
+        "Sample"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "i-matra to the right of its base",
+            "விலை நிலை தமிழ் கிளி"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Pre-base vowel signs",
+            "கெ கே கை செய் நேரம்"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Two-part vowel signs",
+            "கொ கோ கௌ போய் தோட்டம்"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Pulli",
+            "ல் ண் ழ் அத்தியாயம் முடிந்தது"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "u and uu ligatures",
+            "ரூ கு கூ மு நூல்"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Conjuncts",
+            "ஸ்ரீ க்ஷ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Grantha letters",
+            "ஜ ஷ ஸ ஹ ஜப்பான்"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Digits and symbols",
+            "௧,௦௦௦ ௨௦௨௬ ௹ ௳"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Long words",
+            "முன்மாதிரியாகும் அம்சங்கள் மறுசீரமைப்பு"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Aytham and Latin",
+            "அஃது PDF/A-2b"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "தமிழ் OpenType வடிவமைப்பு (GSUB + GPOS)",
+        "முன்-அடிப்படை உயிர்க்குறிகள் மறுசீரமைப்பு",
+        "PDF/A-2b ஆதரவு"
+      ]
+    }
+  ]
+}

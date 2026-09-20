@@ -1,0 +1,648 @@
+{
+  "title": "Greek, Cyrillic, Georgian, Armenian, Polish, Turkish & Vietnamese",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "Seven alphabetic scripts and Latin extensions, each with its own bundled module (pdfnative 1.8.0) — demonstration content",
+    "keywords": "greek, cyrillic, georgian, armenian, polish, turkish, vietnamese, multilingual"
+  },
+  "blocks": [
+    {
+      "type": "heading",
+      "text": "Greek, Cyrillic, Georgian, Armenian, Polish, Turkish & Vietnamese",
+      "level": 1
+    },
+    {
+      "type": "paragraph",
+      "text": "Rendered with --font el --font ru --font ka --font hy --font pl --font tr --font vi --font latin --lang el,ru,ka,hy,pl,tr,vi,latin. pdfnative 1.8.0 rebuilt the Polish, Turkish and Vietnamese modules so that every letter a module advertises is one it can draw: the ogonek letters, the dotless and dotted i, and the stacked Vietnamese diacritics below all come from their own subset."
+    },
+    {
+      "type": "heading",
+      "text": "Greek (el) — Ελληνικό έγγραφο – επίδειξη",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "Αυτό το έγγραφο δείχνει τη δημιουργία PDF στα ελληνικά με τη βιβλιοθήκη pdfnative. Η σελίδα περιέχει επικεφαλίδες, παραγράφους, λίστες και πίνακα, και κάθε τόνος, διαλυτικά και τελικό σίγμα φαίνονται σε μία σελίδα."
+    },
+    {
+      "type": "table",
+      "headers": [
+        "What the row exercises",
+        "Sample"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "Tonos on every vowel",
+            "ά έ ή ί ό ύ ώ Ά Έ Ή Ί Ό Ύ Ώ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Dialytika and combined",
+            "ϊ ϋ ΐ ΰ Ϊ Ϋ προϊόν καΐκι"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Final sigma",
+            "σοφός σύστημα Οδυσσεύς"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Polytonic",
+            "ἀλήθεια ἡμέρα ὦ ῥήτωρ ᾶ ῷ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Capitals and digraphs",
+            "ΕΛΛΑΔΑ Άγγελος ευχαριστώ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Punctuation",
+            "Τι κάνεις; Καλά· «ναι»"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Digits and currency",
+            "€ 1.000,50 2026 ΄ ΅"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Mixed with Latin",
+            "PDF/A-2b πρότυπο ISO 32000-1"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "Μονοτονικό και πολυτονικό",
+        "Τελικό σίγμα και διαλυτικά",
+        "Υποστήριξη PDF/A-2b"
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Russian (ru) — Документ на русском языке – демонстрация",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "Этот документ показывает создание PDF на русском языке с помощью библиотеки pdfnative. На странице есть заголовки, абзацы, список и таблица; каждая буква, знак ударения и расширенная кириллица видны на одной странице."
+    },
+    {
+      "type": "table",
+      "headers": [
+        "What the row exercises",
+        "Sample"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "Russian letters",
+            "ёж йод щука объём цирк"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Stress marks",
+            "за́мок замо́к ударе́ние"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Ukrainian and Belarusian",
+            "Київ ґанок їжак є ў"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Serbian and Macedonian",
+            "ђак љубав њива ћирилица џеп ѓ ќ ѕ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Capitals",
+            "РОССИЯ Ёлка ЩИТ Ъ Ь"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Punctuation and typography",
+            "«кавычки» — тире … № 5"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Digits and currency",
+            "1 000 ₽ 2026 г."
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Mixed with Latin",
+            "PDF/A-2b стандарт ISO 32000-1"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "Русский, украинский, сербский алфавиты",
+        "Знаки ударения через GPOS",
+        "Поддержка PDF/A-2b"
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Georgian (ka) — ქართული დოკუმენტი – ნიმუში",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "ეს დოკუმენტი აჩვენებს PDF-ის შექმნას ქართულად pdfnative ბიბლიოთეკით. გვერდზე არის სათაურები, აბზაცები, სია და ცხრილი; მხედრული, მთავრული და ასომთავრული ასოები ერთ გვერდზე ჩანს."
+    },
+    {
+      "type": "table",
+      "headers": [
+        "What the row exercises",
+        "Sample"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "Mkhedruli",
+            "საქართველო თბილისი ქართული ენა"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Ascenders and descenders",
+            "ბ გ დ ლ ო ჟ რ ყ შ ჩ ც ძ წ ჭ ხ ჯ ჰ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Mtavruli capitals",
+            "ᲡᲐᲥᲐᲠᲗᲕᲔᲚᲝ ᲗᲑᲘᲚᲘᲡᲘ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Asomtavruli and Nuskhuri",
+            "ႠႡႢႣ ⴀⴁⴂⴃ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Consonant clusters",
+            "მწვრთნელი გვბრდღვნის ბრწყინვალე"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Punctuation",
+            "გამარჯობა! \"კარგად\", ჻"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Digits and currency",
+            "₾ 1 000 2026 წ."
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Mixed with Latin",
+            "PDF/A-2b სტანდარტი ISO 32000-1"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "მხედრული, მთავრული, ასომთავრული",
+        "თანხმოვანთა კომპლექსები",
+        "PDF/A-2b მხარდაჭერა"
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Armenian (hy) — Հայերեն փաստաթուղթ – ցուցադրություն",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "Այս փաստաթուղթը ցույց է տալիս pdfnative գրադարանով հայերեն PDF-ի ստեղծումը։ Էջում կան վերնագրեր, պարբերություններ, ցուցակ և աղյուսակ, և բոլոր տառերը, կապակցությունները և կետադրական նշանները երևում են մեկ էջում։"
+    },
+    {
+      "type": "table",
+      "headers": [
+        "What the row exercises",
+        "Sample"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "Lowercase and capitals",
+            "Հայաստան Երևան հայերեն ՀԱՅԵՐԵՆ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Ligature ev",
+            "և Սևան ևս սիրով"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Descenders and ascenders",
+            "ց փ ք ֆ ձ ղ ճ յ ռ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Armenian punctuation",
+            "Ինչպե՞ս ես։ Լա՛վ, շնորհակալությո՜ւն՝"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Abbreviation and apostrophe",
+            "և այլն՝ Ա. Բ. Գ. թ."
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Digits and currency",
+            "֏ 1 000 2026 թ."
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Mixed with Latin",
+            "PDF/A-2b ստանդարտ ISO 32000-1"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "Հայկական այբուբեն, երկու դեպք",
+        "և կապակցություն և կետադրություն",
+        "PDF/A-2b աջակցություն"
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Polish (pl) — Dokument polski – pokaz",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "Ten dokument pokazuje tworzenie PDF po polsku biblioteką pdfnative. Strona zawiera nagłówki, akapity, listę i tabelę; wszystkie znaki diakrytyczne, dwuznaki i polskie cudzysłowy są widoczne na jednej stronie."
+    },
+    {
+      "type": "table",
+      "headers": [
+        "What the row exercises",
+        "Sample"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "Ogonek",
+            "ą ę Ą Ę wąż węże"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Acute accents",
+            "ć ń ó ś ź Ć Ń Ó Ś Ź"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Stroke and dot",
+            "ł ż Ł Ż łódź żółw"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Digraphs",
+            "sz cz rz dz dź dż ch szczęście"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Pangram",
+            "Zażółć gęślą jaźń"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Quotes and dashes",
+            "„cudzysłów” — myślnik – półpauza"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Digits and currency",
+            "1 000,50 zł 2026 r."
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Mixed with English",
+            "PDF/A-2b norma ISO 32000-1"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "Dziewięć polskich znaków diakrytycznych",
+        "Dwuznaki i cudzysłowy",
+        "Wsparcie PDF/A-2b"
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Turkish (tr) — Türkçe belge – gösterim",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "Bu belge pdfnative kütüphanesiyle Türkçe PDF üretimini gösterir. Sayfada başlıklar, paragraflar, bir liste ve bir tablo vardır; noktalı ve noktasız i, yumuşak g ve çengelli harflerin tamamı tek sayfada görünür."
+    },
+    {
+      "type": "table",
+      "headers": [
+        "What the row exercises",
+        "Sample"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "Dotted and dotless i",
+            "İstanbul ılık İZMİR ısı IŞIK"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Soft g and cedillas",
+            "ağaç dağ çiçek şeker Şişli"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Umlauted vowels",
+            "gül ölçü Türkçe Ölçü ÜZÜM"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Circumflex",
+            "kâğıt hâlâ âlem rüzgâr"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Capitalisation",
+            "DİYARBAKIR ANKARA İÇİN"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Punctuation and quotes",
+            "“Merhaba” ‘dünya’ — 3’ü 5’i"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Digits and currency",
+            "₺ 1.000,50 %18 2026"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Mixed with English",
+            "PDF/A-2b standardı ISO 32000-1"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "İ ve ı ayrımı",
+        "Ğ Ş Ç Ö Ü harfleri",
+        "PDF/A-2b desteği"
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Vietnamese (vi) — Tài liệu tiếng Việt – trình diễn",
+      "level": 2
+    },
+    {
+      "type": "paragraph",
+      "text": "Tài liệu này minh họa việc tạo PDF tiếng Việt bằng thư viện pdfnative. Trang này có tiêu đề, đoạn văn, danh sách và bảng; mọi nguyên âm mang dấu, chữ đ và các dấu thanh chồng nhau đều hiện trên một trang."
+    },
+    {
+      "type": "table",
+      "headers": [
+        "What the row exercises",
+        "Sample"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "Six tones on one vowel",
+            "a à á ả ã ạ — e è é ẻ ẽ ẹ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Stacked diacritics",
+            "ấ ầ ẩ ẫ ậ ế ề ể ễ ệ ố ồ ổ ỗ ộ"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Horned letters",
+            "ơ ớ ờ ở ỡ ợ ư ứ ừ ử ữ ự Ơ Ư"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Breve and d with stroke",
+            "ắ ằ ẳ ẵ ặ đ Đ Đà Nẵng"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Capitals with tones",
+            "VIỆT NAM HÀ NỘI SÀI GÒN"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Sentence",
+            "Tiếng Việt có sáu thanh điệu và bảy nguyên âm cơ bản."
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Digits and currency",
+            "₫ 1.000.000 15/09/2026"
+          ],
+          "type": "normal",
+          "pointed": false
+        },
+        {
+          "cells": [
+            "Mixed with English",
+            "PDF/A-2b tiêu chuẩn ISO 32000-1"
+          ],
+          "type": "normal",
+          "pointed": false
+        }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "Sáu thanh điệu, dấu chồng dấu",
+        "Chữ ơ ư đ",
+        "Hỗ trợ PDF/A-2b"
+      ]
+    }
+  ]
+}
