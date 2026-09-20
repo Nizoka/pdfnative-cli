@@ -181,7 +181,7 @@ rendered with their font, `metrics: "exact"` inert in its own sample — all clo
 
 - `npm run typecheck:all` → clean (three configs). `npm run lint` → clean.
 - `npm run test:coverage` → **1387 / 1387 passing across 96 files**; coverage
-  statements 85.99 % / branches 75.83 % / functions 92.53 % / lines 87.89 %
+  statements 86.06 % / branches 75.91 % / functions 92.59 % / lines 87.92 %
   (thresholds raised 79/68/83/79 → 82/71/86/82, `min(measured − 2, current + 3)`).
 - `npm run verify:docs` → 26 rules across the documentation corpus, 0 errors
   (156 `eol-lf` warnings, shrinking as touched files normalise: CRLF blobs pending the maintainer's renormalisation commit).
@@ -190,11 +190,11 @@ rendered with their font, `metrics: "exact"` inert in its own sample — all clo
 - `npm run corpus:pdfa && npm run validate:pdfx` → 22 files; PDF/X 3 PASS + 1 XFAIL.
 - `npm run validate:pdfa` with veraPDF 1.30.2 (portable) + JDK 13 (`JAVACMD`) →
   14 PASS + 4 XFAIL + 4 SKIP (the PDF/X files), exit 0.
-- `npx tsx scripts/gate.ts --publish --require-all` at `b1f87c3` → **14 passed, 0 skipped
-  in 355 s** (typecheck:all 25 s, lint 8 s, build 13 s, dist-check, smoke — 21 commands —,
+- `npx tsx scripts/gate.ts --publish --require-all` at `d4d8530` → **14 passed, 0 skipped
+  in 437 s** (typecheck:all 26 s, lint 10 s, build 10 s, dist-check, smoke — 21 commands —,
   bundle-size 368 KiB of the 448 KiB budget, bundle-check — 2 externals —, test:generate
-  40 s — 79 PDFs —, test:coverage 138 s — 1387 tests, 86.0 % stmts —, verify:docs 5 s,
-  verify:samples 5 s, corpus:pdfa 13 s, validate:pdfx 6 s, validate:pdfa 101 s).
+  44 s — 91 sample PDFs —, test:coverage 130 s — 1387 tests, 86.1 % stmts —, verify:docs 8 s,
+  verify:samples 10 s, corpus:pdfa 30 s — 22 files —, validate:pdfx 11 s, validate:pdfa 158 s).
 - Built binary smoke: `--version` 1.5.0; `doctor --json` (pdfnative 1.8.0, fonts
   31/27, unicode, conformance); PDF/X-4 render → `inspect --check pdfx` exit 0 →
   `annotate` link → `--check pdfx` exit 1; identical SHA-256 under `TZ=Europe/Paris`
