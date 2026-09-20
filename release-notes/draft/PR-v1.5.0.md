@@ -21,7 +21,7 @@ Counts: 21 commands, 19 schema subjects, 12 stable error codes and 14 manifest c
 unchanged; global flags 9 → 10 (`--creation-date`); `render` flags 44 → 57; `inspect`
 14 → 16; `sign` 21 → 23; `--font` 22 → 27 scripts (+ 4 aliases); `--strict` diagnostics
 3 → 9; `doctor` checks 5 → 8; conformance corpus 12 → 16 files; workflows 5 → 9;
-tests 600 → 1237 across 88 files.
+tests 600 → 1237 across 90 files.
 
 ## Changes
 
@@ -101,7 +101,7 @@ tests 600 → 1237 across 88 files.
   `render/reproducible/`, `inspect/09-10`, `doctor/02`, `annotate/02`, `verify/07`,
   `sign/10`, `agent/05`; multilang drivers honour `PDFNATIVE_SAMPLES_OUT` /
   `SOURCE_DATE_EPOCH`; `tests/regression/baselines/samples.sha256.json` (79 entries).
-- Tests: 1237 across 88 files (was 600) — `tests/helpers/cli-harness.ts`, per-feature
+- Tests: 1237 across 90 files (was 600) — `tests/helpers/cli-harness.ts`, per-feature
   command suites, utils, `integration/{pdfx-roundtrip,reproducible-build}`,
   `tools/{gate,verapdf,pdfx,workflows,sample-plan,verify-docs,cli-surface,agent-config,
   build-claude-rules,release-prepare,guard}`, `regression/samples`, `docs/prose-language`.
@@ -160,7 +160,7 @@ edited and not reproduced in 11 consecutive full runs on a quiet tree.
 ## Validation (what actually ran on the release branch, Windows 11, Node 22.17.0)
 
 - `npm run typecheck:all` → clean (three configs). `npm run lint` → clean.
-- `npm run test:coverage` → **1237 / 1237 passing across 88 files**; coverage
+- `npm run test:coverage` → **1237 / 1237 passing across 90 files**; coverage
   statements 85.99 % / branches 75.83 % / functions 92.53 % / lines 87.89 %
   (thresholds raised 79/68/83/79 → 82/71/86/82, `min(measured − 2, current + 3)`).
 - `npm run verify:docs` → 26 rules across the documentation corpus, 0 errors

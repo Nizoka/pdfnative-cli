@@ -135,9 +135,10 @@ export function diagnosticCodes(envelope: Record<string, unknown>): string[] {
     return list.map((d) => d.code);
 }
 
+export interface LaidOutBlock { readonly type: string; readonly page: number; readonly top: number; readonly height: number }
 export interface LayoutReport {
     readonly totalPages: number;
-    readonly [key: string]: unknown;
+    readonly pages: readonly { readonly index: number; readonly blocks: readonly LaidOutBlock[] }[];
 }
 
 /**
