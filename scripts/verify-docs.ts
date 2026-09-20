@@ -488,6 +488,7 @@ export async function verifyDocs(root: string, options: VerifyOptions = {}): Pro
             { pattern: /\((\d+)\+?\s+(?:test\s+)?files\b/g, source: 'derived.testFiles', mode: 'equal' },
             { pattern: /\b(\d+)\+?\s+test files\b/g, source: 'derived.testFiles', mode: 'equal' },
             { pattern: /\b(\d+)\s+sample PDFs\b/g, source: 'derived.samplePdfs', mode: 'equal' },
+            { pattern: /\b(\d+)-sample (?:byte\/semantic )?baseline\b/g, source: 'derived.samplePdfs', mode: 'equal' },
             { pattern: /\b(\d+)\s+sample scripts\b/g, source: 'derived.sampleScripts', mode: 'equal' },
             { pattern: /\b(\d+)\s+(?:dual-shell\s+)?sample pairs\b/g, source: 'derived.sampleScripts', mode: 'equal' },
             { pattern: /\b(\d+)\s+render samples\b/g, source: 'derived.renderSamples', mode: 'equal' },

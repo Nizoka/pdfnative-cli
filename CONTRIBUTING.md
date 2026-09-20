@@ -353,6 +353,25 @@ agent) and **merged, tagged and published by the maintainer only**:
    attestations to the release. Afterwards `npm view pdfnative-cli version` confirms the
    publish and the weekly `docs.yml --online` run confirms the manifest against npm.
 
+### Bumping the engine pin
+
+Moving `pdfnative` to a new release is adopting that release: every user-facing entry of its
+changelog must end up exercised through the CLI, or waived in writing. In the same change:
+
+1. Read the engine's changelog entry; extend `tests/regression/engine-surface.json` with one item
+   per bullet — named tests and baseline samples, or a waiver (`LIB`, `TOOLING`, `DOCS`,
+   `tested-upstream` with its transmission suite, `upstream-limit`). Set `engine` to the new
+   version: `tests/regression/engine-surface.test.ts` fails until the matrix follows the pin, and
+   (with the engine checked out next to this repository) until every bullet has an item.
+2. A new diagnostic code goes in `src/commands/schema.ts` (`status`), the `render` usage text,
+   `declared.diagnosticCodes` **and** `tests/helpers/diagnostic-triggers.ts` — a code the docs
+   name is a code a test triggers.
+3. A new script code gets a string in `tests/helpers/script-text.ts` and a sample that loads its
+   font; a new `TypographyOptions` key gets a sample that sets it.
+4. Refresh `tests/fixtures/pdfnative-build-errors.json` from the engine's error registry, re-run
+   the `it.fails` markers of `tests/commands/render-scripts.test.ts` (a fixed upstream limit
+   turns them red: delete the marker), regenerate the samples and declare any rebaseline.
+
 ### Branch protection
 
 The rules for `main` are versioned in [.github/rulesets/main.json](.github/rulesets/main.json),

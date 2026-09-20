@@ -107,7 +107,7 @@ scripts/                  # (v1.5.0) repository tooling — TypeScript, run with
 tests/
 ├── commands/ utils/ integration/ tools/ regression/ docs/   # vitest suites (helpers/cli-harness.ts, fixtures/)
 ├── helpers/der.ts + mock-pki.ts   # (v1.4.0) Offline mock PKI: in-process RFC 3161 TSA + OCSP/CRL responders
-└── regression/baselines/samples.sha256.json   # (v1.5.0) the sample baseline — 79 entries, chained by `since`
+└── regression/baselines/samples.sha256.json   # (v1.5.0) the sample baseline — 91 sample PDFs, chained by `since`
 ```
 
 ### Data Flow
@@ -333,13 +333,27 @@ pdfnative render [--input <file.json>] [--output <out.pdf>] [--stream|--stream-p
 **Typography (v1.5.0, pdfnative ≥ 1.8.0 — `layout.typography`):**
 - Paragraph breaking — `widows`, `orphans`, `splitParagraphs`, `keepHeadingsWithNext: true | { minLines }`; block-level `keepWithNext` / `splittable`.
 - Line composition — paragraph `align: "justify"` (a block property, not a typography key), `opticalMargins`, soft hyphens (an existing U+00AD is always a break opportunity — there is no switch), `hyphenationLanguage`, `punctuationSpacing: "fr" | "fr-CA" | [{ char, side, space }]` (narrow no-break spaces before `; : ! ?` and inside guillemets; the presets or an explicit rules array — an object is not a valid form), `unitBinding` (a number never separates from its unit or currency), `bindShortWords: { maxLength, words }`.
-- Glyphs — `kerning` (GPOS pairs of embedded fonts), `fontFeatures` (OpenType tags such as `onum`, `smcp`, `tnum`; the engine applies no ligature feature, so `liga` reports `TYPOGRAPHY_FEATURE_INEFFECTIVE`), `metrics: "exact"` (base-14 widths from the real metrics). These are the engine's `TypographyOptions` keys verbatim (`schema render` describes them); an unknown key is silently ignored by the engine.
+- Glyphs — `kerning` (GPOS pairs of embedded fonts), `fontFeatures` (OpenType tags such as `onum`, `smcp`, `tnum`; the engine applies no ligature feature, so `liga` reports `TYPOGRAPHY_FEATURE_INEFFECTIVE`), `metrics: "exact"` (base-14 widths from the real metrics — it acts only where NO registered font measures the text, so it is inert under `--font`; `samples/render/base14/` shows it). From untagged output, glyphs a feature substitutes extract as their source characters (`onum`) unless they have code points of their own (`subs`, `sups` return the subscript / superscript characters); tagged output returns the source text. These are the engine's `TypographyOptions` keys verbatim (`schema render` describes them); an unknown key is silently ignored by the engine.
 - Flags: `--split-paragraphs`, `--keep-headings-with-next`, `--kerning`, `--font-features <tag,…>`. Precedence: flags > `--layout` file > document `layout`; `typography` and `outputIntent` merge one level deep (`mergeNestedLayout`), every other layout key is replaced whole.
 - A feature the font cannot honour emits `TYPOGRAPHY_FEATURE_INEFFECTIVE` (warning, or `E_CHECK_FAILED` under `--strict`). Tagged output carries `/ActualText`, so `extract-text` returns the source text.
 
 **CMYK and PDF/X-4 (v1.5.0):**
 - Every colour field and colour flag (`--watermark-color`, `--zebra`, chart series, table styles, annotation colours) accepts CMYK as `"c m y k"` (components 0–1) or `[c, m, y, k]` (percent) beside hex / `r g b` / `[r,g,b]`; the content stream then carries `k` / `K` operators.
-- `layout.pdfx: "pdfx4"` (`--pdfx pdfx4`) requires a `prtr` CMYK `outputIntent`, embedded fonts (`--font latin --lang latin`), `trapped` `true` or `false`, and no encryption or PDF/A in the same file; the engine's coherence messages map to `E_INPUT` (`src/utils/build-errors.ts`), the `PDFX_*` diagnostics to `--strict`. The XMP carries `pdfxid:GTS_PDFXVersion`; `inspect --pdfx` / `--check pdfx` re-validate with `validatePdfX` (structural, not a certified preflight). `metadata` rewrites the XMP without the PDF/X identification (upstream limit — see ROADMAP.md).
+- `layout.pdfx: "pdfx4"` (`--pdfx pdfx4`) requires a `prtr` (output-class) `outputIntent` — CMYK for a colour job, Gray for a one-ink job (`samples/render/print/06-gray-pdfx4.json`); device colour must match it (`PDFX_DEVICE_CMYK`) — embedded fonts (`--font latin --lang latin`), `trapped` `true` or `false`, and no encryption or PDF/A in the same file; the engine's coherence messages map to `E_INPUT` (`src/utils/build-errors.ts`), the `PDFX_*` diagnostics to `--strict`. The XMP carries `pdfxid:GTS_PDFXVersion`; `inspect --pdfx` / `--check pdfx` re-validate with `validatePdfX` (structural, not a certified preflight). `metadata` rewrites the XMP without the PDF/X identification (upstream limit — see ROADMAP.md).
+
+**The nine diagnostics (v1.5.0, pdfnative 1.8.0).** A diagnostic is a warning — `warning: [CODE] …` on stderr and `diagnostics[]` in the `--json` envelope, the file is still written — until `--strict` turns it into `E_CHECK_FAILED` (exit 1, nothing written). `tests/helpers/diagnostic-triggers.ts` holds one minimal trigger per code.
+
+| Code | Raised when | Fix |
+|------|-------------|-----|
+| `PDFA_NO_FONT_ENTRIES` | a PDF/A claim with no embedded font (base-14 text) | `--font latin --lang latin` |
+| `PDFA_UNEMBEDDED_FORM_FONT` | a `formField` under a PDF/A claim with no embedded font covering basic Latin | embed a Latin font: the fields' `/DR` font is then the embedded one |
+| `PDFA_DEVICE_CMYK_IMAGE` | a CMYK JPEG under a PDF/A claim whose output intent is not CMYK | an RGB image, or a CMYK `--output-intent-icc` |
+| `PDFA_DEVICE_CMYK_CONTENT` | a CMYK colour under a PDF/A claim whose output intent is not CMYK | RGB colours, or a CMYK `--output-intent-icc` |
+| `PDFA_ICC_PROFILE_VERSION` | `--tagged pdfa1b` with an ICC v4 output profile (PDF/A-1 requires v2, ISO 19005-1 §6.2.2) | an ICC v2 profile, or `pdfa2b` / `pdfa2u` / `pdfa3b` |
+| `PDFX_NO_FONT_ENTRIES` | `--pdfx` with no embedded font | `--font latin --lang latin` |
+| `PDFX_DEVICE_CMYK` | a CMYK colour or image under `--pdfx` whose output intent is Gray or RGB | a CMYK output profile, or no CMYK content |
+| `PDFX_ANNOTATIONS` | a `link`, `toc` or `formField` block under `--pdfx` (annotations inside the BleedBox) | drop them from the print version |
+| `TYPOGRAPHY_FEATURE_INEFFECTIVE` | a `fontFeatures` tag that changes nothing: the font lacks it (`tnum` on Noto Sans), or no registered font declares it (base-14 run) | a font that carries the feature, or drop the tag |
 
 **Reproducible output (v1.5.0):** the global `--creation-date <iso8601>` (or `SOURCE_DATE_EPOCH`) calls `setDefaultCreationDate()` once per process; `/CreationDate`, `xmp:CreateDate`, the `{date}` placeholder and the trailer `/ID` derive from it, in UTC. A `creationDate` string in a `--layout` file or the document `layout` is revived to a `Date` (`reviveLayoutJson`); the flag wins. Encrypted output is never reproducible (CSPRNG keys); `sign --signing-time` and `metadata --mod-date` are separate instants.
 
@@ -1073,7 +1087,7 @@ See [AGENT_CONTRACT.md](AGENT_CONTRACT.md) for the full consumer contract and
 | Unsafe `link` URL (v1.5.0) | `validateURL` (`http`, `https`, `mailto`; no `javascript:`, no control characters) and PDF-string escaping before the `/URI` action |
 | Supply-chain risk | Zero extra runtime dependencies; Trusted Publishing (OIDC, npm ≥ 11.5.1) with provenance; CycloneDX SBOM + build attestations on each release; harden-runner + SHA-pinned actions on every job; `npm ci --ignore-scripts`; Dependabot + dependency review + weekly `npm audit`; CodeQL + Scorecard; committed rulesets; a HITL guard hook for agents |
 | False PDF/A conformance claims | Blocking veraPDF CI gate (`.github/workflows/verapdf.yml` + the publish gate in `publish.yml`): a CLI-generated 16-file corpus is validated against the veraPDF reference validator, with negative canaries an "accepts-everything" validator would expose. veraPDF is an **external CI tool**, never bundled — the zero-extra-runtime-dependency policy is unchanged — and its pinned 1.30.2 installer's SHA-256 is verified before `java -jar` executes it |
-| False PDF/X-4 conformance claims (v1.5.0) | The same corpus carries three PDF/X-4 files (one a negative canary) validated in-process by `validatePdfX` (`scripts/validate-pdfx.ts`, never skipped); `render --pdfx` refuses incoherent input (`E_INPUT`) and `--strict` refuses `PDFX_*` diagnostics before any byte is written |
+| False PDF/X-4 conformance claims (v1.5.0) | The same corpus carries four PDF/X-4 files (a CMYK and a Gray intent, a signed render, one negative canary) validated in-process by `validatePdfX` (`scripts/validate-pdfx.ts`, never skipped); `render --pdfx` refuses incoherent input (`E_INPUT`) and `--strict` refuses `PDFX_*` diagnostics before any byte is written |
 | Non-deterministic output (v1.5.0) | `--creation-date` / `SOURCE_DATE_EPOCH` pin every date in UTC; the sample corpus is held to a committed SHA-256 baseline (`verify:samples`, required in CI); invalid pins are usage errors, never ignored |
 
 ### Network model (v1.4.0)
@@ -1212,8 +1226,11 @@ npm test
 npm run test:coverage
 
 # Samples — the byte baseline (tests/regression/baselines/samples.sha256.json)
-npm run test:generate          # 79 PDFs into test-output/samples/ with the BUILT CLI, TZ=UTC, pinned date
+npm run test:generate          # 91 sample PDFs into test-output/samples/ with the BUILT CLI, TZ=UTC, pinned date
 npm run verify:samples         # compare; `npx tsx scripts/verify-samples.ts --update` rebaselines (declare it)
+
+# Engine surface — tests/regression/engine-surface.json maps every pdfnative changelog bullet to tests + samples
+npx vitest run tests/regression/engine-surface.test.ts
 
 # Conformance corpus — 22 corpus files (PDF/A via veraPDF, an external tool; PDF/X in-process)
 npm run corpus:pdfa            # generate test-output/pdfa/ (needs a prior npm run build)
@@ -1253,13 +1270,14 @@ Complete, runnable examples live in [`samples/`](../samples/), organized by feat
 | [`render/link/`](../samples/render/link/) | 1 | Resource directory with hyperlinks |
 | [`render/watermark/`](../samples/render/watermark/) | 2 | Draft and confidential watermarks |
 | [`render/layout/`](../samples/render/layout/) | 3 | US Letter, A5 portrait, A4 landscape |
-| [`render/pdfa/`](../samples/render/pdfa/) | 4 | PDF/A-1b, PDF/A-2b, PDF/A-2u, PDF/A-3b archival conformance (rendered with `--font latin --lang latin`; veraPDF-validated in CI) |
+| [`render/pdfa/`](../samples/render/pdfa/) | 5 | PDF/A-1b, PDF/A-2b, PDF/A-2u, PDF/A-3b archival conformance, (v1.5.0) an AcroForm under PDF/A-2b (rendered with `--font latin --lang latin`; veraPDF-validated in CI) |
 | [`render/chart/`](../samples/render/chart/) | 5 | Native vector charts — incl. (v1.4.0) stacked bars, area + dual axes, log-scale scatter, time x-axis |
-| [`render/print/`](../samples/render/print/) | 5 | Print production (`layout.print` bleed/marks) + viewer preferences; (v1.5.0) CMYK colours, colour bars, PDF/X-4 with a synthetic CMYK profile |
-| [`render/typography/`](../samples/render/typography/) | 4 | (v1.5.0) Paragraph breaking, justify + optical margins + soft hyphens, French spacing + unit binding, kerning + OpenType features + exact metrics |
+| [`render/print/`](../samples/render/print/) | 7 | Print production (`layout.print` bleed/marks) + viewer preferences; (v1.5.0) CMYK colours, colour bars, PDF/X-4 with a synthetic CMYK profile |
+| [`render/typography/`](../samples/render/typography/) | 7 | (v1.5.0) Paragraph breaking, justify + optical margins + soft hyphens, French (`fr`, `fr-CA`) and custom punctuation spacing, unit binding, kerning + OpenType features, per-block `keepWithNext` / `splittable` |
+| [`render/base14/`](../samples/render/base14/) | 1 | (v1.5.0) `layout.typography.metrics: "exact"` on the base-14 path (no `--font` flag) |
 | [`render/reproducible/`](../samples/render/reproducible/) | 2 + 1 pair | (v1.5.0) `--creation-date` / `SOURCE_DATE_EPOCH`; the double-render script proves byte identity across timezones |
-| [`render/multilang/`](../samples/render/multilang/) | 7 + 2 drivers | Thai, Japanese, multilingual; (v1.5.0) Lao, Tai Tham / New Tai Lue / Tai Le / Cham, Hausa / Yoruba / Igbo / Swahili |
-| [`render/font/`](../samples/render/font/) | 4 + 5 pairs | Latin, the 1.3.0 scripts, emoji; (v1.5.0) the five 1.8.0 scripts and `--font-file` |
+| [`render/multilang/`](../samples/render/multilang/) | 11 + 2 drivers | Thai, Japanese, multilingual; (v1.5.0) Lao, Tai Tham / New Tai Lue / Tai Le / Cham, Hausa / Yoruba / Igbo / Swahili, and four script families (European & Caucasian, RTL, Indic, Chinese & Korean) |
+| [`render/font/`](../samples/render/font/) | 5 + 6 pairs | Latin, the 1.3.0 scripts, emoji; (v1.5.0) the five 1.8.0 scripts, `--font-file`, colour-emoji sequences |
 | [`sign/`](../samples/sign/) | 10 pairs | Digital signature (Bash + PowerShell) — incl. `06-timestamp.*` PAdES B-T, `08-ltv.*` full PAdES ladder, `09-multiple-signatures.*`, (v1.5.0) `10-timestamp-timeout.*` |
 | [`verify/`](../samples/verify/) | 7 pairs | Trust roots, strict mode, RSA/ECDSA, revocation, (v1.5.0) `07-weak-digest.*` |
 | [`inspect/`](../samples/inspect/) | 10 pairs | JSON/text inspection, CI `--check` gates, PDF/UA, annotations, `--signatures` inventory, (v1.5.0) `09-check-pdfx.*`, `10-iso-dates.*` |
@@ -1274,7 +1292,7 @@ Complete, runnable examples live in [`samples/`](../samples/), organized by feat
 Generate every sample at once — the same run the CI baseline uses:
 
 ```bash
-npm run build && npm run test:generate      # 79 PDFs → test-output/samples/ (byte-stable)
+npm run build && npm run test:generate      # 91 sample PDFs → test-output/samples/ (byte-stable)
 npx tsx scripts/verify-samples.ts           # compare with the committed baseline
 ```
 

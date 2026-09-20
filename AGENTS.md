@@ -47,7 +47,7 @@ One suite: `npx vitest run tests/<path>.test.ts` (dot reporter). Smoke-test the 
 | `src/utils/` | args/argv, io, error codes, envelopes, projection, layout (PDF/X, typography), fonts, reproducible dates, build errors, PKI, fetch-guard | `commands.instructions.md` |
 | `src/core-bridge/index.ts` | The single `pdfnative` import point (selective re-exports, `pdfnative/tools` included) | `copilot-instructions.md` |
 | `scripts/` | gate, sample generator (`generators/`, `helpers/`, `lib/`), baseline, conformance corpus + validators, verify-docs, release-prepare | `testing.instructions.md` |
-| `tests/` | vitest: `commands/`, `utils/`, `integration/`, `tools/`, `regression/` (sample baseline), `fuzz/` (hostile input), `docs/`; `helpers/`, `fixtures/` | `testing.instructions.md` |
+| `tests/` | vitest: `commands/`, `utils/`, `integration/`, `tools/`, `regression/` (sample baseline, engine-surface matrix), `fuzz/` (hostile input), `docs/`; `helpers/`, `fixtures/` | `testing.instructions.md` |
 | `samples/` | Runnable dual-shell demos (`.sh` + `.ps1`, one pair per feature) and the JSON documents the generator renders | `samples/README.md` |
 | `docs/` | `KNOWLEDGE_BASE.md` (deep reference), `AGENT_CONTRACT.md` (consumer contract), `assets/ecosystem.json` (every count and version) | — |
 
@@ -62,7 +62,8 @@ Adding or changing a command touches ALL of these (`verify:docs` rules `command-
 
 1. `src/commands/<name>.ts`, and `src/index.ts` (USAGE list, `<NAME>_USAGE`, the `--help` and `loadCommand()` switches).
 2. `src/commands/completion.ts` (flags) and `src/commands/schema.ts` (subject, `status` fields); `utils/error.ts` + `utils/agent.ts` for a new code.
-3. `tests/`, `samples/<name>/` (`.sh` + `.ps1`), and `scripts/lib/sample-plan.ts` or `scripts/generators/` when the output belongs in the baseline.
+3. `tests/`, `samples/<name>/` (`.sh` + `.ps1`), and `scripts/lib/sample-plan.ts` or `scripts/generators/` when the output belongs in the baseline;
+   an engine feature also gets its item in `tests/regression/engine-surface.json`.
 4. README command reference, `docs/KNOWLEDGE_BASE.md`, `docs/AGENT_CONTRACT.md`, `llms.txt`, `docs/assets/ecosystem.json`.
 
 ## Consumer contract in brief
@@ -88,7 +89,7 @@ Adding or changing a command touches ALL of these (`verify:docs` rules `command-
 
 ## Counts and versions
 
-21 commands, 19 subjects, 12 stable error codes, 10 global flags, 27 Unicode scripts (31 font modules), 1237 tests, 91 sample PDFs in the baseline, 22 corpus files.
+21 commands, 19 subjects, 12 stable error codes, 10 global flags, 27 Unicode scripts (31 font modules), 1387 tests, 91 sample PDFs in the baseline, 22 corpus files.
 `docs/assets/ecosystem.json` is the source of every count and version quoted in the docs; run `npm run verify:docs` after touching any of them.
 Coverage: ≥ 82 % statements enforced by CI (the thresholds live once in `vitest.config.ts`). Engine: pdfnative 1.8.0 (`^1.8.0`); Node ≥ 22.
 

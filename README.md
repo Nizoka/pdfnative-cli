@@ -55,7 +55,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 - **Reproducible output (v1.5.0)** — the global `--creation-date <iso8601>` (or
   `SOURCE_DATE_EPOCH`) pins `/CreationDate`, `xmp:CreateDate`, the `{date}` placeholder and
   the trailer `/ID`, all in UTC, so the same input renders to **byte-identical** bytes on every
-  host and in every timezone. The repository's own 79-sample baseline is held to that promise.
+  host and in every timezone. The repository's own 91-sample baseline is held to that promise.
 - **27 scripts & custom fonts (v1.5.0)** — `--font lo|nod|khb|tdd|cjm` add Lao, Tai Tham,
   New Tai Lue, Tai Le and Cham; `ha`/`yo`/`ig`/`sw` alias `latin` for Hausa, Yoruba, Igbo and
   Swahili; `--font-file <path.ttf>[:name]` registers your own TrueType/OpenType file (32 MiB
@@ -134,7 +134,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
   `tests/regression/baselines/samples.sha256.json`), a PDF/A + PDF/X conformance corpus,
   hardened workflows (egress-audited runners, SHA-pinned actions, Trusted Publishing, SBOM +
   build attestations), a documentation verifier (`npm run verify:docs`) and a committed
-  Claude Code layer with a human-in-the-loop guard hook — 1237 tests.
+  Claude Code layer with a human-in-the-loop guard hook — 1387 tests.
 - **AI-governance / HITL** — the **`govern`** command surfaces pdfnative's Human-in-the-Loop
   contract to agents: they act as *draftsmen*, never autonomous submitters. `govern
   verify-issue` gates a local draft; a human always reviews and submits.
@@ -615,16 +615,17 @@ Ready-to-run examples are in [`samples/`](samples/), organized by feature catego
 | [`render/watermark/`](samples/render/watermark/) | 3 files | Draft watermark, confidential watermark, CLI-flag styling |
 | [`render/layout/`](samples/render/layout/) | 3 files | US Letter, A5 portrait, A4 landscape |
 | [`render/headers-footers/`](samples/render/headers-footers/), [`template/`](samples/render/template/) | 1 + 2 files | Page-number placeholders; `--template` deep-merge |
-| [`render/pdfa/`](samples/render/pdfa/), [`attachments/`](samples/render/attachments/) | 4 + 1 files | PDF/A-1b, PDF/A-2b, PDF/A-2u, PDF/A-3b archival conformance; PDF/A-3b XML attachment |
+| [`render/pdfa/`](samples/render/pdfa/), [`attachments/`](samples/render/attachments/) | 5 + 1 files | PDF/A-1b, PDF/A-2b, PDF/A-2u, PDF/A-3b archival conformance; (v1.5.0) an AcroForm under PDF/A-2b; PDF/A-3b XML attachment |
 | [`render/encryption/`](samples/render/encryption/) | 2 files | AES-128 / AES-256 protected renders |
 | [`render/outline/`](samples/render/outline/) | 2 files | PDF bookmarks — `--outline auto` + explicit tree |
 | [`render/math/`](samples/render/math/) | 1 file | Math/technical symbols via `--font math` |
 | [`render/inspect-layout/`](samples/render/inspect-layout/) | scripts | `--inspect-layout` report + `--debug-layout` guides |
-| [`render/font/`](samples/render/font/) | 4 files | Bundled font presets: Latin, the 1.3.0 scripts, emoji, (v1.5.0) the five 1.8.0 scripts and `--font-file` |
-| [`render/multilang/`](samples/render/multilang/) | 7 files | Thai, Japanese, multilingual drivers, (v1.5.0) Lao, Tai Tham / New Tai Lue / Tai Le / Cham, Hausa / Yoruba / Igbo / Swahili |
+| [`render/font/`](samples/render/font/) | 5 files | Bundled font presets: Latin, the 1.3.0 scripts, emoji, (v1.5.0) the five 1.8.0 scripts, `--font-file`, colour-emoji skin tones / ZWJ sequences / flags |
+| [`render/multilang/`](samples/render/multilang/) | 11 files | Thai, Japanese, multilingual drivers, (v1.5.0) Lao, Tai Tham / New Tai Lue / Tai Le / Cham, Hausa / Yoruba / Igbo / Swahili, and four families (European & Caucasian, right-to-left, Indic, Chinese & Korean) — every one of the 27 script codes is rendered by the corpus |
 | [`render/chart/`](samples/render/chart/) | 5 files | Native vector charts — bar/line/pie/donut plus (v1.4.0) stacked bars, area/scatter, dual axes, log & time axes |
-| [`render/print/`](samples/render/print/) | 5 files | Print production — bleed/trim boxes + printer's marks, viewer preferences, (v1.5.0) CMYK colours, colour bars, PDF/X-4 with a synthetic CMYK profile |
-| [`render/typography/`](samples/render/typography/) | 4 files | (v1.5.0) Paragraph breaking, justify + optical margins + soft hyphens, French spacing + unit binding, kerning + OpenType features + exact metrics |
+| [`render/print/`](samples/render/print/) | 7 files | Print production — bleed/trim boxes + printer's marks, viewer preferences, (v1.5.0) CMYK colours, colour bars, PDF/X-4 with a synthetic CMYK profile |
+| [`render/typography/`](samples/render/typography/) | 7 files | (v1.5.0) Paragraph breaking, justify + optical margins + soft hyphens, French (`fr`, `fr-CA`) and custom punctuation spacing, unit binding, kerning + OpenType features, per-block `keepWithNext` / `splittable` |
+| [`render/base14/`](samples/render/base14/) | 1 file | (v1.5.0) `layout.typography.metrics: "exact"` on the base-14 path — rendered with no `--font` flag, the only place the option acts |
 | [`render/reproducible/`](samples/render/reproducible/) | 2 files | (v1.5.0) `--creation-date` / `SOURCE_DATE_EPOCH` — the double-render script proves byte identity across timezones |
 | [`render/watch/`](samples/render/watch/) | scripts | `--watch` re-render on change |
 | [`merge/`](samples/merge/) | scripts | Concatenate PDFs (page-tree) |
@@ -649,7 +650,7 @@ Ready-to-run examples are in [`samples/`](samples/), organized by feature catego
 **Render every sample at once** (the same run the CI baseline uses):
 
 ```bash
-npm run build && npm run test:generate     # → test-output/samples/ (79 PDFs, byte-stable)
+npm run build && npm run test:generate     # → test-output/samples/ (91 sample PDFs, byte-stable)
 npx tsx scripts/verify-samples.ts          # compare with tests/regression/baselines/samples.sha256.json
 ```
 
@@ -720,7 +721,7 @@ The 21 commands are grouped by purpose (the global `pdfnative --help` shows the 
 (`widows`, `orphans`, `splitParagraphs`, `keepHeadingsWithNext: true | { minLines }`,
 `opticalMargins`, `punctuationSpacing: "fr" | "fr-CA" | [{ char, side, space }]`,
 `unitBinding`, `bindShortWords`, `hyphenationLanguage`, `kerning`, `fontFeatures: [tag, …]`,
-`metrics: "exact"`; soft hyphens U+00AD are honoured unconditionally), paragraph
+`metrics: "exact"` — base-14 path only, inert once `--font` registers a font; soft hyphens U+00AD are honoured unconditionally), paragraph
 `align: "justify"`, block-level `keepWithNext` / `splittable`; every colour accepts CMYK (`"c m y k"` 0–1 or
 `[c,m,y,k]` percent) beside hex / RGB; `layout.print.marks.colourBars: true | { tints, size }`;
 `layout.pdfx: "pdfx4"` with a `prtr` CMYK `layout.outputIntent` (`iccProfile` as a number

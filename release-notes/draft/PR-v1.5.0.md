@@ -21,7 +21,7 @@ Counts: 21 commands, 19 schema subjects, 12 stable error codes and 14 manifest c
 unchanged; global flags 9 → 10 (`--creation-date`); `render` flags 44 → 57; `inspect`
 14 → 16; `sign` 21 → 23; `--font` 22 → 27 scripts (+ 4 aliases); `--strict` diagnostics
 3 → 9; `doctor` checks 5 → 8; conformance corpus 12 → 22 files; workflows 5 → 9;
-tests 600 → 1237 across 96 files.
+tests 600 → 1387 across 96 files.
 
 ## Changes
 
@@ -100,8 +100,8 @@ tests 600 → 1237 across 96 files.
   `synthetic-cmyk.icc`, `render/multilang/05-07`, `render/font/04-05`,
   `render/reproducible/`, `inspect/09-10`, `doctor/02`, `annotate/02`, `verify/07`,
   `sign/10`, `agent/05`; multilang drivers honour `PDFNATIVE_SAMPLES_OUT` /
-  `SOURCE_DATE_EPOCH`; `tests/regression/baselines/samples.sha256.json` (79 entries).
-- Tests: 1237 across 96 files (was 600) — `tests/helpers/cli-harness.ts`, per-feature
+  `SOURCE_DATE_EPOCH`; `tests/regression/baselines/samples.sha256.json` (91 sample PDFs).
+- Tests: 1387 across 96 files (was 600) — `tests/helpers/cli-harness.ts`, per-feature
   command suites, utils, `integration/{pdfx-roundtrip,reproducible-build}`,
   `tools/{gate,verapdf,pdfx,workflows,sample-plan,verify-docs,cli-surface,agent-config,
   build-claude-rules,release-prepare,guard}`, `regression/samples`, `docs/prose-language`.
@@ -157,15 +157,35 @@ edited and not reproduced in 11 consecutive full runs on a quiet tree.
 
 **Verdict: GO** — no open blocker, every major has a commit, publish gate green (below).
 
+## Engine-surface coverage closure
+
+After the audit, every user-facing bullet of the pdfnative 1.8.0 changelog was mapped to the
+CLI's tests and samples (`tests/regression/engine-surface.json`, 85 items: tests + samples, or a
+motivated waiver). The mapping found about thirty gaps — four 1.8.0 fixes with no CLI coverage
+(AcroForm `/DR` font under PDF/A, `--inspect-layout` with a table of contents, `fr` ≡ `fr-CA`,
+marks clearance), five of nine diagnostic codes never triggered, 14 of 27 script codes never
+rendered with their font, `metrics: "exact"` inert in its own sample — all closed:
+
+- 10 new suites; a trigger table for the 9 diagnostics; the 27 scripts rendered under
+  `--tagged pdfa2b --strict`; a transmission contract for `validatePdfX` on crafted PDFs.
+- 12 samples + 10 dual-shell pairs (validated under Git Bash and PowerShell); baseline 79 → 91,
+  additions only. Conformance corpus 16 → 22 (veraPDF: form under PDF/A-2b, Gray and CMYK
+  intents pass; unembedded form font and ICC v4 under PDF/A-1b are rejected).
+- A generated, veraPDF-accepted Gray `prtr` ICC profile (`scripts/lib/synthetic-gray-profile.ts`).
+- One CLI bug found and fixed on the way: `inspect` / `compare` and UTF-16 `/Info` strings.
+- Engine limits found and pinned with `it.fails` (untagged extraction of Khmer / Myanmar stacks
+  and of CJK ideographs), plus two recorded in ROADMAP.md (a long table of contents does not
+  paginate; a malformed chart series raises a `TypeError`). No CLI workaround.
+
 ## Validation (what actually ran on the release branch, Windows 11, Node 22.17.0)
 
 - `npm run typecheck:all` → clean (three configs). `npm run lint` → clean.
-- `npm run test:coverage` → **1237 / 1237 passing across 96 files**; coverage
+- `npm run test:coverage` → **1387 / 1387 passing across 96 files**; coverage
   statements 85.99 % / branches 75.83 % / functions 92.53 % / lines 87.89 %
   (thresholds raised 79/68/83/79 → 82/71/86/82, `min(measured − 2, current + 3)`).
 - `npm run verify:docs` → 26 rules across the documentation corpus, 0 errors
   (156 `eol-lf` warnings, shrinking as touched files normalise: CRLF blobs pending the maintainer's renormalisation commit).
-- `npm run build && npm run test:generate` → 79 PDFs, byte-identical across two runs;
+- `npm run build && npm run test:generate` → 91 sample PDFs, byte-identical across two runs;
   `npx tsx scripts/verify-samples.ts --strict` → green.
 - `npm run corpus:pdfa && npm run validate:pdfx` → 22 files; PDF/X 3 PASS + 1 XFAIL.
 - `npm run validate:pdfa` with veraPDF 1.30.2 (portable) + JDK 13 (`JAVACMD`) →
@@ -173,7 +193,7 @@ edited and not reproduced in 11 consecutive full runs on a quiet tree.
 - `npx tsx scripts/gate.ts --publish --require-all` at `b1f87c3` → **14 passed, 0 skipped
   in 355 s** (typecheck:all 25 s, lint 8 s, build 13 s, dist-check, smoke — 21 commands —,
   bundle-size 368 KiB of the 448 KiB budget, bundle-check — 2 externals —, test:generate
-  40 s — 79 PDFs —, test:coverage 138 s — 1237 tests, 86.0 % stmts —, verify:docs 5 s,
+  40 s — 79 PDFs —, test:coverage 138 s — 1387 tests, 86.0 % stmts —, verify:docs 5 s,
   verify:samples 5 s, corpus:pdfa 13 s, validate:pdfx 6 s, validate:pdfa 101 s).
 - Built binary smoke: `--version` 1.5.0; `doctor --json` (pdfnative 1.8.0, fonts
   31/27, unicode, conformance); PDF/X-4 render → `inspect --check pdfx` exit 0 →
@@ -221,7 +241,10 @@ edited and not reproduced in 11 consecutive full runs on a quiet tree.
 5. Countersign the audit: `/release-audit release-notes/v1.5.0.md v1.4.0` in Claude Code
    (ledger under `.audit/1.5.0/`) before the merge.
 6. Upstream issues to file on pdfnative (drafts go through `pdfnative govern verify-issue`):
-   `formField.fieldType` is not validated (`NaN` rectangles); `updateMetadata` drops the
+   untagged extraction (U+FFFD for Khmer / Myanmar stacks, Kangxi radicals for CJK); a long
+   table of contents does not paginate; a chart series without `label` raises a `TypeError`;
+   a Gray synthetic profile generator to sit next to the CMYK one; export
+   `decodePdfTextString`; `formField.fieldType` is not validated (`NaN` rectangles); `updateMetadata` drops the
    PDF/X identification; the signed revision `/ID` ignores the pinned creation instant;
    kerning on untagged output leaves a stray space in extracted text.
 7. In the pdfnative repository: `docs/guides/cli.md`, `docs/data/surfaces.json`

@@ -63,7 +63,7 @@ is not a finding.
 ### 6. Reproducible output
 - `--creation-date` / `SOURCE_DATE_EPOCH` make a render byte-identical across hosts and
   timezones (`tests/integration/reproducible-build.test.ts`); dates are written in UTC
-- The 79-sample baseline (`tests/regression/baselines/samples.sha256.json`) holds; a
+- The 91-sample baseline (`tests/regression/baselines/samples.sha256.json`) holds; a
   rebaseline is declared in the release note
 - Encrypted output is documented as non-reproducible; `sign --signing-time` and
   `metadata --mod-date` are separate instants

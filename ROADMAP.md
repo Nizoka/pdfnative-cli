@@ -232,6 +232,12 @@ This document outlines the planned development direction for pdfnative-cli. Prio
   `--strict`, `timestampDigest` reported), **`inspect --iso-dates`**, **`doctor`** font / Unicode /
   conformance checks, **fetch-guard** benchmarking / TEST-NET / NAT64 ranges, `E_INPUT`
   classification of every PDF/X and print coherence message (`utils/build-errors.ts`).
+- [x] **The whole 1.8.0 surface, exercised through the CLI** — `tests/regression/engine-surface.json`
+  maps every bullet of the engine's changelog entry to named tests and baseline samples (or a
+  motivated waiver) and its suite fails when the pin moves without it: 9 diagnostic codes
+  triggered, 27 script codes and 12 typography keys rendered by a sample, 91 sample PDFs, a
+  `validatePdfX` transmission contract, a generated Gray `prtr` ICC profile, and `inspect` /
+  `compare` decoding UTF-16 `/Info` strings (a bug the new samples exposed).
 - [x] **Engineering parity with pdfnative 1.8.0** — `scripts/gate.ts` (fast / CI / publish,
   `--require-all`), hermetic sample generator over the built binary with a byte/semantic
   SHA-256 baseline (`verify:samples`, chained `since`), 22-file PDF/A + PDF/X corpus, TypeScript
@@ -286,6 +292,19 @@ Feasibility is called out honestly: some ideas need pdfnative to expose a primit
   (`E_INPUT`, v1.5.0); the guard can go once the builder throws. Same family: with
   `layout.typography.kerning` on an untagged document, `extract-text` can read a stray space
   inside a kerned word. **Upstream issues to file** (maintainer, HITL).
+- **Untagged text extraction of shaped scripts** — from UNTAGGED output pdfnative 1.8.0 returns
+  stacked Khmer and Myanmar clusters as U+FFFD, CJK ideographs that share a glyph with a Kangxi
+  radical as the radical (U+2F49 for U+6708), and reordered glyphs (reph, Tamil and Thai pre-base
+  signs) in visual order; glyphs of `subs` / `sups` extract as their own code points. Tagged output
+  (`--tagged`) carries `/ActualText` and returns the source text exactly.
+  `tests/commands/render-scripts.test.ts` pins the first two with `it.fails`.
+  **Upstream issues to file** (maintainer, HITL).
+- **A long table of contents does not paginate** — 160 entries are laid out on one page and run
+  past its foot; `--inspect-layout` agrees with the render, so the report is faithful. **Upstream.**
+- **Malformed block shapes reach the engine** — a chart series without `label` next to another
+  series raises a `TypeError` inside the engine (`E_RUNTIME`, not `E_INPUT`). The CLI validates
+  paths, sizes and `formField.fieldType`, not every block shape; a JSON-Schema pre-check of
+  `render` input is a candidate for a later release.
 - **Hyphenation dictionaries from the CLI** — the engine breaks lines at
   existing U+00AD soft hyphens; a language dictionary or a hyphenation provider (a function in
   the engine's API) would need the CLI to load code or data from a user path. Deferred by

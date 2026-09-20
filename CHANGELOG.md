@@ -128,7 +128,7 @@ backward-compatible command surface — every envelope field is additive.
   `TZ=UTC` with the creation instant pinned twice (`--creation-date` and
   `SOURCE_DATE_EPOCH`); `samples/run-all.js` is removed (`npm run test:generate` replaces
   it, `PDFNATIVE_CLI` points it at a global install). `scripts/verify-samples.ts` holds the
-  79 generated PDFs to `tests/regression/baselines/samples.sha256.json` — 69 byte-exact, 10
+  91 sample PDFs to `tests/regression/baselines/samples.sha256.json` — 81 byte-exact, 10
   semantic (encrypted: CSPRNG keys; signed: per-revision `/ID`) — as a chain with `since`
   per entry; `tests/regression/samples.test.ts` mirrors it.
 - **Conformance corpus** — `scripts/generate-pdfa-corpus.ts` + `validate-pdfa.ts` +
@@ -136,6 +136,27 @@ backward-compatible command surface — every envelope field is additive.
   (4 negative canaries) validated by veraPDF 1.30.2, 4 PDF/X-4 (1 negative canary) validated
   in-process — among them an AcroForm under PDF/A-2b, Gray and CMYK output intents, and an
   ICC v4 profile that PDF/A-1b must refuse; reproducible (fixture key pair, pinned dates, per-file SHA-256 in the manifest).
+- **Engine-surface coverage** — every user-facing entry of the pdfnative 1.8.0 changelog is
+  exercised THROUGH the CLI and held there by `tests/regression/engine-surface.json`: one item
+  per changelog bullet, mapped to named tests and baseline samples or waived with a reason
+  (`LIB`, `TOOLING`, `DOCS`, `tested-upstream`). `engine-surface.test.ts` checks every reference,
+  requires each of the 9 diagnostic codes to have an executed trigger
+  (`tests/helpers/diagnostic-triggers.ts`), each `TypographyOptions` key and each of the 27 script
+  codes to appear in a rendered sample, and fails when the pdfnative pin moves without the
+  matrix. New suites: typography one option at a time (`fr` vs `fr-CA` vs explicit rules,
+  orphans / widows, soft hyphens, `keepWithNext`, `splittable`, optical margins, unit binding,
+  short words, every `fontFeatures` tag), `metrics: "exact"` on the base-14 path, the 27 scripts
+  and the shaping fixes, colour-emoji skin tones / ZWJ sequences / flags, AcroForm under PDF/A,
+  `--inspect-layout` page counts with a table of contents, printer's marks clearance, the Gray
+  output intent, and a transmission contract for `validatePdfX` on crafted PDFs.
+- **Samples** — twelve documents and ten dual-shell pairs: `pdfa/05` (AcroForm under PDF/A-2b),
+  `typography/05`–`07` (fr-CA, explicit spacing rules, soft hyphens and per-block keep rules),
+  `base14/01` (exact metrics, rendered without `--font`), `multilang/08`–`11` (Greek, Russian,
+  Georgian, Armenian, Polish, Turkish, Vietnamese; Arabic, Hebrew; Hindi, Bengali, Tamil;
+  Chinese, Korean), `font/06` (colour-emoji sequences), `print/06` (PDF/X-4 under a Gray
+  intent), `print/07` (marks in a 3 mm bleed), `extract-text/02` (`/ActualText`).
+  `scripts/lib/synthetic-gray-profile.ts` generates the 408-byte Gray `prtr` ICC profile the
+  Gray samples and tests use (veraPDF accepts it).
 - **`npm run verify:docs`** (`scripts/verify-docs.ts`, 26 rules) over
   `docs/assets/ecosystem.json`: counts derived from the source constants (commands, subjects,
   codes, flags, corpus, fonts, samples, baseline), stale/version/count tokens, command / flag /
@@ -177,7 +198,7 @@ backward-compatible command surface — every envelope field is additive.
   double-render script proves byte identity across timezones), `inspect --check pdfx` and
   `--iso-dates`, `doctor` capabilities, `annotate link`, `verify` weak digest,
   `sign --timestamp-timeout`, global flags first — each as a dual-shell pair.
-- **Tests** — 1237 tests across 96 files (600 in 1.4.0): every feature above,
+- **Tests** — 1387 tests across 96 files (600 in 1.4.0): every feature above,
   the tools (gate, validators, fingerprints, sample plan, verify-docs, release-prepare, agent
   config, guard, workflows), the sample regression suite, an English-only prose scan, a
   reproducible-build integration test that spawns the built binary under two timezones, and a
@@ -224,6 +245,12 @@ backward-compatible command surface — every envelope field is additive.
   the `status` schema; a typo is still reported as an unknown command). A `null` block is
   refused with `E_INPUT` instead of a `TypeError`. Arguments
   with no command exit 2 (`E_USAGE`); a bare `pdfnative` still prints the usage and exits 0.
+- `inspect` reported `title` / `author` / `subject` as `null` — and `compare` printed raw bytes —
+  for any `/Info` value outside Latin-1 (an em dash is enough): pdfnative writes those as
+  UTF-16BE text strings, whose NUL bytes read as control characters. `utils/pdftext.ts` decodes
+  the byte-order-marked forms (UTF-16BE, UTF-8) for both commands.
+- `samples/render/print/03-cmyk-colours.json` named its chart keys `kind` / `name`; the engine's
+  are `chartType` / `label` (bytes unchanged: a bar chart with one series draws no legend).
 - Docs and help aligned with the binary after the final review: `inspect --iso-dates` covers
   `metadata.modDate`; `fontFeatures` examples use `smcp` (no ligature feature is applied);
   the release-audit ledger lives under the git-ignored `.audit/` (readable by agents).

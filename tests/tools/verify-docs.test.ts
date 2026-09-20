@@ -92,7 +92,7 @@ describe('verify-docs — a corrupted sandbox', () => {
         writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
         // A stray sample directory and an unpaired script.
         writeFileSync(join(sandbox, 'samples', 'render', 'zz-orphan.sh'), 'echo orphan\n');
-        writeFileSync(join(sandbox, 'README.md'), `${readFileSync(join(sandbox, 'README.md'), 'utf8')}\n\nStale: pdfnative-cli v0.0.1 has 12 commands and E_NOPE.\n\nBroken anchors: [same](#no-such-heading), [cross](docs/KNOWLEDGE_BASE.md#nope-either), [fine](#installation).\n\n[allowed](#also-missing) <!-- verify-docs:allow anchor-parity -->\n`);
+        writeFileSync(join(sandbox, 'README.md'), `${readFileSync(join(sandbox, 'README.md'), 'utf8')}\n\nStale: pdfnative-cli v0.0.1 has 12 commands and E_NOPE. A 3-sample baseline and 4 sample PDFs.\n\nBroken anchors: [same](#no-such-heading), [cross](docs/KNOWLEDGE_BASE.md#nope-either), [fine](#installation).\n\n[allowed](#also-missing) <!-- verify-docs:allow anchor-parity -->\n`);
         // A governance reference whose fragment does not exist.
         const policyPath = join(sandbox, '.github', 'ai-governance.json');
         writeFileSync(policyPath, readFileSync(policyPath, 'utf8').replace('AGENTS.md#mission-and-constraints', 'AGENTS.md#no-such-section'));
@@ -117,6 +117,13 @@ describe('verify-docs — a corrupted sandbox', () => {
         expect(messages('stale-token')).toEqual(expect.arrayContaining([expect.stringMatching(/README\.md:\d+ "12 commands"/)]));
         expect(messages('version-token')).toEqual(expect.arrayContaining([expect.stringContaining('pdfnative-cli v0.0.1')]));
         expect(messages('error-parity')).toEqual(expect.arrayContaining([expect.stringContaining('"E_NOPE"')]));
+    });
+
+    it('holds both spellings of the sample count to the baseline (count-tokens)', () => {
+        expect(messages('count-tokens')).toEqual(expect.arrayContaining([
+            expect.stringContaining('"3-sample baseline"'),
+            expect.stringContaining('"4 sample PDFs"'),
+        ]));
     });
 
     it('fails sample-shell-parity on the unpaired script', () => {
