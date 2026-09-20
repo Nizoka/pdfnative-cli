@@ -234,7 +234,7 @@ This document outlines the planned development direction for pdfnative-cli. Prio
   classification of every PDF/X and print coherence message (`utils/build-errors.ts`).
 - [x] **Engineering parity with pdfnative 1.8.0** — `scripts/gate.ts` (fast / CI / publish,
   `--require-all`), hermetic sample generator over the built binary with a byte/semantic
-  SHA-256 baseline (`verify:samples`, chained `since`), 16-file PDF/A + PDF/X corpus, TypeScript
+  SHA-256 baseline (`verify:samples`, chained `since`), 22-file PDF/A + PDF/X corpus, TypeScript
   validators, `verify:docs` (26 rules) over `docs/assets/ecosystem.json`, `release-prepare.ts`,
   hardened workflows (harden-runner, SHA pins, dependency-review, audit, sample-regression,
   docs, composite veraPDF action, Trusted Publishing + SBOM + attestations), committed rulesets,

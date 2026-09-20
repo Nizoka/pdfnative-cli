@@ -50,7 +50,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 - **CMYK & PDF/X-4 (v1.5.0)** — every colour accepts CMYK (`"c m y k"` or `[c,m,y,k]`),
   printer's marks gain **colour bars**, and `render --pdfx pdfx4 --output-intent-icc <cmyk.icc>
   --trapped false` writes a PDF/X-4 file whose claim `inspect --check pdfx` re-validates with
-  pdfnative's structural validator (`PDFX_*` diagnostics, `--strict` gating). A 16-file
+  pdfnative's structural validator (`PDFX_*` diagnostics, `--strict` gating). A 22-file
   conformance corpus (PDF/A via veraPDF, PDF/X via the validator) guards every release.
 - **Reproducible output (v1.5.0)** — the global `--creation-date <iso8601>` (or
   `SOURCE_DATE_EPOCH`) pins `/CreationDate`, `xmp:CreateDate`, the `{date}` placeholder and
@@ -311,10 +311,11 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 
 The CLI's PDF/A outputs are **validated against the [veraPDF](https://verapdf.org)
 reference validator in CI (blocking)**, and its PDF/X-4 outputs against pdfnative's
-structural PDF/X validator: a corpus of 16 files produced by the CLI itself — 13 claiming
+structural PDF/X validator: a corpus of 22 files produced by the CLI itself — 18 claiming
 PDF/A (renders across all four levels plus attachments, headers/footers, outline, watermark,
-a table-variant render with embedded fonts, an incremental PAdES signature and a `metadata`
-update) and 3 claiming PDF/X-4 (a print render, a signed print render and a negative canary
+a table-variant render with embedded fonts, an AcroForm, Gray and CMYK output intents, an
+incremental PAdES signature and a `metadata` update) and 4 claiming PDF/X-4 (a CMYK and a
+Gray print render, a signed print render and a negative canary
 broken by an annotation outside the page boxes) — is checked against the profile each file
 claims in XMP. It includes **negative canaries** that the validators must reject — so a
 validator that accepts everything fails the run instead of turning it green. The PDF/A

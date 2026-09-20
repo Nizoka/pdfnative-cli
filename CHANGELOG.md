@@ -132,9 +132,10 @@ backward-compatible command surface — every envelope field is additive.
   semantic (encrypted: CSPRNG keys; signed: per-revision `/ID`) — as a chain with `since`
   per entry; `tests/regression/samples.test.ts` mirrors it.
 - **Conformance corpus** — `scripts/generate-pdfa-corpus.ts` + `validate-pdfa.ts` +
-  `validate-pdfx.ts` (TypeScript, shared cores in `scripts/lib/`): 16 files, 13 PDF/A
-  (2 negative canaries) validated by veraPDF 1.30.2, 3 PDF/X-4 (1 negative canary) validated
-  in-process; reproducible (fixture key pair, pinned dates, per-file SHA-256 in the manifest).
+  `validate-pdfx.ts` (TypeScript, shared cores in `scripts/lib/`): 22 files, 18 PDF/A
+  (4 negative canaries) validated by veraPDF 1.30.2, 4 PDF/X-4 (1 negative canary) validated
+  in-process — among them an AcroForm under PDF/A-2b, Gray and CMYK output intents, and an
+  ICC v4 profile that PDF/A-1b must refuse; reproducible (fixture key pair, pinned dates, per-file SHA-256 in the manifest).
 - **`npm run verify:docs`** (`scripts/verify-docs.ts`, 26 rules) over
   `docs/assets/ecosystem.json`: counts derived from the source constants (commands, subjects,
   codes, flags, corpus, fonts, samples, baseline), stale/version/count tokens, command / flag /

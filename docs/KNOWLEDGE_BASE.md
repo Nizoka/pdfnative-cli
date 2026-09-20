@@ -1215,7 +1215,7 @@ npm run test:coverage
 npm run test:generate          # 79 PDFs into test-output/samples/ with the BUILT CLI, TZ=UTC, pinned date
 npm run verify:samples         # compare; `npx tsx scripts/verify-samples.ts --update` rebaselines (declare it)
 
-# Conformance corpus — 16 corpus files (PDF/A via veraPDF, an external tool; PDF/X in-process)
+# Conformance corpus — 22 corpus files (PDF/A via veraPDF, an external tool; PDF/X in-process)
 npm run corpus:pdfa            # generate test-output/pdfa/ (needs a prior npm run build)
 npm run validate:pdfx          # PDF/X-4 entries — never skipped
 npm run validate:pdfa          # PDF/A entries — SKIPs with exit 0 without veraPDF (see CONTRIBUTING.md)

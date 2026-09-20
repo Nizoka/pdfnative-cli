@@ -20,7 +20,7 @@ committed Claude Code layer.
 Counts: 21 commands, 19 schema subjects, 12 stable error codes and 14 manifest commands
 unchanged; global flags 9 → 10 (`--creation-date`); `render` flags 44 → 57; `inspect`
 14 → 16; `sign` 21 → 23; `--font` 22 → 27 scripts (+ 4 aliases); `--strict` diagnostics
-3 → 9; `doctor` checks 5 → 8; conformance corpus 12 → 16 files; workflows 5 → 9;
+3 → 9; `doctor` checks 5 → 8; conformance corpus 12 → 22 files; workflows 5 → 9;
 tests 600 → 1237 across 95 files.
 
 ## Changes
@@ -68,7 +68,7 @@ tests 600 → 1237 across 95 files.
 ### Tooling (`scripts/`)
 - `gate.ts` (STEPS + fast / ci / publish, `--only`, `--json`, `--require-all`),
   `validate-pdfa.ts`, `generate-pdfa-corpus.ts`, `validate-pdfx.ts`, `lib/{verapdf,pdfx,
-  pdfa-corpus}.ts` (16 entries), `helpers/{tz,io,cli}.ts`.
+  pdfa-corpus}.ts` (22 entries), `helpers/{tz,io,cli}.ts`.
 - `generate-samples.ts` + `generators/{render,drivers,derived}.ts` + `lib/sample-plan.ts`
   (replaces `samples/run-all.js`), `lib/sample-fingerprint.ts` + `verify-samples.ts`
   (chained baseline, semantic mode for encrypted and signed samples, identical groups).
@@ -167,9 +167,9 @@ edited and not reproduced in 11 consecutive full runs on a quiet tree.
   (156 `eol-lf` warnings, shrinking as touched files normalise: CRLF blobs pending the maintainer's renormalisation commit).
 - `npm run build && npm run test:generate` → 79 PDFs, byte-identical across two runs;
   `npx tsx scripts/verify-samples.ts --strict` → green.
-- `npm run corpus:pdfa && npm run validate:pdfx` → 16 files; PDF/X 2 PASS + 1 XFAIL.
+- `npm run corpus:pdfa && npm run validate:pdfx` → 22 files; PDF/X 3 PASS + 1 XFAIL.
 - `npm run validate:pdfa` with veraPDF 1.30.2 (portable) + JDK 13 (`JAVACMD`) →
-  11 PASS + 2 XFAIL + 3 SKIP (the PDF/X files), exit 0.
+  14 PASS + 4 XFAIL + 4 SKIP (the PDF/X files), exit 0.
 - `npx tsx scripts/gate.ts --publish --require-all` at `b1f87c3` → **14 passed, 0 skipped
   in 355 s** (typecheck:all 25 s, lint 8 s, build 13 s, dist-check, smoke — 21 commands —,
   bundle-size 368 KiB of the 448 KiB budget, bundle-check — 2 externals —, test:generate

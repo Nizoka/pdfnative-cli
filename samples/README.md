@@ -299,7 +299,7 @@ pdfnative render --input doc.json --output doc.pdf --conformance 2b --font latin
 > `scripts/lib/sample-plan.ts`, applies them to the `pdfa` and `attachments`
 > categories). Without them the render emits a `PDFA_NO_FONT_ENTRIES` warning and
 > the output fails the reference validator. PDF/A outputs are validated with
-> veraPDF in CI (blocking — a 16-file conformance corpus with negative canaries;
+> veraPDF in CI (blocking — a 22-file conformance corpus with negative canaries;
 > its PDF/X-4 entries are validated by pdfnative's validator); run
 > `npm run corpus:pdfa && npm run validate:pdfx && npm run validate:pdfa`
 > locally, but note the PDF/A step exits 0 as a *skip* when veraPDF is not

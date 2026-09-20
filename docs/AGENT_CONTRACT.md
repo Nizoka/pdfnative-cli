@@ -276,8 +276,8 @@ the XMP without the PDF/X identification (an upstream limit — re-check after e
 `npm run build && npm run corpus:pdfa && npm run validate:pdfx && npm run validate:pdfa`
 for any change touching PDF/A or PDF/X behaviour (render, fonts, metadata/XMP, signing
 over claiming files, the `samples/render/pdfa/` and `print/` inputs): it generates the
-16 corpus files (13 claiming PDF/A, two of them negative canaries veraPDF must reject;
-3 PDF/X-4, one of them a negative canary) and validates every file against the profile it
+22 corpus files (18 claiming PDF/A, four of them negative canaries veraPDF must reject;
+4 PDF/X-4, one of them a negative canary) and validates every file against the profile it
 claims. Mind the skip semantics — **without veraPDF installed `validate:pdfa` exits 0 as a
 SKIP, not a pass**; `npx tsx scripts/gate.ts --publish --require-all` turns the skip into
 a failure. The same gate runs blocking in CI and pre-publish. For rendering, the PDF/A

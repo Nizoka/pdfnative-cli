@@ -33,6 +33,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { REPO_ROOT, TEST_OUTPUT_DIR, SAMPLE_CREATION_ISO } from '../helpers/io.js';
+import { buildSyntheticGrayProfile } from './synthetic-gray-profile.js';
 
 export const OUT_DIR = join(TEST_OUTPUT_DIR, 'pdfa');
 export const SPECS_DIR = join(OUT_DIR, '.specs');
@@ -99,6 +100,23 @@ const TABLE_SPEC = {
 const BAD_ANNOTATION_SPEC = [
     { page: 1, type: 'square', rect: [72, 640, 300, 700], color: '#ff0000', contents: 'Not allowed under PDF/X' },
 ];
+
+const GRAY_ICC = join(SAMPLES, 'print', 'synthetic-gray.icc');
+const CMYK_ICC = join(SAMPLES, 'print', 'synthetic-cmyk.icc');
+const GRAY_PDFX_FLAGS = [
+    '--pdfx', 'pdfx4',
+    '--output-intent-icc', GRAY_ICC,
+    '--output-intent-id', 'Synthetic Gray (pdfnative-cli test profile)',
+    '--trapped', 'false',
+] as const;
+
+/** The ICC v4 variant of the Gray profile: never committed, written under .specs/ for the PDF/A-1 canary. */
+function writeGrayV4Profile(): string {
+    mkdirSync(SPECS_DIR, { recursive: true });
+    const file = join(SPECS_DIR, 'synthetic-gray-v4.icc');
+    writeFileSync(file, buildSyntheticGrayProfile({ version: 4 }));
+    return file;
+}
 
 function writeSpec(name: string, value: unknown): string {
     mkdirSync(SPECS_DIR, { recursive: true });
@@ -184,6 +202,28 @@ export const CORPUS: readonly CorpusEntry[] = [
         before: () => { writeSpec('table.json', TABLE_SPEC); },
         args: (out) => ['render', '--input', join(SPECS_DIR, 'table.json'), '--output', out('table-pdfa2b-fonts.pdf'), '--variant', 'table', '--tagged', 'pdfa2b', ...STRICT_FONTS, ...PINNED],
     },
+    {
+        // pdfnative 1.8.0 (#74): the fields' default resources (/DR) carry the
+        // embedded Latin font instead of Helvetica, so a PDF/A file may hold an
+        // interactive form. --strict proves no diagnostic is raised.
+        file: 'form-pdfa2b.pdf', claims: 'pdfa',
+        command: 'render samples/render/pdfa/05-form-pdfa2b.json --strict --font latin --lang latin',
+        args: (out) => ['render', '--input', pdfaSample('05-form-pdfa2b.json'), '--output', out('form-pdfa2b.pdf'), ...STRICT_FONTS, ...PINNED],
+    },
+    {
+        // pdfnative 1.8.0: a Gray output intent (/N 1); device RGB content is
+        // remapped through /DefaultRGB so the file stays device-independent.
+        file: 'gray-intent-pdfa2b.pdf', claims: 'pdfa',
+        command: 'render samples/render/pdfa/02-pdfa-2b.json --output-intent-icc synthetic-gray.icc --strict --font latin --lang latin',
+        args: (out) => ['render', '--input', pdfaSample('02-pdfa-2b.json'), '--output', out('gray-intent-pdfa2b.pdf'), '--output-intent-icc', GRAY_ICC, '--output-intent-id', 'Synthetic Gray (pdfnative-cli test profile)', ...STRICT_FONTS, ...PINNED],
+    },
+    {
+        // pdfnative 1.8.0: CMYK colours are legitimate under PDF/A once the
+        // output intent is CMYK (ISO 19005-2 §6.2.4.3) — no PDFA_DEVICE_CMYK_CONTENT.
+        file: 'cmyk-intent-pdfa2b.pdf', claims: 'pdfa',
+        command: 'render samples/render/print/03-cmyk-colours.json --tagged pdfa2b --output-intent-icc synthetic-cmyk.icc --strict --font latin --lang latin',
+        args: (out) => ['render', '--input', join(SAMPLES, 'print', '03-cmyk-colours.json'), '--output', out('cmyk-intent-pdfa2b.pdf'), '--tagged', 'pdfa2b', '--output-intent-icc', CMYK_ICC, '--output-intent-id', 'Synthetic CMYK (pdfnative test profile)', ...STRICT_FONTS, ...PINNED],
+    },
 
     // ── PDF/A negative canaries: rendered WITHOUT --strict and WITHOUT fonts ─
     {
@@ -201,12 +241,33 @@ export const CORPUS: readonly CorpusEntry[] = [
         before: () => { writeSpec('table.json', TABLE_SPEC); },
         args: (out) => ['render', '--input', join(SPECS_DIR, 'table.json'), '--output', out('table-pdfa1b-nofonts.pdf'), '--variant', 'table', '--tagged', 'pdfa1b', ...PINNED],
     },
+    {
+        // The form without an embedded font: the fields fall back to Helvetica
+        // (PDFA_UNEMBEDDED_FORM_FONT). veraPDF MUST reject it.
+        file: 'form-pdfa2b-nofonts.pdf', claims: 'pdfa', expectCompliant: false,
+        command: 'render samples/render/pdfa/05-form-pdfa2b.json (no --strict, no fonts — unembedded form font canary)',
+        args: (out) => ['render', '--input', pdfaSample('05-form-pdfa2b.json'), '--output', out('form-pdfa2b-nofonts.pdf'), ...PINNED],
+    },
+    {
+        // PDF/A-1 requires an ICC v2 output profile (ISO 19005-1 §6.2.2); the
+        // render warns (PDFA_ICC_PROFILE_VERSION) and veraPDF MUST reject the file.
+        file: 'iccv4-pdfa1b.pdf', claims: 'pdfa', expectCompliant: false,
+        command: 'render samples/render/pdfa/01-pdfa-1b.json --output-intent-icc .specs/synthetic-gray-v4.icc --font latin --lang latin (no --strict — ICC v4 under PDF/A-1 canary)',
+        before: () => { writeGrayV4Profile(); },
+        args: (out) => ['render', '--input', pdfaSample('01-pdfa-1b.json'), '--output', out('iccv4-pdfa1b.pdf'), '--output-intent-icc', join(SPECS_DIR, 'synthetic-gray-v4.icc'), '--font', 'latin', '--lang', 'latin', ...PINNED],
+    },
 
     // ── PDF/X-4 (v1.5.0): validated by pdfnative's validatePdfX(), not veraPDF ─
     {
         file: 'pdfx4-print.pdf', claims: 'pdfx',
         command: 'render samples/render/print/05-pdfx4.json --pdfx pdfx4 --output-intent-icc synthetic-cmyk.icc --trapped false --strict --font latin --lang latin',
         args: (out) => ['render', '--input', join(SAMPLES, 'print', '05-pdfx4.json'), '--output', out('pdfx4-print.pdf'), ...PDFX_FLAGS, ...STRICT_FONTS, ...PINNED],
+    },
+    {
+        // pdfnative 1.8.0: PDF/X-4 under a Gray output intent (a one-ink job).
+        file: 'pdfx4-gray.pdf', claims: 'pdfx',
+        command: 'render samples/render/print/06-gray-pdfx4.json --pdfx pdfx4 --output-intent-icc synthetic-gray.icc --trapped false --strict --font latin --lang latin',
+        args: (out) => ['render', '--input', join(SAMPLES, 'print', '06-gray-pdfx4.json'), '--output', out('pdfx4-gray.pdf'), ...GRAY_PDFX_FLAGS, ...STRICT_FONTS, ...PINNED],
     },
     {
         // A PAdES signature is an incremental update; the PDF/X-4 claim, the

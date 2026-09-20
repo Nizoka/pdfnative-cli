@@ -117,20 +117,23 @@ encrypted and signed output through a canonical projection (`ENCRYPTED_SAMPLES` 
 The CLI's PDF/A claims are checked against the official reference validator,
 [veraPDF](https://verapdf.org). `npm run corpus:pdfa` drives the **built** CLI
 (`scripts/generate-pdfa-corpus.ts`, corpus table in `scripts/lib/pdfa-corpus.ts`) to write
-16 files to `test-output/pdfa/` — 13 claiming PDF/A (renders at all four levels 1b / 2b /
+22 files to `test-output/pdfa/` — 18 claiming PDF/A (renders at all four levels 1b / 2b /
 2u / 3b, a PDF/A-3b XML attachment, header/footer templates, `--outline auto`, an opaque
-watermark, a `--variant table` render with embedded fonts, an incremental PAdES signature
-over a claiming file and an incremental `metadata` update) and 3 claiming PDF/X-4 (a print
-render, a signed print render and a negative canary broken by `annotate`). The corpus is
+watermark, a `--variant table` render with embedded fonts, an AcroForm, a Gray and a CMYK
+output intent, an incremental PAdES signature over a claiming file and an incremental
+`metadata` update) and 4 claiming PDF/X-4 (a CMYK and a Gray print render, a signed print
+render and a negative canary broken by `annotate`). The corpus is
 reproducible: pinned dates, the committed test key pair, a per-file SHA-256 in `manifest.json`.
 
 `npm run validate:pdfa` (`scripts/validate-pdfa.ts`, pure core in `scripts/lib/verapdf.ts`)
 validates each PDF/A file against the profile it claims in XMP and compares the verdict with
 the manifest's `expectCompliant` flag. The positive entries render with `--strict --font latin
 --lang latin` (ISO 19005 requires embedded fonts; the sRGB OutputIntent is emitted by the
-engine). Two **negative canaries** (`expectCompliant: false`) must be rejected — a render
-without fonts (ISO 19005-2 §6.2.11.4.1) and a `--variant table` render under PDF/A-1b
-without `--font` / `--lang` (ISO 19005-1 §6.3.4) — otherwise the validator is accepting
+engine). Four **negative canaries** (`expectCompliant: false`) must be rejected — a render
+without fonts (ISO 19005-2 §6.2.11.4.1), a `--variant table` render under PDF/A-1b
+without `--font` / `--lang` (ISO 19005-1 §6.3.4), an AcroForm whose fields fall back to a
+base-14 font, and a PDF/A-1b render with an ICC v4 output profile (ISO 19005-1 §6.2.2) —
+otherwise the validator is accepting
 everything and the run fails. An unexpected pass (`XPASS`) is always fatal, and a coverage canary fails the run
 when the number of claiming files differs from `declared.pdfaSamples`.
 
