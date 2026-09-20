@@ -285,5 +285,12 @@ Feasibility is called out honestly: some ideas need pdfnative to expose a primit
   the engine's API) would need the CLI to load code or data from a user path. Deferred by
   posture (the CLI loads fonts from disk, never code); a bundled dictionary would have to ship
   upstream first.
+- **Performance budget (`bench/`)** — pdfnative holds its benchmark figures to the docs
+  (`bench-parity`); the CLI measures nothing yet, and its user-visible cost is start-up.
+  Method for a later release: median of five runs of `--version` (cold start), of a render of
+  `samples/render/document/05-technical-spec.json` and of a 200-page streamed render, under
+  `TZ=UTC` on the CI runner class, with generous thresholds declared in
+  `docs/assets/ecosystem.json` and a `perf-budget` gate step. Deferred from 1.5.0 by decision:
+  a budget needs stable reference numbers before it can block a merge.
 - **Visual (pixel) regression of the sample baseline** — the byte/semantic fingerprints prove
   identity, not appearance; a rendering comparison stays out of scope without a rasteriser.

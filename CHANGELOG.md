@@ -97,7 +97,20 @@ backward-compatible command surface — every envelope field is additive.
   gains the `link` type and `url`; `verify` gains `timestampDigest`. `SUBJECTS` is exported.
 - `completion`: `--creation-date` in every shell; the new `render`, `inspect` and `sign` flags.
 - `govern policy` now prints the full `.github/ai-governance.json` (1.1.0, `claude_code`
-  block included); the embedded copy is held identical by `verify:docs`.
+  block included) and `govern rules` prints `.github/AGENT_RULES.md` verbatim; both embedded
+  copies are held identical by `verify:docs` (rule `governance-embed`).
+- **`render --dry-run` pre-flights the real build**: the buffered builder runs in memory and
+  the bytes are discarded, so every engine coherence error (`--pdfx` without an output
+  intent, inline `layout.pdfx` + `tagged`, attachments without PDF/A-3, watermark
+  transparency under PDF/A-1, print geometry) and every diagnostic — `--strict` escalation
+  included — surfaces exactly as on a real run. The envelope stays additive
+  (`dryRun: true`, no `bytes`, `diagnostics` when any).
+- **`schema status` pins every field a command emits** (31 properties: the common ones plus
+  the command-specific `variant`, `parts`, `sources`, `pages`, `mode`, `fields`, …), held by a
+  parity test over every `emitStatus({…})` call.
+- `inspect` emits `metadata.modDate` (additive; normalised by `--iso-dates`).
+- `.pdfnativerc.json` per-command sections now apply to all 21 commands (they were silently
+  dropped outside `render`, `sign`, `verify`, `inspect`, `batch`).
 - `docs/AGENT_CONTRACT.md` — the consumer contract moved out of AGENTS.md (which now holds
   the repository rules for agents, under the 16 KiB Claude Code budget with `CLAUDE.md`).
 
@@ -146,7 +159,17 @@ backward-compatible command surface — every envelope field is additive.
   PreToolUse hook refusing publish / push / tag / GitHub writes in every shell segment and
   interpreter payload; `tests/tools/guard.test.ts`), `.claude/rules/` generated from
   `.github/instructions/` (`npm run agents:rules`), the `/release-audit` skill,
-  `.github/prompts/quality-gate.prompt.md`, `.github/ai-governance.json` 1.1.0.
+  `.github/prompts/quality-gate.prompt.md` and `compliance-audit.prompt.md`,
+  `.github/ai-governance.json` 1.1.0.
+- **Release and draft templates** — `release-notes/PR_TEMPLATE.md` (the section source of the
+  committed `release-notes/draft/PR-vX.Y.Z.md` bodies), `.github/drafts/TEMPLATE.md` (an issue
+  draft that passes `pdfnative govern verify-issue`; other drafts are git-ignored),
+  `scripts/README.md` (every script: purpose, flags, exit codes, gate step),
+  `scripts/tsconfig.json`, CONTRIBUTING "First pull request in ten minutes" and
+  "Branch protection"; `overrides.esbuild` pinned exactly.
+- **Independent release audit** — two auditors (claims vs code; hardening parity with
+  pdfnative 1.8.0 and the agent surfaces), an adversarial verifier and a final reviewer; the
+  ledger is in `release-notes/draft/PR-v1.5.0.md`.
 - **Samples** — typography (4), print (CMYK colours, colour bars, PDF/X-4 with a synthetic
   CMYK profile), multilang (Lao; Tai Tham / New Tai Lue / Tai Le / Cham; Hausa / Yoruba / Igbo /
   Swahili), font (the five 1.8.0 scripts, `--font-file`), reproducible (pinned date twice; the
@@ -197,6 +220,17 @@ backward-compatible command surface — every envelope field is additive.
 - `--layout` files are capped at 50 MB before parsing; ICC profiles at 16 MiB with the `acsp`
   signature checked; custom fonts at 32 MiB with magic-byte and parser validation; fonts and
   profiles are only ever loaded from command-line paths.
+- **Hostile-input suite** (`tests/fuzz/`, seeded and deterministic, ported in spirit from the
+  engine's `tests/fuzzing/`): argv and global-flag placement, page selectors,
+  `.pdfnativerc.json`, batch manifests, layout JSON, mutated / truncated / xref-looping PDFs
+  through `inspect` and `extract-text`, reproducible-date parsing and font sniffing — the only
+  acceptable failure is a `CliError` with a stable `E_*` code. The hardenings it drove:
+  `--template` deep-merge ignores `__proto__` / `constructor` / `prototype` keys and caps
+  nesting (`E_INPUT` instead of a stack overflow), the config loader and the manifest parser
+  refuse those keys, and an `iccProfile` array in layout JSON shares the 16 MiB cap.
+- Gate step **`bundle-check`**: `dist/cli.cjs` must keep the engine external (`pdfnative`,
+  `pdfnative/tools`, node builtins only) and carry no font data, PEM block, `console.log` or
+  attribution trailer.
 - `verify` surfaces SHA-1 timestamp imprints and refuses them under `--strict`.
 - Supply chain: Trusted Publishing (OIDC, npm ≥ 11.5.1), SBOM + build attestations on the
   release, harden-runner on every job, SHA-pinned actions, `npm ci --ignore-scripts`, weekly

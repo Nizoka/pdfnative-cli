@@ -47,7 +47,7 @@ One suite: `npx vitest run tests/<path>.test.ts` (dot reporter). Smoke-test the 
 | `src/utils/` | args/argv, io, error codes, envelopes, projection, layout (PDF/X, typography), fonts, reproducible dates, build errors, PKI, fetch-guard | `commands.instructions.md` |
 | `src/core-bridge/index.ts` | The single `pdfnative` import point (selective re-exports, `pdfnative/tools` included) | `copilot-instructions.md` |
 | `scripts/` | gate, sample generator (`generators/`, `helpers/`, `lib/`), baseline, conformance corpus + validators, verify-docs, release-prepare | `testing.instructions.md` |
-| `tests/` | vitest: `commands/`, `utils/`, `integration/`, `tools/`, `regression/` (sample baseline), `docs/`; `helpers/cli-harness.ts`, `fixtures/` | `testing.instructions.md` |
+| `tests/` | vitest: `commands/`, `utils/`, `integration/`, `tools/`, `regression/` (sample baseline), `fuzz/` (hostile input), `docs/`; `helpers/`, `fixtures/` | `testing.instructions.md` |
 | `samples/` | Runnable dual-shell demos (`.sh` + `.ps1`, one pair per feature) and the JSON documents the generator renders | `samples/README.md` |
 | `docs/` | `KNOWLEDGE_BASE.md` (deep reference), `AGENT_CONTRACT.md` (consumer contract), `assets/ecosystem.json` (every count and version) | — |
 
