@@ -3,13 +3,12 @@
 // (v1.5.0, pdfnative 1.8.0).
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { createHash } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { CliError, ErrorCode } from '../../src/utils/error.js';
-import { openPdf, extractText, setDefaultCreationDate } from '../../src/core-bridge/index.js';
-import { TempFiles, MINIMAL_DOC, renderTo, withJsonEnvelope } from '../helpers/cli-harness.js';
+import { extractText, setDefaultCreationDate } from '../../src/core-bridge/index.js';
+import { TempFiles, MINIMAL_DOC, renderTo, withJsonEnvelope, sha256, pageCount } from '../helpers/cli-harness.js';
 
 const tmp = new TempFiles();
 afterEach(async () => {
@@ -19,7 +18,6 @@ afterEach(async () => {
     await tmp.cleanup();
 });
 
-const sha256 = (b: Uint8Array): string => createHash('sha256').update(b).digest('hex');
 const LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '.repeat(6);
 
 function longDoc(sections: number, repeat = 1): { title: string; blocks: unknown[] } {
@@ -31,17 +29,13 @@ function longDoc(sections: number, repeat = 1): { title: string; blocks: unknown
     return { title: 'Typography', blocks };
 }
 
-async function pageCount(bytes: Uint8Array): Promise<number> {
-    return openPdf(bytes).pageCount;
-}
-
 describe('render typography (layout.typography, pdfnative 1.8.0)', () => {
     it('--split-paragraphs lets paragraphs break across pages: never more pages than atomic paragraphs', async () => {
         // Twelve ~15-line paragraphs: at least one straddles a page boundary, so
         // the split layout differs from the atomic one (which moves it whole).
         const atomic = await renderTo(tmp, longDoc(12, 2), ['--font', 'latin', '--lang', 'latin', '--creation-date', '2026-01-01T00:00:00Z'], 'atomic.pdf');
         const split = await renderTo(tmp, longDoc(12, 2), ['--font', 'latin', '--lang', 'latin', '--split-paragraphs', '--creation-date', '2026-01-01T00:00:00Z'], 'split.pdf');
-        expect(await pageCount(split.bytes)).toBeLessThanOrEqual(await pageCount(atomic.bytes));
+        expect(pageCount(split.bytes)).toBeLessThanOrEqual(pageCount(atomic.bytes));
         expect(sha256(split.bytes)).not.toBe(sha256(atomic.bytes));
     });
 

@@ -8,13 +8,18 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { vi } from 'vitest';
+import { createHash } from 'node:crypto';
+import { expect, vi } from 'vitest';
 
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
+import { CliError } from '../../src/utils/error.js';
+import { openPdf } from '../../src/core-bridge/index.js';
 
 export const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
 export const SYNTHETIC_CMYK_ICC = path.join(FIXTURES, 'synthetic-cmyk.icc');
+/** A valid monochrome `prtr` profile (scripts/lib/synthetic-gray-profile.ts) — a non-CMYK PDF/X intent. */
+export const SYNTHETIC_GRAY_ICC = path.join(FIXTURES, 'synthetic-gray.icc');
 export const RSA_KEY = path.join(FIXTURES, 'rsa-key.pem');
 export const RSA_CERT = path.join(FIXTURES, 'rsa-cert.pem');
 
@@ -110,6 +115,59 @@ export async function renderTo(
     const { stderr } = await captured(() => render(parseArgs(['--input', input, '--output', output, ...argv])));
     const bytes = await fs.readFile(output);
     return { output, bytes, stderr };
+}
+
+/** Render under --json: the status envelope (diagnostics included) and the bytes written. */
+export async function renderJson(
+    tmp: TempFiles,
+    doc: unknown,
+    argv: readonly string[] = [],
+): Promise<{ envelope: Record<string, unknown>; bytes: Buffer; output: string }> {
+    const input = await tmp.json('in.json', doc);
+    const output = tmp.path('out.pdf');
+    const { envelope } = await withJsonEnvelope(() => render(parseArgs(['--input', input, '--output', output, ...argv])));
+    return { envelope, bytes: await fs.readFile(output), output };
+}
+
+/** The diagnostic codes an envelope carries (empty when the field is absent). */
+export function diagnosticCodes(envelope: Record<string, unknown>): string[] {
+    const list = (envelope['diagnostics'] ?? []) as { code: string }[];
+    return list.map((d) => d.code);
+}
+
+export interface LayoutReport {
+    readonly totalPages: number;
+    readonly [key: string]: unknown;
+}
+
+/**
+ * `render --inspect-layout` written through --output (never stdout: under
+ * `captured()` the mocked stream never calls the write callback back).
+ */
+export async function inspectLayoutTo(tmp: TempFiles, doc: unknown, argv: readonly string[] = []): Promise<LayoutReport> {
+    const input = await tmp.json('layout-in.json', doc);
+    const output = tmp.path('layout.json');
+    await captured(() => render(parseArgs(['--input', input, '--output', output, '--inspect-layout', ...argv])));
+    return JSON.parse(await fs.readFile(output, 'utf8')) as LayoutReport;
+}
+
+export const sha256 = (b: Uint8Array): string => createHash('sha256').update(b).digest('hex');
+/** The file as a latin1 string — one char per byte, for operator and dictionary probes. */
+export const latin1 = (b: Uint8Array): string => Buffer.from(b).toString('latin1');
+export const pageCount = (bytes: Uint8Array): number => openPdf(new Uint8Array(bytes)).pageCount;
+
+/** Assert `fn` rejects with a CliError of this exit code (and stable code / message fragment). */
+export async function expectCliError(fn: () => Promise<unknown>, exitCode: number, code?: string, contains?: string): Promise<void> {
+    try {
+        await fn();
+        expect.unreachable('expected a CliError');
+    } catch (e) {
+        expect(e).toBeInstanceOf(CliError);
+        const err = e as CliError;
+        expect(err.exitCode).toBe(exitCode);
+        if (code !== undefined) expect(err.code).toBe(code);
+        if (contains !== undefined) expect(err.message).toContain(contains);
+    }
 }
 
 /** The document every v1.5.0 test starts from: one heading, one paragraph. */

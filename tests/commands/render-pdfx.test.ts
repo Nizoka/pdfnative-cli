@@ -7,7 +7,7 @@ import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { CliError, ErrorCode } from '../../src/utils/error.js';
 import { validatePdfX } from '../../src/core-bridge/index.js';
-import { TempFiles, SYNTHETIC_CMYK_ICC, MINIMAL_DOC, renderTo, captured, withJsonEnvelope } from '../helpers/cli-harness.js';
+import { TempFiles, SYNTHETIC_CMYK_ICC, MINIMAL_DOC, renderTo, captured, withJsonEnvelope, expectCliError } from '../helpers/cli-harness.js';
 
 const tmp = new TempFiles();
 afterEach(async () => {
@@ -26,19 +26,6 @@ const PRINT_DOC = {
     ],
     layout: { print: { bleed: 8.5 } },
 };
-
-async function expectCliError(fn: () => Promise<unknown>, exitCode: number, code?: string, contains?: string): Promise<void> {
-    try {
-        await fn();
-        expect.unreachable('expected a CliError');
-    } catch (e) {
-        expect(e).toBeInstanceOf(CliError);
-        const err = e as CliError;
-        expect(err.exitCode).toBe(exitCode);
-        if (code !== undefined) expect(err.code).toBe(code);
-        if (contains !== undefined) expect(err.message).toContain(contains);
-    }
-}
 
 describe('render --pdfx pdfx4', () => {
     it('renders a file validatePdfX() accepts, with the claim in XMP and /Trapped /False', async () => {

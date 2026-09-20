@@ -271,9 +271,16 @@ export function textBombPayload(repeat: number): Uint8Array {
     return ENC.encode('BT /F1 12 Tf 10 100 Td (bomb) Tj ET\n'.repeat(repeat));
 }
 
+export interface ObjectsPdfOptions {
+    /** Header line (default `%PDF-1.7`). */
+    readonly header?: string;
+    /** Add a trailer `/ID` (PDF/X requires one). */
+    readonly id?: boolean;
+}
+
 /** Assemble numbered objects (1-based) with a correct xref table; object 1 is the catalog. */
-export function buildObjectsPdf(objects: readonly (string | Uint8Array)[]): Uint8Array {
-    const parts: Uint8Array[] = [ENC.encode('%PDF-1.7\n%\xe2\xe3\xcf\xd3\n')];
+export function buildObjectsPdf(objects: readonly (string | Uint8Array)[], opts: ObjectsPdfOptions = {}): Uint8Array {
+    const parts: Uint8Array[] = [ENC.encode(`${opts.header ?? '%PDF-1.7'}\n%\xe2\xe3\xcf\xd3\n`)];
     let offset = parts[0]!.length;
     const offsets: number[] = [];
     objects.forEach((body, i) => {
@@ -285,9 +292,23 @@ export function buildObjectsPdf(objects: readonly (string | Uint8Array)[]): Uint
     const xrefAt = offset;
     let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
     for (const o of offsets) xref += `${String(o).padStart(10, '0')} 00000 n \n`;
-    xref += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF\n`;
+    xref += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R${opts.id === true ? ' /ID [<01> <01>]' : ''} >>\nstartxref\n${xrefAt}\n%%EOF\n`;
     parts.push(ENC.encode(xref));
     return concatBytes(parts);
+}
+
+/**
+ * Replace the first occurrence of `from` with `to` (same byte length, latin1)
+ * so every xref offset stays valid. Throws when the marker is absent: a probe
+ * that silently patches nothing would prove nothing.
+ */
+export function patchBytes(bytes: Uint8Array, from: string, to: string): Uint8Array {
+    if (from.length !== to.length) throw new Error(`patchBytes: "${from}" and "${to}" differ in length`);
+    const at = Buffer.from(bytes).indexOf(Buffer.from(from, 'latin1'));
+    if (at === -1) throw new Error(`patchBytes: marker "${from}" not found`);
+    const out = Uint8Array.from(bytes);
+    out.set(Buffer.from(to, 'latin1'), at);
+    return out;
 }
 
 let minimal: Uint8Array | null = null;
