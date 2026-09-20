@@ -5,8 +5,8 @@
 This folder holds the fixtures the `pdfnative-cli` test suite and the sample
 generator need to be deterministic without downloading anything: self-signed
 key pairs and X.509 certificates for the `sign` → `verify` round-trip, a
-synthetic CMYK ICC profile for the PDF/X-4 paths, and the engine's build-error
-message corpus.
+synthetic CMYK and Gray ICC profiles for the PDF/X-4 and output-intent paths,
+and the engine's build-error message corpus.
 
 | File | Purpose |
 | ---- | ------- |
@@ -15,6 +15,7 @@ message corpus.
 | `ec-key.pem` | EC P-256 private key (SEC1) |
 | `ec-cert.pem` | Self-signed X.509 cert for the above |
 | `synthetic-cmyk.icc` | Synthetic ICC v2 `prtr` CMYK profile (9 968 bytes) — the output intent of every PDF/X-4 test, corpus entry and sample |
+| `synthetic-gray.icc` | Synthetic ICC v2 `prtr` Gray profile (408 bytes) — the Gray output intent, and the non-CMYK PDF/X intent that triggers `PDFX_DEVICE_CMYK` |
 | `pdfnative-build-errors.json` | The coherence messages pdfnative 1.8.0's builders throw (PDF/X, print geometry, OutputIntent, attachments, watermark) — each must classify as `E_INPUT` |
 
 These fixtures are committed for deterministic CI runs (no `openssl`
@@ -32,6 +33,16 @@ must never be reused outside it; the same key pair signs the sample corpus
   header before accepting an output intent, so the 128-byte stub earlier tests
   used is rejected (`outputIntent.iccProfile is not an ICC profile`). The same
   bytes ship as `samples/render/print/synthetic-cmyk.icc`.
+- **`synthetic-gray.icc`** is generated in this repository by
+  `scripts/lib/synthetic-gray-profile.ts` (the monochrome twin of the engine's CMYK
+  generator, which ships no Gray profile): ICC v2.1, class `prtr`, colour space
+  `GRAY`, XYZ connection space, tags `desc`, `cprt`, `wtpt`, `kTRC` (gamma 2.2) —
+  **not a press profile**. `tests/tools/synthetic-gray-profile.test.ts` holds the
+  committed bytes to the generator; the same bytes ship as
+  `samples/render/print/synthetic-gray.icc`. Regenerate both copies with
+  `npx tsx scripts/lib/synthetic-gray-profile.ts`. The ICC v4 variant the generator
+  can also write is never committed: tests and the conformance corpus build it on
+  the fly to prove that PDF/A-1b refuses it (`PDFA_ICC_PROFILE_VERSION`).
 - **`pdfnative-build-errors.json`** is derived from `docs/data/errors.json →
   buildErrors` of the pdfnative repository (1.8.0), with the `${…}` placeholders
   substituted by representative values. `tests/utils/build-errors.test.ts` feeds

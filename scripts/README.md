@@ -40,6 +40,7 @@ npm run build && npm run test:generate && npx tsx scripts/verify-samples.ts   # 
 | `lib/cli-surface.ts` | verify-docs, tests | The command surface derived from `src/commands/completion.ts`, `schema.ts`, `error.ts` |
 | `lib/markdown-anchors.ts` | verify-docs (`anchor-parity`) | GitHub heading slugs, the anchor inventory of a document, its fragment links |
 | `lib/bundle-probe.ts` | gate (`bundle-check`) | What `dist/cli.cjs` must (external engine) and must not (markers, font data, PEM, `console.log`) contain |
+| `lib/synthetic-gray-profile.ts` | generate-pdfa-corpus, tests; run directly to rewrite the two committed copies | The synthetic ICC Gray `prtr` profile (`tests/fixtures/synthetic-gray.icc`, `samples/render/print/synthetic-gray.icc`) and its never-committed v4 variant |
 | `lib/agent-config.ts`, `lib/prose-language.ts` | verify-docs, tests | `.claude/settings.json` checks; the English-only prose detector |
 | `helpers/cli.ts`, `helpers/io.ts`, `helpers/tz.ts` | every generator | Spawning the built CLI, shared I/O and the pinned instant, `TZ=UTC` |
 | `generators/render.ts`, `generators/drivers.ts`, `generators/derived.ts` | generate-samples | The three sample families: JSON renders, Node driver samples, outputs derived through the other commands |
