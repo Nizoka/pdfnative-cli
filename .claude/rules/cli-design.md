@@ -28,8 +28,9 @@ paths:
 - `loadCommand()` switches on the command name and dynamically imports `commands/<name>.js` (one
   `case` per command). The `--help` switch prints `<NAME>_USAGE`. Both switches must know every
   command in `completion.ts` `COMMANDS` (`verify:docs` rule `command-parity`).
-- `--help`/`-h` and `--version`/`-V` (`--json` → `{ version, node, pdfnative }`) are handled before dispatch.
-- Unknown command → stderr message + exit 1 (`E_USAGE` envelope under `--json`).
+- `--help`/`-h` and `--version`/`-V` (`--json` → `{ name, version }`) are handled before dispatch.
+- Unknown command → stderr message + exit 1 (`E_RUNTIME` envelope under `--json`); arguments with no command at all → exit 2 (`E_USAGE`); a bare `pdfnative` prints the usage and exits 0.
+- A COMMAND flag placed before the command (`--strict render …`) is recovered: `splitCommandArgv(argv, KNOWN_COMMANDS)` takes the first token that is a command name.
 
 ## Global flags
 

@@ -336,7 +336,7 @@ agent) and **merged, tagged and published by the maintainer only**:
    entry is declared in the note's Upgrade section.
 4. `npx tsx scripts/gate.ts --publish --require-all` must pass locally with veraPDF installed;
    in Claude Code, `/release-audit release-notes/vX.Y.Z.md vA.B.C` runs the independent audit
-   and writes its ledger under `test-output/.audit/`.
+   and writes its ledger under `.audit/`.
 5. Draft the PR body: copy [release-notes/PR_TEMPLATE.md](release-notes/PR_TEMPLATE.md) to
    `release-notes/draft/PR-vX.Y.Z.md` and fill every section (summary, changes by area, the
    audit ledger, what actually ran, backward compatibility, out of scope, self-review). The

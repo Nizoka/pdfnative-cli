@@ -91,7 +91,7 @@ applyTo: "src/commands/**,src/utils/**,src/core-bridge/**"
 
 ## `inspect` / `extract-text` / `compare`
 
-- `inspect`: default JSON; `--text` human-readable; no raw binary blobs. `--pdfua` and `--pdfx`
+- `inspect`: default JSON; `--format text` human-readable; no raw binary blobs. `--pdfua` and `--pdfx`
   add validator reports; `pdfaConformance` and `pdfxConformance` (XMP `pdfxid:GTS_PDFXVersion`)
   are always present; `--iso-dates` normalises `/CreationDate` and `/ModDate` through
   `utils/pdfdate.ts`. `--check` allow-list: `pdfa`, `signed`, `encrypted`, `pdfua`, `pdfx`,

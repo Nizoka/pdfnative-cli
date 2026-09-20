@@ -214,7 +214,7 @@ samples/
 
 | File | Description |
 |------|-------------|
-| [01-contact-form.json](render/form/01-contact-form.json) | Contact form: `text`, `email`, `phone`, `textarea` fields |
+| [01-contact-form.json](render/form/01-contact-form.json) | Contact form: `text` fields (name, e-mail, phone) and a `multilineText` message |
 | [02-survey.json](render/form/02-survey.json) | Survey with `radio`, `checkbox`, and `select` fields |
 
 ### `render/toc/` — Table of Contents
@@ -673,7 +673,7 @@ operations: metadata editing, PDF comparison, manifest pipelines, and print prod
 | [02-justify-optical-hyphenation.json](render/typography/02-justify-optical-hyphenation.json) | `align: "justify"`, `opticalMargins`, `hyphenationLanguage`, soft hyphens (U+00AD break opportunities, always honoured) |
 | [03-french-spacing-units-short-words.json](render/typography/03-french-spacing-units-short-words.json) | `punctuationSpacing: "fr"` (narrow no-break space before `; : ! ?`, inside guillemets), `unitBinding` (`150 €`, `20 %` never break), short-word rules — the demonstrated content is French (`demo-language: fr`) |
 | [04-kerning-features-metrics.json](render/typography/04-kerning-features-metrics.json) | `kerning`, OpenType `fontFeatures` (`onum`, `smcp`), `metrics: "exact"` base-14 widths |
-| [01-typography.sh](render/typography/01-typography.sh) | Renders all four with `--font latin --lang latin`, then re-renders `01` with the flags `--split-paragraphs --keep-headings-with-next --kerning --font-features onum,liga` and shows `--inspect-layout` |
+| [01-typography.sh](render/typography/01-typography.sh) | Renders all four with `--font latin --lang latin`, then re-renders `01` with the flags `--split-paragraphs --keep-headings-with-next --kerning --font-features onum,smcp` and shows `--inspect-layout` |
 | [01-typography.ps1](render/typography/01-typography.ps1) | PowerShell equivalent |
 
 Every typography option lives in `layout.typography` (JSON, `--layout` file or the four flags; flags win, nested objects merge one level). Requesting a feature the font cannot honour (`tnum` on a font without the table) emits `TYPOGRAPHY_FEATURE_INEFFECTIVE` — a warning, or `E_CHECK_FAILED` under `--strict`. Tagged output carries `/ActualText`, so `extract-text` returns the source text, not the inserted spaces.

@@ -31,6 +31,17 @@ the two documents do not overlap.
 Keep stdout binary-clean: write PDFs to `--output <file>` or redirect stdout, and
 read the envelope from stderr.
 
+**Reading stderr under `--json`.** The envelope is always the **last line** of stderr and the
+only line that parses as a JSON object; human `warning:` lines (the same diagnostics the
+envelope carries in `diagnostics[]`) may precede it. Parse the last line, or add `--quiet` to
+silence the progress and warning lines.
+
+**Flag placement.** Global flags may precede the command. A command's own flags belong after
+the command name; a command flag written first (`pdfnative --strict render …`) is still
+resolved, but a flag that takes a value must never be the token right before the command
+name. Arguments that name no command at all are a usage error (exit 2, `E_USAGE`) — never a
+silent exit 0.
+
 **Global flags may precede or follow the command name** (v1.5.0):
 `pdfnative --json --dry-run render --input doc.json` and
 `pdfnative render --input doc.json --json --dry-run` are equivalent. The global

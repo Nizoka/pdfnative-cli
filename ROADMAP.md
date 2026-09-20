@@ -280,7 +280,13 @@ Feasibility is called out honestly: some ideas need pdfnative to expose a primit
 - **PDF/A and PDF/X in one file** — ISO 19005 and ISO 15930 can be claimed together
   (PDF/A-2 + PDF/X-4), but the engine refuses `layout.pdfx` with `tagged` and the CLI mirrors
   that pre-check. **Blocked upstream**.
-- **Hyphenation dictionaries from the CLI** — `layout.typography.softHyphens` breaks at
+- **`formField.fieldType` validated by the engine** — pdfnative 1.8.0 does not check the value:
+  anything outside `text` / `multilineText` / `checkbox` / `radio` / `dropdown` / `listbox` falls
+  through its geometry table and writes `NaN` rectangles. `render` refuses the value up front
+  (`E_INPUT`, v1.5.0); the guard can go once the builder throws. Same family: with
+  `layout.typography.kerning` on an untagged document, `extract-text` can read a stray space
+  inside a kerned word. **Upstream issues to file** (maintainer, HITL).
+- **Hyphenation dictionaries from the CLI** — the engine breaks lines at
   existing U+00AD soft hyphens; a language dictionary or a hyphenation provider (a function in
   the engine's API) would need the CLI to load code or data from a user path. Deferred by
   posture (the CLI loads fonts from disk, never code); a bundled dictionary would have to ship

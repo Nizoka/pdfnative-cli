@@ -77,7 +77,7 @@ describe('loadPem — env precedence', () => {
     });
 
     it('reads from file when env is unset', async () => {
-        const p = path.join(os.tmpdir(), `key-${Date.now()}.pem`);
+        const p = path.join(os.tmpdir(), `keys-test-key-${Date.now()}-${Math.random().toString(36).slice(2)}.pem`);
         tmp.push(p);
         await fs.writeFile(p, FAKE_PEM, 'utf8');
         const pem = await loadPem('TEST_PEM_ENV', p, 'cert', 'cert');

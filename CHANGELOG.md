@@ -176,7 +176,7 @@ backward-compatible command surface — every envelope field is additive.
   double-render script proves byte identity across timezones), `inspect --check pdfx` and
   `--iso-dates`, `doctor` capabilities, `annotate link`, `verify` weak digest,
   `sign --timestamp-timeout`, global flags first — each as a dual-shell pair.
-- **Tests** — 1210 tests across 84 files (600 in 1.4.0): every feature above,
+- **Tests** — 1234 tests across 85 files (600 in 1.4.0): every feature above,
   the tools (gate, validators, fingerprints, sample plan, verify-docs, release-prepare, agent
   config, guard, workflows), the sample regression suite, an English-only prose scan, a
   reproducible-build integration test that spawns the built binary under two timezones, and a
@@ -212,6 +212,17 @@ backward-compatible command surface — every envelope field is additive.
   by the document when the file sets a sibling key.
 - `tests/commands/render-enhancements.test.ts` used a 128-byte fake ICC profile that the
   1.8.0 engine rejects (no `acsp` signature); the suite now uses a real synthetic profile.
+- `render` refuses an unknown `formField.fieldType` with `E_INPUT`, in a real run and under
+  `--dry-run`. The engine does not validate the value, so `textarea` / `select` produced `NaN`
+  field rectangles that `fill` then refused; the allowed values are `text`, `multilineText`,
+  `checkbox`, `radio`, `dropdown`, `listbox`. Three samples used `textarea` and are corrected
+  (`form/01-contact-form`, `form/02-survey`, `document/03-all-blocks` rebaselined before release).
+- A command flag placed before the command (`pdfnative --strict render …`) no longer swallows
+  the command name — `splitCommandArgv` recovers it from the known command names. Arguments
+  with no command exit 2 (`E_USAGE`); a bare `pdfnative` still prints the usage and exits 0.
+- Docs and help aligned with the binary after the final review: `inspect --iso-dates` covers
+  `metadata.modDate`; `fontFeatures` examples use `smcp` (no ligature feature is applied);
+  the release-audit ledger lives under the git-ignored `.audit/` (readable by agents).
 
 ### Security
 

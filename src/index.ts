@@ -2,7 +2,7 @@ import { parseArgs, hasFlag, getStringFlag, GLOBAL_BOOLEAN_FLAGS } from './utils
 import { splitCommandArgv } from './utils/argv.js';
 import { CliError } from './utils/error.js';
 import { isJsonMode, emitJsonError } from './utils/agent.js';
-import { loadConfig, applyConfigDefaults } from './utils/config.js';
+import { loadConfig, applyConfigDefaults, KNOWN_COMMANDS } from './utils/config.js';
 import { cliVersion } from './utils/version.js';
 import { resolveReproducibleDate } from './utils/reproducible.js';
 
@@ -491,8 +491,8 @@ Options:
                   actions, embedded files, OPI/PostScript XObjects, LZW,
                   transfer functions, device colour. Not a certified preflight
                   (veraPDF does not cover PDF/X).
-  --iso-dates     Normalise metadata.creationDate from the PDF date string
-                  (D:YYYYMMDDHHmmSS+HH'mm') to ISO 8601
+  --iso-dates     Normalise metadata.creationDate and metadata.modDate from the
+                  PDF date string (D:YYYYMMDDHHmmSS+HH'mm') to ISO 8601
   --signatures    List signature fields (fieldName, subFilter, byteRange,
                   isDocTimestamp, isPlaceholder — never the signature bytes)
   --check         Assert a property; repeatable; AND semantics; exits 1 on
@@ -1014,11 +1014,18 @@ async function main(): Promise<void> {
         process.exit(0);
     }
 
-    const { commandName, commandArgv } = splitCommandArgv(argv);
+    // A COMMAND flag placed before the command (`--strict render …`) would
+    // otherwise swallow the command name; the known names recover it.
+    const { commandName, commandArgv } = splitCommandArgv(argv, KNOWN_COMMANDS);
 
     if (commandName === undefined) {
-        process.stdout.write(USAGE);
-        process.exit(0);
+        if (argv.length === 0) {
+            process.stdout.write(USAGE);
+            process.exit(0);
+        }
+        // Arguments but no command: never answer "success" with a usage text —
+        // an agent would read exit 0 as "done" while nothing was produced.
+        throw new CliError('No command given. Run pdfnative --help for usage.', 2);
     }
 
     activeCommand = commandName;

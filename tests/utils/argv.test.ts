@@ -70,3 +70,42 @@ describe('splitCommandArgv', () => {
         expect(r.commandArgv).toEqual(['--config', 'rc.json', '--format', 'json']);
     });
 });
+
+describe('splitCommandArgv with the known command names (audit D-02)', () => {
+    const KNOWN = ['render', 'inspect', 'extract-text', 'doc-timestamp'];
+
+    it('recovers the command when a COMMAND boolean flag precedes it', () => {
+        // `--strict` is not a global boolean, so the parser takes `render` as its
+        // value and no positional is left; the known names recover the command.
+        const r = splitCommandArgv(['--json', '--strict', 'render', '-i', 'a.json'], KNOWN);
+        expect(r.commandName).toBe('render');
+        expect(r.commandArgv).toEqual(['--json', '--strict', '-i', 'a.json']);
+        expect(parseArgs([...r.commandArgv], { booleanFlags: GLOBAL_BOOLEAN_FLAGS }).flags['strict']).toBe(true);
+    });
+
+    it('recovers the command after an unknown flag too', () => {
+        expect(splitCommandArgv(['--whatever', 'inspect', '--input', 'x.pdf'], KNOWN).commandName).toBe('inspect');
+    });
+
+    it('prefers a known first positional and strips only that occurrence', () => {
+        const r = splitCommandArgv(['render', '--input', 'render'], KNOWN);
+        expect(r.commandName).toBe('render');
+        expect(r.commandArgv).toEqual(['--input', 'render']);
+    });
+
+    it('never looks for a command after the -- terminator', () => {
+        expect(splitCommandArgv(['--strict', '--', 'render'], KNOWN).commandName).toBe('render'); // positional after --
+        expect(splitCommandArgv(['--output', 'x', '--'], KNOWN).commandName).toBeUndefined();
+    });
+
+    it('reports an unknown first positional as the (unknown) command', () => {
+        const r = splitCommandArgv(['frobnicate', '--json'], KNOWN);
+        expect(r.commandName).toBe('frobnicate');
+        expect(r.commandArgv).toEqual(['--json']);
+    });
+
+    it('returns no command when argv names none', () => {
+        expect(splitCommandArgv(['--json', '--input', 'a.json'], KNOWN).commandName).toBeUndefined();
+        expect(splitCommandArgv([], KNOWN).commandName).toBeUndefined();
+    });
+});

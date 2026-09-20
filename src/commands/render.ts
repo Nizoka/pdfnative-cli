@@ -87,6 +87,30 @@ function isDocumentParamsLike(value: unknown): value is DocumentParams {
     return Array.isArray(v.blocks);
 }
 
+/**
+ * The `fieldType` values pdfnative's `FormFieldType` accepts. The engine does
+ * not validate the value: an unknown type (the HTML-flavoured `textarea` /
+ * `select` are the usual guesses) falls through its per-type geometry table
+ * and writes `NaN` coordinates — a PDF every reader, this CLI's `fill` and
+ * `inspect --form-fields` included, then refuses. Refuse it here instead.
+ */
+export const FORM_FIELD_TYPES: readonly string[] = ['text', 'multilineText', 'checkbox', 'radio', 'dropdown', 'listbox'];
+
+function assertKnownFormFieldTypes(params: DocumentParams): void {
+    params.blocks.forEach((block, index) => {
+        const b = block as { type?: unknown; fieldType?: unknown; name?: unknown };
+        if (b.type !== 'formField') return;
+        if (typeof b.fieldType === 'string' && FORM_FIELD_TYPES.includes(b.fieldType)) return;
+        const label = typeof b.name === 'string' ? ` ("${b.name}")` : '';
+        throw new CliError(
+            `blocks[${index}]${label}: unknown formField fieldType ${JSON.stringify(b.fieldType ?? null)}. `
+            + `Allowed: ${FORM_FIELD_TYPES.join(', ')}.`,
+            1,
+            ErrorCode.INPUT,
+        );
+    });
+}
+
 /** Detect TOC blocks (incompatible with --stream). */
 function hasTocBlock(params: DocumentParams): boolean {
     for (const b of params.blocks) {
@@ -519,6 +543,8 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
     }
 
     let params: DocumentParams = parsedInput;
+
+    assertKnownFormFieldTypes(params);
 
     if (cfg.tableDefaults !== undefined) {
         params = applyTableDefaults(params, cfg.tableDefaults);

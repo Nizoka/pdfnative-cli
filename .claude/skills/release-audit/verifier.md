@@ -21,6 +21,6 @@ You receive one or two auditor reports for a pdfnative-cli release. Assume each 
 
 ## Output
 
-Write `test-output/.audit/<version>/verifier-<n>.md`: the auditor's table with a `stamp` and `justification` column added, then a tally per stamp and per severity. Finish with the list of `CONFIRMED` blockers, if any — that list is what Phase E reads first.
+Write `.audit/<version>/verifier-<n>.md`: the auditor's table with a `stamp` and `justification` column added, then a tally per stamp and per severity. Finish with the list of `CONFIRMED` blockers, if any — that list is what Phase E reads first.
 
 Do not fix anything. Do not push, tag or publish. Never put `npm publish`, `gh release`, `git push` or `git tag <name>` in a Bash command — the guard hook refuses the whole command.

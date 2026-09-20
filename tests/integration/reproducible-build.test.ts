@@ -69,6 +69,22 @@ describe.runIf(haveDist)('dist/cli.cjs reproducible output', () => {
         expect(r.stderr).toContain('"dryRun":true');
     });
 
+    it('a command flag placed before the command is recovered, not swallowed', () => {
+        const r = run(['--json', '--strict', 'render', '--input', doc, '--dry-run']);
+        expect(r.status).toBe(0);
+        expect(r.stderr).toContain('"command":"render"');
+    });
+
+    it('arguments with no command exit 2 (E_USAGE); an unknown command exits 1; a bare call prints the usage', () => {
+        const none = run(['--json', '--input', doc]);
+        expect(none.status).toBe(2);
+        expect(none.stderr).toContain('"code":"E_USAGE"');
+        expect(run(['frobnicate']).status).toBe(1);
+        const bare = run([]);
+        expect(bare.status).toBe(0);
+        expect(bare.stdout).toContain('Commands (21):');
+    });
+
     it('doctor reports the 1.5.0 capabilities and --version matches package.json', () => {
         const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as { version: string };
         expect(run(['--version']).stdout.trim()).toBe(pkg.version);

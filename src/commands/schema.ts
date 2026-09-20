@@ -59,7 +59,9 @@ function renderSchema(): JsonSchema {
             blocks: {
                 type: 'array',
                 description: 'Ordered document blocks (heading, paragraph, table, list, '
-                    + 'spacer, pageBreak, image, link, toc, barcode, svg, formField, '
+                    + 'spacer, pageBreak, image, link, toc, barcode, svg, formField '
+                    + '(fieldType: text | multilineText | checkbox | radio | dropdown | listbox — '
+                    + 'any other value is refused with E_INPUT), '
                     + 'chart). Chart blocks support 9 kinds (bar, barH, line, pie, '
                     + 'donut, stackedBar, stackedBarH, area, scatter) plus xValues, '
                     + 'yAxis "left"|"right", axis.scale "linear"|"log", axis2, xAxis '

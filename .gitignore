@@ -38,7 +38,9 @@ Thumbs.db
 # Logs
 *.log
 
-# Release audit ledgers (skill release-audit) and gate logs live under test-output/
+# Gate logs live under test-output/; release audit ledgers (skill release-audit) under .audit/
+# (test-output/ is read-denied to Claude Code, the ledger must stay readable)
+.audit/
 
 # npm
 *.tgz

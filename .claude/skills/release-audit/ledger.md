@@ -1,6 +1,6 @@
 # Ledger and verdict formats
 
-Everything lives under `test-output/.audit/<version>/` (git-ignored). Plain Markdown, one table per file, so `git diff`-style review and grep both work.
+Everything lives under `.audit/<version>/` (git-ignored). Plain Markdown, one table per file, so `git diff`-style review and grep both work.
 
 ## Finding format (auditors)
 

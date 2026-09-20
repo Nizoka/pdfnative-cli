@@ -80,8 +80,10 @@ samples/                       # dual-shell demos (.sh + .ps1) and the JSON docu
   `--no-color`, `--config`, `--no-config`, `--max-inflate-size`, `--creation-date`, `--help`,
   `--version`) are accepted before or after it.
 - `--help` / `-h` prints usage and exits 0; `--version` / `-V` prints the version (`--json` for
-  `{ version, node, pdfnative }`) and exits 0.
-- Unknown command prints an error to stderr and exits 1.
+  `{ name, version }`) and exits 0.
+- Unknown command prints an error to stderr and exits 1; arguments with no command exit 2
+  (`E_USAGE`); a bare `pdfnative` prints the usage and exits 0. A command flag placed before the
+  command (`--strict render …`) is recovered through the known command names.
 - `CliError` is caught in `main()` — prints `.message` to stderr (or the `--json` envelope) and
   exits `.exitCode`; all other unhandled errors exit 1.
 - `--creation-date <iso>` (fallback `SOURCE_DATE_EPOCH`) calls `setDefaultCreationDate()` once,

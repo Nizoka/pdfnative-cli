@@ -1,6 +1,6 @@
 ---
 name: release-audit
-description: Pre-release audit of pdfnative-cli — two parallel auditors (claims vs code; docs, counters and agent surfaces), an adversarial verifier, an agent-autonomy pass and a GO/NO-GO ledger under test-output/.audit/<version>/. Run by the maintainer before every release; never invoked by the model on its own.
+description: Pre-release audit of pdfnative-cli — two parallel auditors (claims vs code; docs, counters and agent surfaces), an adversarial verifier, an agent-autonomy pass and a GO/NO-GO ledger under .audit/<version>/. Run by the maintainer before every release; never invoked by the model on its own.
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Bash(npm run *), Bash(npx tsx scripts/*), Bash(npx vitest *), Bash(node dist/cli.cjs *), Bash(git diff*), Bash(git log*), Bash(git show*), Agent
 argument-hint: [release-notes/vX.Y.Z.md] [previous-tag]
@@ -14,7 +14,7 @@ Read `ledger.md` first for the ledger and verdict formats. Each phase below hand
 
 ## Ledger location
 
-`test-output/.audit/<version>/` — `test-output/` is git-ignored (check `.gitignore` covers it before writing), so nothing here is ever committed. One Markdown file per report: auditor-a, auditor-b, verifier-1, auditor-d, verifier-2, then the ledger and the verdict (formats in `ledger.md`).
+`.audit/<version>/` — git-ignored (check `.gitignore` covers it before writing; it is NOT under `test-output/`, which Claude Code is denied to Read), so nothing here is ever committed. One Markdown file per report: auditor-a, auditor-b, verifier-1, auditor-d, verifier-2, then the ledger and the verdict (formats in `ledger.md`).
 
 ## Phase A and B — two auditors, in parallel
 

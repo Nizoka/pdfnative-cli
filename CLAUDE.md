@@ -61,7 +61,7 @@ Use plan mode for multi-file changes; plans name the files, the commands and the
 - `.claude/rules/*.md` are generated from `.github/instructions/*.instructions.md` by `npm run agents:rules` (scoped by `paths:` = the source `applyTo`).
   Never edit a rule: edit the instruction file, then regenerate (`verify:docs` rule `claude-rules-sync` fails on drift).
 - `/release-audit [release-notes/vX.Y.Z.md] [previous-tag]` (`.claude/skills/release-audit/`) is the maintainer-invoked pre-release audit:
-  two auditors, an adversarial verifier, an agent-autonomy pass and a GO/NO-GO ledger under `test-output/.audit/`.
+  two auditors, an adversarial verifier, an agent-autonomy pass and a GO/NO-GO ledger under `.audit/`.
 
 ## Release
 

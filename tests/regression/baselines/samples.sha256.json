@@ -85,8 +85,8 @@
     },
     "document/03-all-blocks.pdf": {
       "mode": "bytes",
-      "hash": "0496fed7e22fdb455769018e60584efa69c0301f3b6e34940b88dba1b760d191",
-      "size": 20542,
+      "hash": "522438e461d9e74441ee6a0829031442f97547dbfe48acea53f8b2e846eb201e",
+      "size": 20652,
       "since": "1.5.0"
     },
     "document/04-invoice.pdf": {
@@ -187,14 +187,14 @@
     },
     "form/01-contact-form.pdf": {
       "mode": "bytes",
-      "hash": "47ba19f53b3cbfbb60a56d1ce1a22dcd2b7da3c9bc0f6928929464615ba3fb51",
-      "size": 10787,
+      "hash": "4b608188b7604c4b6d26586b1c42ee369c7199109301b3afc4a0ab35afeeb3cf",
+      "size": 10893,
       "since": "1.5.0"
     },
     "form/02-survey.pdf": {
       "mode": "bytes",
-      "hash": "beb93ceffa4dbccd0f73b6e04d20ef02dafc70f45011b5bc7d6e01378f18c732",
-      "size": 13523,
+      "hash": "bd5c48e760a1a74c8d2c3629eb31ac51adc2df0a54f370345142e6dd17ee62c6",
+      "size": 14186,
       "since": "1.5.0"
     },
     "headers-footers/01-page-numbers.pdf": {

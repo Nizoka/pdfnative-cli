@@ -134,7 +134,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
   `tests/regression/baselines/samples.sha256.json`), a PDF/A + PDF/X conformance corpus,
   hardened workflows (egress-audited runners, SHA-pinned actions, Trusted Publishing, SBOM +
   build attestations), a documentation verifier (`npm run verify:docs`) and a committed
-  Claude Code layer with a human-in-the-loop guard hook — 1210 tests.
+  Claude Code layer with a human-in-the-loop guard hook — 1234 tests.
 - **AI-governance / HITL** — the **`govern`** command surfaces pdfnative's Human-in-the-Loop
   contract to agents: they act as *draftsmen*, never autonomous submitters. `govern
   verify-issue` gates a local draft; a human always reviews and submits.
@@ -397,7 +397,7 @@ pdfnative render --input document.json --output archived.pdf \
 # Typography: split long paragraphs across pages, keep headings with their body,
 # kern the bundled Latin font and turn on old-style numerals
 pdfnative render --input report.json --output report.pdf --font latin --lang latin \
-  --split-paragraphs --keep-headings-with-next --kerning --font-features onum,liga
+  --split-paragraphs --keep-headings-with-next --kerning --font-features onum,smcp
 
 # The full typography surface lives in layout.typography (JSON or --layout file):
 # widows/orphans, justify, optical margins, soft hyphens, French spacing + unit binding
@@ -695,7 +695,7 @@ The 21 commands are grouped by purpose (the global `pdfnative --help` shows the 
 | `--split-paragraphs` | false | (v1.5.0) `layout.typography.splitParagraphs` — long paragraphs may break across pages (widow/orphan rules apply) |
 | `--keep-headings-with-next` | false | (v1.5.0) `layout.typography.keepHeadingsWithNext` — a heading never ends a page alone |
 | `--kerning` | false | (v1.5.0) `layout.typography.kerning` — GPOS pair kerning for embedded fonts |
-| `--font-features <tag,…>` | — | (v1.5.0) `layout.typography.fontFeatures` — OpenType feature tags (`onum`, `smcp`, `tnum`, `liga`, …; four alphanumerics each) |
+| `--font-features <tag,…>` | — | (v1.5.0) `layout.typography.fontFeatures` — OpenType feature tags (`onum`, `smcp`, `tnum`, …; ligature features are not applied by the engine; four alphanumerics each) |
 | `--conformance <1b\|2b\|3b>` | — | **Deprecated** — use `--tagged pdfa<level>` |
 | `--watermark-text <s>` / `--watermark-image <path>` | — | Text or image watermark |
 | `--watermark-opacity <0-1>` / `--watermark-angle <deg>` / `--watermark-color <#hex>` / `--watermark-font-size <pt>` / `--watermark-position background\|foreground` | — | Watermark styling |
