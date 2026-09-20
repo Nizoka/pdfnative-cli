@@ -21,7 +21,7 @@ Counts: 21 commands, 19 schema subjects, 12 stable error codes and 14 manifest c
 unchanged; global flags 9 → 10 (`--creation-date`); `render` flags 44 → 57; `inspect`
 14 → 16; `sign` 21 → 23; `--font` 22 → 27 scripts (+ 4 aliases); `--strict` diagnostics
 3 → 9; `doctor` checks 5 → 8; conformance corpus 12 → 16 files; workflows 5 → 9;
-tests 600 → 1234 across 85 files.
+tests 600 → 1237 across 85 files.
 
 ## Changes
 
@@ -101,7 +101,7 @@ tests 600 → 1234 across 85 files.
   `render/reproducible/`, `inspect/09-10`, `doctor/02`, `annotate/02`, `verify/07`,
   `sign/10`, `agent/05`; multilang drivers honour `PDFNATIVE_SAMPLES_OUT` /
   `SOURCE_DATE_EPOCH`; `tests/regression/baselines/samples.sha256.json` (79 entries).
-- Tests: 1234 across 85 files (was 600) — `tests/helpers/cli-harness.ts`, per-feature
+- Tests: 1237 across 85 files (was 600) — `tests/helpers/cli-harness.ts`, per-feature
   command suites, utils, `integration/{pdfx-roundtrip,reproducible-build}`,
   `tools/{gate,verapdf,pdfx,workflows,sample-plan,verify-docs,cli-surface,agent-config,
   build-claude-rules,release-prepare,guard}`, `regression/samples`, `docs/prose-language`.
@@ -116,27 +116,65 @@ tests 600 → 1234 across 85 files.
 
 ## Independent audit
 
-`/release-audit release-notes/v1.5.0.md v1.4.0` — PENDING (run by the maintainer in
-Claude Code before merge; the ledger lands under `.audit/1.5.0/`).
+Method of `.claude/skills/release-audit/` applied on the branch before this PR: two
+independent auditors, an adversarial verifier, the fixes, a final reviewer and a re-review of
+the final fixes. Every finding carries a reproducible command; the working reports stay out
+of the tree (git-ignored `.audit/`). The maintainer's own `/release-audit
+release-notes/v1.5.0.md v1.4.0` countersigns this before merge.
+
+- **Auditor A — claims vs code**: 55 claims of the release note, CHANGELOG, README and
+  AGENT_CONTRACT checked against the code and the built binary.
+- **Auditor B — hardening parity**: 118 mechanisms of pdfnative 1.8.0 compared (package,
+  `.github/`, scripts, tests, `.claude/`, docs, supply chain) + the agent surfaces.
+- **Verifier**: 14 CONFIRMED, 1 DOWNGRADED, 3 DUPLICATE, 3 REJECTED — 0 blocker, 6 major,
+  8 minor, 1 note.
+- **Final reviewer D** (read-only, agent-autonomy pass on 10 features): conditional NO-GO on
+  2 majors, both fixed; **re-review**: all D fixes hold, 2 minor residues + 1 note fixed.
+
+| id | severity | finding | fix |
+|---|---|---|---|
+| A-22 | major | `render --dry-run` returned before the engine builder: no coherence error, no diagnostics | `d2df525` — the real buffered build runs in memory, bytes discarded |
+| A-12 / A-13 / A-14 | major | docs named `layout.typography.features` / `softHyphens` / `justify` and an object form of `punctuationSpacing`; none exists in the engine | `3cddfb3` — `fontFeatures`, paragraph `align`, `'fr' \| 'fr-CA' \| rule[]` |
+| B-03 | major | `schema status` pinned 9 of the emitted envelope fields | `3cddfb3` — 31 properties pinned + an emit ↔ schema parity test |
+| A-08 | major | CI ran the tests before the build: two `runIf` suites skipped silently | `f795e20` — build and samples first, `GATE_REQUIRE_ARTIFACTS=1` |
+| D-01 | major | `formField.fieldType: "textarea"` (3 samples, docs) is not an engine type: `NaN` rectangles, `fill` refused the PDF | `ee0fc95` — `render` refuses unknown types (`E_INPUT`), samples corrected and rebaselined |
+| D-02 | major | a command flag before the command swallowed the command name (usage, exit 0) | `ee0fc95`, `b1f87c3` — recovered before the first positional; no command → exit 2 |
+| A-23, A-30, A-34, A-44, B-08, B-09, B-17, B-18 | minor | `acsp` check attribution, `batch` envelope wording, `inspect` `modDate`, config sections for 21 commands, `govern rules` = AGENT_RULES.md verbatim, dead anchor, flag counts, Node version in the bug template | `3cddfb3` |
+| D-03 … D-11 | minor / note | `liga` example, ROADMAP wording, `--iso-dates` help, instruction files vs binary, kerning note, stderr last-line rule, ledger under a read-denied path, temp-name collision | `ee0fc95` |
+| R-01, R-02, R-04 | minor / note | a typo + a flag value equal to a command name dispatched that command; `--pretty schema status` printed another subject; `blocks: [null]` raised a `TypeError` | `b1f87c3` |
+| A-45 | note | stale comment on the engine's `exports` map | `3cddfb3` |
+| G1, G4, G5 | parity | hostile-input suite, `anchor-parity` rule, `bundle-check` gate step | `01cb2d3`, `a11c891`, `f795e20` |
+| G2, G3, G6, G8, G9, G10, G14, G15 | parity | PR template, drafts template, compliance-audit prompt, CONTRIBUTING (first PR, branch protection), `scripts/README.md`, `scripts/tsconfig.json`, exact esbuild override, ignored logs | `4fec43f` |
+| G7 | note | no `THIRD-PARTY-NOTICES.md` | waived — the CLI vendors nothing (2 externals, checked by `bundle-check`) |
+| G11 | note | no `bench/` | deferred by the maintainer — ROADMAP entry |
+
+Rejected by the verifier: the `docs.yml` call form, the README badge placeholder (inside an
+HTML comment), one duplicate claim. Known and accepted: R-03 — a boolean command flag
+followed by two command names (`--pretty schema render`) is ambiguous; AGENT_CONTRACT §1
+tells agents to write command flags after the command. One intermittent failure of the
+live-tree `verify-docs` test was seen twice under `gate --fast` while files were being
+edited and not reproduced in 11 consecutive full runs on a quiet tree.
+
+**Verdict: GO** — no open blocker, every major has a commit, publish gate green (below).
 
 ## Validation (what actually ran on the release branch, Windows 11, Node 22.17.0)
 
 - `npm run typecheck:all` → clean (three configs). `npm run lint` → clean.
-- `npm run test:coverage` → **1234 / 1234 passing across 85 files**; coverage
-  statements 84.97 % / branches 74.45 % / functions 92.38 % / lines 86.81 %
+- `npm run test:coverage` → **1237 / 1237 passing across 85 files**; coverage
+  statements 85.99 % / branches 75.83 % / functions 92.53 % / lines 87.89 %
   (thresholds raised 79/68/83/79 → 82/71/86/82, `min(measured − 2, current + 3)`).
 - `npm run verify:docs` → 26 rules across the documentation corpus, 0 errors
-  (171 `eol-lf` warnings: CRLF blobs pending the maintainer's renormalisation commit).
+  (156 `eol-lf` warnings, shrinking as touched files normalise: CRLF blobs pending the maintainer's renormalisation commit).
 - `npm run build && npm run test:generate` → 79 PDFs, byte-identical across two runs;
   `npx tsx scripts/verify-samples.ts --strict` → green.
 - `npm run corpus:pdfa && npm run validate:pdfx` → 16 files; PDF/X 2 PASS + 1 XFAIL.
 - `npm run validate:pdfa` with veraPDF 1.30.2 (portable) + JDK 13 (`JAVACMD`) →
   11 PASS + 2 XFAIL + 3 SKIP (the PDF/X files), exit 0.
-- `npx tsx scripts/gate.ts --publish --require-all` → **13 passed, 0 skipped in 308 s**
-  (typecheck:all 24 s, lint 14 s, test:coverage 114 s — 1234 tests, 85.0 % stmts —, build
-  21 s, dist-check, smoke — 21 commands —, bundle-size 357 KiB of the 448 KiB budget,
-  verify:docs 6 s, test:generate 31 s — 79 PDFs —, verify:samples 5 s, corpus:pdfa 9 s,
-  validate:pdfx 4 s, validate:pdfa 77 s).
+- `npx tsx scripts/gate.ts --publish --require-all` at `b1f87c3` → **14 passed, 0 skipped
+  in 355 s** (typecheck:all 25 s, lint 8 s, build 13 s, dist-check, smoke — 21 commands —,
+  bundle-size 368 KiB of the 448 KiB budget, bundle-check — 2 externals —, test:generate
+  40 s — 79 PDFs —, test:coverage 138 s — 1237 tests, 86.0 % stmts —, verify:docs 5 s,
+  verify:samples 5 s, corpus:pdfa 13 s, validate:pdfx 6 s, validate:pdfa 101 s).
 - Built binary smoke: `--version` 1.5.0; `doctor --json` (pdfnative 1.8.0, fonts
   31/27, unicode, conformance); PDF/X-4 render → `inspect --check pdfx` exit 0 →
   `annotate` link → `--check pdfx` exit 1; identical SHA-256 under `TZ=Europe/Paris`
@@ -180,7 +218,13 @@ Claude Code before merge; the ledger lands under `.audit/1.5.0/`).
    `release-notes/v1.5.0.md`, approve the environment; then `npm view pdfnative-cli
    version`, a manual `docs.yml --online` run; at J+14 consider `egress-policy: block` on
    `publish.yml`.
-5. In the pdfnative repository: `docs/guides/cli.md`, `docs/data/surfaces.json`
+5. Countersign the audit: `/release-audit release-notes/v1.5.0.md v1.4.0` in Claude Code
+   (ledger under `.audit/1.5.0/`) before the merge.
+6. Upstream issues to file on pdfnative (drafts go through `pdfnative govern verify-issue`):
+   `formField.fieldType` is not validated (`NaN` rectangles); `updateMetadata` drops the
+   PDF/X identification; the signed revision `/ID` ignores the pinned creation instant;
+   kerning on untagged output leaves a stray space in extracted text.
+7. In the pdfnative repository: `docs/guides/cli.md`, `docs/data/surfaces.json`
    (`pdfnative-cli` gaps are closed) and `docs/assets/ecosystem.json` (cli 1.5.0, pin
    `^1.8.0`) — an alignment PR after publication.
 
