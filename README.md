@@ -134,7 +134,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
   `tests/regression/baselines/samples.sha256.json`), a PDF/A + PDF/X conformance corpus,
   hardened workflows (egress-audited runners, SHA-pinned actions, Trusted Publishing, SBOM +
   build attestations), a documentation verifier (`npm run verify:docs`) and a committed
-  Claude Code layer with a human-in-the-loop guard hook — 1234 tests.
+  Claude Code layer with a human-in-the-loop guard hook — 1237 tests.
 - **AI-governance / HITL** — the **`govern`** command surfaces pdfnative's Human-in-the-Loop
   contract to agents: they act as *draftsmen*, never autonomous submitters. `govern
   verify-issue` gates a local draft; a human always reviews and submits.

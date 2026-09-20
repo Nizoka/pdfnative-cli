@@ -25,7 +25,7 @@ applyTo: "src/index.ts,src/utils/args.ts,src/utils/argv.ts,src/utils/reproducibl
   command in `completion.ts` `COMMANDS` (`verify:docs` rule `command-parity`).
 - `--help`/`-h` and `--version`/`-V` (`--json` → `{ name, version }`) are handled before dispatch.
 - Unknown command → stderr message + exit 1 (`E_RUNTIME` envelope under `--json`); arguments with no command at all → exit 2 (`E_USAGE`); a bare `pdfnative` prints the usage and exits 0.
-- A COMMAND flag placed before the command (`--strict render …`) is recovered: `splitCommandArgv(argv, KNOWN_COMMANDS)` takes the first token that is a command name.
+- A COMMAND flag placed before the command (`--strict render …`) is recovered: `splitCommandArgv(argv, KNOWN_COMMANDS)` takes the first command name found BEFORE the first positional and moves the flag that swallowed it to the end of the command's argv (so `--pretty schema status` keeps `status`); an unknown first positional is never replaced by a command name that follows it.
 
 ## Global flags
 

@@ -42,6 +42,11 @@ describe('render — formField.fieldType validation', () => {
         await expect(fs.access(out)).rejects.toBeDefined();
     });
 
+    it('refuses a null block with E_INPUT instead of a TypeError (audit R-04)', async () => {
+        const input = await tmp.json('in.json', { title: 'x', blocks: [null] });
+        await expect(render(parseArgs(['--input', input, '--output', tmp.path('out.pdf')]))).rejects.toMatchObject({ code: ErrorCode.INPUT, exitCode: 1 });
+    });
+
     it('refuses it in a dry run as well', async () => {
         const input = await tmp.json('in.json', formDoc('textarea'));
         await expect(render(parseArgs(['--input', input, '--dry-run']))).rejects.toMatchObject({ code: ErrorCode.INPUT });

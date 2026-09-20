@@ -23,9 +23,9 @@
     }
   },
   "declared": {
-    "tests": 1234,
+    "tests": 1237,
     "coverageStatements": 82,
-    "coverageMeasured": 84.97,
+    "coverageMeasured": 85.99,
     "bundleBudgetBytes": 458752,
     "pdfaSamples": 13,
     "pdfxSamples": 3,

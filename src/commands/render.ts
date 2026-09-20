@@ -98,6 +98,9 @@ export const FORM_FIELD_TYPES: readonly string[] = ['text', 'multilineText', 'ch
 
 function assertKnownFormFieldTypes(params: DocumentParams): void {
     params.blocks.forEach((block, index) => {
+        if (block === null || block === undefined) {
+            throw new CliError(`blocks[${index}]: expected a block object, got null.`, 1, ErrorCode.INPUT);
+        }
         const b = block as { type?: unknown; fieldType?: unknown; name?: unknown };
         if (b.type !== 'formField') return;
         if (typeof b.fieldType === 'string' && FORM_FIELD_TYPES.includes(b.fieldType)) return;

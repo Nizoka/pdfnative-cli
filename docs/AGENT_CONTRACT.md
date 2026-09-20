@@ -37,9 +37,13 @@ envelope carries in `diagnostics[]`) may precede it. Parse the last line, or add
 silence the progress and warning lines.
 
 **Flag placement.** Global flags may precede the command. A command's own flags belong after
-the command name; a command flag written first (`pdfnative --strict render …`) is still
-resolved, but a flag that takes a value must never be the token right before the command
-name. Arguments that name no command at all are a usage error (exit 2, `E_USAGE`) — never a
+the command name — write them there. As a safety net, ONE boolean command flag written right
+before the command (`pdfnative --strict render …`, `pdfnative --pretty schema status`) is
+recovered and read as the boolean it was written as; a flag that takes a value must never be
+the token right before the command name, and a boolean command flag followed by two command
+names (`--pretty schema render`) is ambiguous — the second one wins. An unknown command is
+reported as such (exit 1), never replaced by a command name found among the flag values.
+Arguments that name no command at all are a usage error (exit 2, `E_USAGE`) — never a
 silent exit 0.
 
 **Global flags may precede or follow the command name** (v1.5.0):

@@ -79,7 +79,7 @@ describe('splitCommandArgv with the known command names (audit D-02)', () => {
         // value and no positional is left; the known names recover the command.
         const r = splitCommandArgv(['--json', '--strict', 'render', '-i', 'a.json'], KNOWN);
         expect(r.commandName).toBe('render');
-        expect(r.commandArgv).toEqual(['--json', '--strict', '-i', 'a.json']);
+        expect(r.commandArgv).toEqual(['--json', '-i', 'a.json', '--strict']);
         expect(parseArgs([...r.commandArgv], { booleanFlags: GLOBAL_BOOLEAN_FLAGS }).flags['strict']).toBe(true);
     });
 
@@ -96,6 +96,20 @@ describe('splitCommandArgv with the known command names (audit D-02)', () => {
     it('never looks for a command after the -- terminator', () => {
         expect(splitCommandArgv(['--strict', '--', 'render'], KNOWN).commandName).toBe('render'); // positional after --
         expect(splitCommandArgv(['--output', 'x', '--'], KNOWN).commandName).toBeUndefined();
+    });
+
+    it('moves the swallowing flag behind the positionals of the recovered command (audit R-02)', () => {
+        const r = splitCommandArgv(['--pretty', 'schema', 'status'], [...KNOWN, 'schema']);
+        expect(r.commandName).toBe('schema');
+        expect(r.commandArgv).toEqual(['status', '--pretty']);
+        expect(parseArgs([...r.commandArgv]).positionals).toEqual(['status']);
+        expect(splitCommandArgv(['--strict', 'render', '--', 'x'], KNOWN).commandArgv).toEqual(['--strict', '--', 'x']);
+    });
+
+    it('never recovers a command from a flag value when the first positional is a typo (audit R-01)', () => {
+        const r = splitCommandArgv(['frobnicate', '--title', 'render', '-i', 'a.json'], KNOWN);
+        expect(r.commandName).toBe('frobnicate');
+        expect(splitCommandArgv(['extract-txt', '--password', 'inspect'], KNOWN).commandName).toBe('extract-txt');
     });
 
     it('reports an unknown first positional as the (unknown) command', () => {

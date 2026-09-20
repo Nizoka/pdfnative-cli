@@ -13,7 +13,14 @@
 // takes `render` as its value and no positional is left. When the caller
 // passes the known command names, the first argv token that IS a command
 // name is recovered as the command, so the invocation behaves as written
-// instead of printing the usage text and exiting 0.
+// instead of printing the usage text and exiting 0. The flag that swallowed
+// the name is moved to the end of the command's argv, where it reads as the
+// boolean it was written as — otherwise it would swallow the command's first
+// positional next (`--pretty schema status` must not print another subject).
+// The recovery only looks BEFORE the first positional (a swallowed command
+// precedes the positionals it was meant to receive): an unknown first
+// positional is otherwise a typo to report, never a reason to go looking for
+// a command name among the flag values that follow it.
 
 import { GLOBAL_BOOLEAN_FLAGS, parseArgs } from './args.js';
 
@@ -28,6 +35,13 @@ function without(argv: readonly string[], index: number): readonly string[] {
     return argv.filter((_, i) => i !== index);
 }
 
+/** argv without the command at `index`, the flag before it moved to the end (before any `--`). */
+function recovered(argv: readonly string[], index: number, limit: number): readonly string[] {
+    const flag = argv[index - 1];
+    if (flag === undefined || !flag.startsWith('-')) return without(argv, index);
+    return [...argv.slice(0, index - 1), ...argv.slice(index + 1, limit), flag, ...argv.slice(limit)];
+}
+
 /**
  * Identify the command in `argv` and return the argv the command itself
  * parses. Only the FIRST occurrence of the command name is stripped, so a
@@ -35,7 +49,8 @@ function without(argv: readonly string[], index: number): readonly string[] {
  *
  * @param knownCommands When given and the first positional is not one of
  *   them (or there is none), the first token equal to a known command name —
- *   before any `--` terminator — is taken as the command.
+ *   before that positional and before any `--` terminator — is taken as the
+ *   command.
  */
 export function splitCommandArgv(argv: readonly string[], knownCommands?: readonly string[]): SplitArgv {
     const parsed = parseArgs([...argv], { booleanFlags: GLOBAL_BOOLEAN_FLAGS });
@@ -46,9 +61,10 @@ export function splitCommandArgv(argv: readonly string[], knownCommands?: readon
     if (knownCommands !== undefined) {
         const terminator = argv.indexOf('--');
         const limit = terminator === -1 ? argv.length : terminator;
-        for (let i = 0; i < limit; i++) {
+        const scanEnd = first === undefined ? limit : Math.min(limit, argv.indexOf(first));
+        for (let i = 0; i < scanEnd; i++) {
             if (knownCommands.includes(argv[i])) {
-                return { commandName: argv[i], commandArgv: without(argv, i) };
+                return { commandName: argv[i], commandArgv: recovered(argv, i, limit) };
             }
         }
     }
