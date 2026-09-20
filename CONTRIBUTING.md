@@ -17,6 +17,34 @@ npm run build                # the gate's smoke step and the sample generator dr
 - npm ≥ 10 (`packageManager` pins the version npm itself reads; publishing uses npm ≥ 11.5.1)
 - Optional: [veraPDF](https://verapdf.org) 1.30.2 + Java for the PDF/A step (see below)
 
+### First pull request in ten minutes
+
+```bash
+npm ci --ignore-scripts        # reproducible install from the lockfile
+npm run hooks:install          # optional: pre-commit CRLF check, pre-push fast gate (core.hooksPath → .githooks)
+npm run gate:fast              # typecheck, lint, tests, docs checks — the loop while you work
+git switch -c fix/<what>       # feat/, fix/, docs/, chore/
+```
+
+Edit, add a test beside the code you touched (`tests/` mirrors `src/`; a new flag also goes in
+`src/commands/completion.ts` and its usage text — `verify:docs` tells you what you missed), run
+the fast gate, commit with a [Conventional Commits](#commit-convention) message, push your
+branch and open the pull request — its template is the [checklist below](#pull-request-checklist).
+Run `npm run gate` (the CI profile: it builds `dist/cli.cjs`, generates the sample corpus and
+holds it to the byte baseline) before you ask for review; `npm run hooks:uninstall` removes
+the hooks.
+
+Sign your commits if you can: with an SSH key already registered on GitHub,
+`git config gpg.format ssh`, `git config user.signingkey ~/.ssh/id_ed25519.pub`,
+`git config commit.gpgsign true` and `git config tag.gpgSign true` make every commit and tag
+verifiable; the rulesets do not require signatures yet, so an unsigned contribution is still
+welcome.
+
+Every file the project writes uses LF line endings (`.gitattributes` says
+`* text=auto eol=lf`); on Windows, Git converts on checkout and the pre-commit hook refuses a
+staged CRLF file. Do not run `git add --renormalize` in a feature branch — the maintainer does
+that in one dedicated commit.
+
 Windows notes: run the `.sh` samples and shell one-liners under Git Bash
 (`C:\Program Files\Git\bin\bash.exe`); PowerShell swallows a bare `--` after `npm run`, so
 pass script flags by calling the script directly (`npx tsx scripts/gate.ts --fast`).
@@ -309,8 +337,11 @@ agent) and **merged, tagged and published by the maintainer only**:
 4. `npx tsx scripts/gate.ts --publish --require-all` must pass locally with veraPDF installed;
    in Claude Code, `/release-audit release-notes/vX.Y.Z.md vA.B.C` runs the independent audit
    and writes its ledger under `test-output/.audit/`.
-5. Draft the PR body in `release-notes/draft/PR-vX.Y.Z.md` (summary, changes by area, the
-   audit ledger, what actually ran, backward compatibility, out of scope, self-review).
+5. Draft the PR body: copy [release-notes/PR_TEMPLATE.md](release-notes/PR_TEMPLATE.md) to
+   `release-notes/draft/PR-vX.Y.Z.md` and fill every section (summary, changes by area, the
+   audit ledger, what actually ran, backward compatibility, out of scope, self-review). The
+   per-version bodies are committed — they are the auditable record of what each release
+   claimed and what was run — and every figure in them comes from a command, never from memory.
 6. **Maintainer:** push the branch, open the PR with that body, wait for `ci (22)`, `ci (24)`
    and `sample-regression` (required by `.github/rulesets/main.json`), squash-merge as
    `release: vX.Y.Z — …`, tag `vX.Y.Z` on the merge commit, publish the GitHub Release with
@@ -318,3 +349,30 @@ agent) and **merged, tagged and published by the maintainer only**:
    gate, publishes with provenance through Trusted Publishing, and attaches the SBOM and the
    attestations to the release. Afterwards `npm view pdfnative-cli version` confirms the
    publish and the weekly `docs.yml --online` run confirms the manifest against npm.
+
+### Branch protection
+
+The rules for `main` are versioned in [.github/rulesets/main.json](.github/rulesets/main.json),
+GitHub's ruleset format: no deletion, no force-push, pull request required (single maintainer,
+so zero approvals — but every review thread resolved, stale reviews dismissed on push, squash
+merges only), and the status checks `ci (22)`, `ci (24)` and `sample-regression` required and
+up to date with `main`. `verapdf`, the Docs workflow and the other path-filtered workflows are
+deliberately **not** required: a required check that never reports leaves a pull request stuck
+on "Expected — waiting for status to be reported". For the same reason the repository Admin
+role may bypass the ruleset through a pull request only — `ci.yml` ignores documentation-only
+changes, so such a pull request has no `ci` run to wait for — never by pushing to `main`
+directly. Release tags are protected by [.github/rulesets/tags.json](.github/rulesets/tags.json)
+(`refs/tags/v*`: no deletion, no force-update, no update; creation stays with the maintainer).
+`verify:docs` (rule `ruleset-parity`) fails when a required check names no workflow job.
+
+Import a file after editing it: Settings → Rules → Rulesets → New ruleset → Import a ruleset,
+or from the shell (maintainer only — agents never run a writing `gh api` call, and the Claude
+Code guard hook refuses it):
+
+```bash
+gh api repos/Nizoka/pdfnative-cli/rulesets --method POST --input .github/rulesets/main.json
+gh api repos/Nizoka/pdfnative-cli/rulesets --method POST --input .github/rulesets/tags.json
+```
+
+To update a ruleset already in place, `gh api repos/Nizoka/pdfnative-cli/rulesets` lists the
+ids and `--method PUT` on `rulesets/<id>` replaces it.

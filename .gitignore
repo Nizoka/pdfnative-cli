@@ -29,6 +29,15 @@ Thumbs.db
 # Claude Code — personal permission allow-list (settings.json is committed)
 .claude/settings.local.json
 
+# AI-agent issue / PR drafts are local until a human submits them (AGENT_RULES.md §5);
+# only the README and the template are tracked
+.github/drafts/*.md
+!.github/drafts/README.md
+!.github/drafts/TEMPLATE.md
+
+# Logs
+*.log
+
 # Release audit ledgers (skill release-audit) and gate logs live under test-output/
 
 # npm
