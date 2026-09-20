@@ -1,0 +1,368 @@
+{
+  "$comment": "Traceability matrix: every bullet of the pdfnative CHANGELOG entry named by `engine` is either exercised THROUGH the CLI (named tests, and baseline samples where a sample can show it) or waived with a reason. tests/regression/engine-surface.test.ts holds every reference to the tree. Extend it in the same change that moves the pdfnative pin (CONTRIBUTING.md, 'Bumping the engine pin'). Waiver kinds: LIB (a JavaScript API a command line cannot reach), TOOLING / DOCS (the engine repository's own build, CI, samples or documentation), tested-upstream (a rule of the engine the CLI only transmits — `transmission` names the test that proves the transmission), upstream-limit (observable through the CLI but wrong or incomplete in the engine; pinned by an it.fails test and listed in ROADMAP.md).",
+  "engine": "1.8.0",
+  "items": [
+    { "id": "deterministic-samples", "kind": "feature", "changelog": "feat(samples): deterministic samples and a byte-level regression harness",
+      "tests": [
+        { "file": "tests/commands/render-typography.test.ts", "name": "two pinned renders are byte-identical, under different TZ values" },
+        { "file": "tests/integration/reproducible-build.test.ts", "name": "SOURCE_DATE_EPOCH alone pins the same instant as the flag" },
+        { "file": "tests/regression/samples.test.ts", "name": "every tracked sample still emits what its reference release emitted" }
+      ],
+      "samples": ["reproducible/01-pinned-date.pdf", "reproducible/02-source-date-epoch.pdf"] },
+
+    { "id": "typography", "kind": "feature", "changelog": "feat(core): typography",
+      "tests": [
+        { "file": "tests/commands/render-typography.test.ts", "name": "--split-paragraphs lets paragraphs break across pages" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "orphans / widows move the break" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "splittable: false keeps one paragraph whole" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "keepWithNext on a block carries it to the page of the block that follows" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "align: \"justify\" keeps the inter-word spaces" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "opticalMargins hangs an opening quote into the left margin" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "a soft hyphen (U+00AD) is a break opportunity" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "unitBinding ties a number to its unit" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "\"fr\" and \"fr-CA\" are different conventions" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "explicit PunctuationSpacingRule[] applies exactly the rules given" },
+        { "file": "tests/commands/render-base14.test.ts", "name": "\"exact\" changes the line breaks of a Helvetica paragraph" },
+        { "file": "tests/commands/render-typography.test.ts", "name": "--kerning needs a registered font" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "glyphs substituted by a feature still extract as their source characters (onum)" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "renders, and the only diagnostic it may raise is TYPOGRAPHY_FEATURE_INEFFECTIVE" }
+      ],
+      "samples": ["typography/01-paragraph-breaking.pdf", "typography/02-justify-optical-hyphenation.pdf", "typography/03-french-spacing-units-short-words.pdf", "typography/04-kerning-features-metrics.pdf", "typography/05-french-canadian-spacing.pdf", "typography/06-custom-spacing-rules.pdf", "typography/07-soft-hyphen-keep-with-next.pdf", "base14/01-exact-metrics.pdf"],
+      "note": "setHyphenationProvider(), bindUnits() and applyPunctuationSpacing() are JavaScript APIs: a command line loads no code from a user path (ROADMAP.md, hyphenation dictionaries)." },
+
+    { "id": "five-new-scripts", "kind": "feature", "changelog": "feat(shaping): Lao, Tai Tham, New Tai Lue, Tai Le and Cham",
+      "tests": [
+        { "file": "tests/commands/render-scripts.test.ts", "name": "its font is embedded, a PDF/A-2b --strict render raises nothing, and the text comes back" },
+        { "file": "tests/commands/render-typography.test.ts", "name": "registers %s and renders a paragraph in that script" }
+      ],
+      "samples": ["font/04-new-scripts-1.8.pdf", "multilang/05-lao.pdf", "multilang/06-tai-tham-cham.pdf"] },
+
+    { "id": "universal-shaping-engine", "kind": "feature", "changelog": "feat(shaping): a data-driven Universal Shaping Engine",
+      "tests": [
+        { "file": "tests/commands/doctor-capabilities.test.ts", "name": "reports the Universal Shaping Engine Unicode version" },
+        { "file": "tests/commands/render-scripts.test.ts", "name": "its font is embedded, a PDF/A-2b --strict render raises nothing, and the text comes back" }
+      ],
+      "samples": ["multilang/06-tai-tham-cham.pdf"] },
+
+    { "id": "colrv1", "kind": "feature", "changelog": "feat(fonts): COLRv1 transforms, variable paints and masks",
+      "tests": [{ "file": "tests/commands/render-color-emoji.test.ts", "name": "draw as vector forms with shadings, never as an image" }],
+      "samples": ["font/06-color-emoji-sequences.pdf", "font/02-new-scripts.pdf"] },
+
+    { "id": "skin-tones", "kind": "feature", "changelog": "feat(fonts): bundled skin tones",
+      "tests": [
+        { "file": "tests/commands/render-color-emoji.test.ts", "name": "is one colour form, not a base plus a swatch" },
+        { "file": "tests/commands/render-color-emoji.test.ts", "name": "the five tones of one gesture are five different colour forms" },
+        { "file": "tests/commands/render-color-emoji.test.ts", "name": "a toned base outside the bundled set falls back to the untoned emoji" }
+      ],
+      "samples": ["font/06-color-emoji-sequences.pdf"],
+      "note": "The `--sequences skin` flag belongs to the engine's pdfnative-build-emoji-font tool, not to this CLI." },
+
+    { "id": "cmyk-colours", "kind": "feature", "changelog": "feat(core): CMYK colours",
+      "tests": [
+        { "file": "tests/commands/render-typography.test.ts", "name": "a [c, m, y, k] paragraph colour emits a DeviceCMYK fill operator" },
+        { "file": "tests/commands/render-typography.test.ts", "name": "a \"c m y k\" operand string is accepted on --watermark-color" },
+        { "file": "tests/commands/render-conformance-surface.test.ts", "name": "every CMYK colour option reaches the content stream" }
+      ],
+      "samples": ["print/03-cmyk-colours.pdf", "print/05-pdfx4.pdf"] },
+
+    { "id": "cmyk-gray-output-intents", "kind": "feature", "changelog": "feat(core): CMYK and Gray OutputIntents",
+      "tests": [
+        { "file": "tests/commands/render-conformance-surface.test.ts", "name": "a Gray prtr profile is a valid PDF/X-4 intent" },
+        { "file": "tests/commands/render-conformance-surface.test.ts", "name": "a CMYK intent remaps RGB the same way and declares four components" },
+        { "file": "tests/commands/render-conformance-surface.test.ts", "name": "a Gray intent under PDF/A-2b is accepted without a diagnostic" },
+        { "file": "tests/commands/render-diagnostics.test.ts", "name": "is a warning in the envelope and on stderr" },
+        { "file": "tests/tools/synthetic-gray-profile.test.ts", "name": "render accepts it as the PDF/A output intent" }
+      ],
+      "samples": ["print/06-gray-pdfx4.pdf", "print/05-pdfx4.pdf"] },
+
+    { "id": "pdfx4", "kind": "feature", "changelog": "feat(core): PDF/X-4",
+      "tests": [
+        { "file": "tests/commands/render-pdfx.test.ts", "name": "renders a file validatePdfX() accepts, with the claim in XMP and /Trapped /False" },
+        { "file": "tests/commands/render-pdfx.test.ts", "name": "without fonts: PDFX_NO_FONT_ENTRIES is a warning" },
+        { "file": "tests/commands/render-diagnostics.test.ts", "name": "fails the render under --strict with E_CHECK_FAILED and writes nothing" },
+        { "file": "tests/commands/doctor-capabilities.test.ts", "name": "reports the conformance targets of --tagged and --pdfx" }
+      ],
+      "samples": ["print/05-pdfx4.pdf", "print/06-gray-pdfx4.pdf"] },
+
+    { "id": "validate-pdfx", "kind": "feature", "changelog": "feat(parser): `validatePdfX()`",
+      "tests": [
+        { "file": "tests/commands/inspect-pdfx.test.ts", "name": "--pdfx adds a { valid, errors, warnings } block" },
+        { "file": "tests/commands/inspect-pdfx-transmission.test.ts", "name": "an error: a markup annotation in the print area" },
+        { "file": "tests/commands/inspect-pdfx-transmission.test.ts", "name": "a warning alone keeps the file valid" }
+      ],
+      "samples": ["print/05-pdfx4.pdf"] },
+
+    { "id": "registration-colour", "kind": "feature", "changelog": "feat(core): registration colour",
+      "tests": [{ "file": "tests/commands/render-pdfx.test.ts", "name": "print.marks.colourBars (object form) renders under a CMYK intent" }],
+      "samples": ["print/04-colour-bars.pdf", "print/07-tight-bleed-marks.pdf"] },
+
+    { "id": "colour-bars", "kind": "feature", "changelog": "feat(core): colour control bars",
+      "tests": [
+        { "file": "tests/commands/render-pdfx.test.ts", "name": "print.marks.colourBars (object form) renders under a CMYK intent" },
+        { "file": "tests/commands/render-conformance-surface.test.ts", "name": "the marks and colour bars are a page artifact" }
+      ],
+      "samples": ["print/04-colour-bars.pdf", "print/05-pdfx4.pdf", "print/07-tight-bleed-marks.pdf"] },
+
+    { "id": "deflate-raw-impl", "kind": "feature", "changelog": "feat(core): `setDeflateRawImpl()` and `wrapZlib()`",
+      "waiver": { "kind": "LIB", "reason": "Injecting a DEFLATE implementation is a JavaScript API for runtimes without node:zlib; the CLI runs on Node and initialises the native compressor." } },
+
+    { "id": "validate-pdfx-form-xobjects", "kind": "feature", "changelog": "feat(parser): `validatePdfX()` covers fonts inside Form XObjects and",
+      "tests": [
+        { "file": "tests/commands/inspect-pdfx-transmission.test.ts", "name": "actions, JavaScript, unembedded Form XObject fonts are errors; a custom halftone is a warning" },
+        { "file": "tests/commands/inspect-pdfx-transmission.test.ts", "name": "an exemption: a /Link inside the print area is an error until it is Hidden" }
+      ],
+      "note": "LZWDecode, interpolated images and patterns: tested upstream; the same inspect path transmits them." },
+
+    { "id": "actualtext", "kind": "feature", "changelog": "feat(parser): `extractText()` honours `/ActualText`",
+      "tests": [
+        { "file": "tests/commands/render-typography.test.ts", "name": "/ActualText on tagged output: extract-text returns the source text of a shaped run" },
+        { "file": "tests/commands/render-scripts.test.ts", "name": "reordered glyphs keep every source letter untagged (visual order), and the logical order once tagged" }
+      ],
+      "samples": ["multilang/10-indic.pdf"],
+      "note": "samples/extract-text/02-actualtext.* runs the tagged / untagged comparison; its outputs are not part of the baseline." },
+
+    { "id": "indic-opentype", "kind": "feature", "changelog": "feat(shaping): Indic OpenType engine",
+      "tests": [
+        { "file": "tests/commands/render-scripts.test.ts", "name": "a shaped cluster extracts as its source letters from UNTAGGED output" },
+        { "file": "tests/commands/render-scripts.test.ts", "name": "reordered glyphs keep every source letter untagged (visual order), and the logical order once tagged" }
+      ],
+      "samples": ["multilang/10-indic.pdf", "font/02-new-scripts.pdf"] },
+
+    { "id": "latin-marks", "kind": "feature", "changelog": "feat(shaping): `shapeLatinMarksText()`",
+      "tests": [{ "file": "tests/commands/render-typography.test.ts", "name": "aliases to latin and renders composed tone marks" }],
+      "samples": ["multilang/07-african-latin.pdf"] },
+
+    { "id": "otl-font-modules", "kind": "feature", "changelog": "feat(fonts): `otl` in every font module",
+      "waiver": { "kind": "LIB", "reason": "Font-module data format and compileFontData(); the CLI observes it only through shaped output, covered by the script and feature items." } },
+
+    { "id": "shaped-glyph-cps", "kind": "feature", "changelog": "feat(core): `ShapedGlyph.cps`",
+      "tests": [{ "file": "tests/commands/render-scripts.test.ts", "name": "a shaped cluster extracts as its source letters from UNTAGGED output" }],
+      "samples": ["multilang/10-indic.pdf"],
+      "note": "upstream-limit: stacked Khmer / Myanmar clusters extract as U+FFFD and CJK ideographs as Kangxi radicals from untagged output — pinned by it.fails in render-scripts.test.ts, listed in ROADMAP.md." },
+
+    { "id": "pdfa-icc-profile-version", "kind": "feature", "changelog": "feat(core): `PDFA_ICC_PROFILE_VERSION`",
+      "tests": [
+        { "file": "tests/commands/render-diagnostics.test.ts", "name": "is a warning in the envelope and on stderr" },
+        { "file": "tests/commands/render-diagnostics.test.ts", "name": "PDFA_ICC_PROFILE_VERSION is a PDF/A-1 rule: the same v4 profile is silent under pdfa2b" }
+      ],
+      "note": "Conformance corpus: iccv4-pdfa1b.pdf is a negative canary veraPDF rejects." },
+
+    { "id": "validate-pdfx-more-checks", "kind": "feature", "changelog": "feat(parser): `validatePdfX()` also checks",
+      "waiver": { "kind": "tested-upstream", "transmission": "tests/commands/inspect-pdfx-transmission.test.ts", "reason": "Annotation appearance fonts, OPI, PostScript and reference XObjects, embedded files: rules of the engine's validator, tested there one by one; the CLI transmits errors[] and warnings[] verbatim, which the transmission suite proves on crafted files." } },
+
+    { "id": "language-conformance-documents", "kind": "feature", "changelog": "feat(samples): twenty-nine one-page language conformance documents",
+      "waiver": { "kind": "TOOLING", "reason": "The engine repository's own sample corpus. The CLI reuses its vetted text (tests/helpers/script-text.ts, samples/render/multilang/08-11)." } },
+
+    { "id": "glyph-names-tool", "kind": "feature", "changelog": "feat(tooling): `scripts/glyph-names.ts`",
+      "waiver": { "kind": "TOOLING", "reason": "A debugging script of the engine repository." } },
+
+    { "id": "typography-feature-ineffective", "kind": "feature", "changelog": "feat(core): `TYPOGRAPHY_FEATURE_INEFFECTIVE`",
+      "tests": [
+        { "file": "tests/commands/render-typography.test.ts", "name": "--font-features tnum on Noto Sans raises TYPOGRAPHY_FEATURE_INEFFECTIVE" },
+        { "file": "tests/commands/render-diagnostics.test.ts", "name": "TYPOGRAPHY_FEATURE_INEFFECTIVE also reports a feature no registered font declares" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "hyphenationLanguage is accepted and inert" }
+      ],
+      "samples": ["typography/04-kerning-features-metrics.pdf", "typography/02-justify-optical-hyphenation.pdf"] },
+
+    { "id": "bind-short-words", "kind": "feature", "changelog": "feat(core): `typography.bindShortWords`",
+      "tests": [
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "bindShortWords ties a one-letter word to the word that follows" },
+        { "file": "tests/commands/render-typography.test.ts", "name": "keepHeadingsWithNext true ≡ { minLines: 2 }" }
+      ],
+      "samples": ["typography/03-french-spacing-units-short-words.pdf", "typography/07-soft-hyphen-keep-with-next.pdf"] },
+
+    { "id": "engine-gate", "kind": "feature", "changelog": "feat(tooling): `npm run gate`",
+      "waiver": { "kind": "TOOLING", "reason": "The engine's quality gate; the CLI has its own (scripts/gate.ts, tests/tools/gate.test.ts)." } },
+
+    { "id": "fifty-new-samples", "kind": "feature", "changelog": "feat(samples): 50 new samples",
+      "waiver": { "kind": "TOOLING", "reason": "The engine repository's samples. Their CLI mirrors are in the baseline: a form inside PDF/A-2b (pdfa/05), CMYK under PDF/X-4 (print/05) and under PDF/A-2b (corpus cmyk-intent-pdfa2b.pdf), skin tones (font/06), typography pairs (typography/, base14/)." } },
+
+    { "id": "one-pagination-planner", "kind": "change", "changelog": "refactor(core): one pagination planner",
+      "tests": [{ "file": "tests/commands/render-inspect-layout.test.ts", "name": "render --inspect-layout: totalPages is the page count of the render" }],
+      "samples": ["toc/01-document-with-toc.pdf"] },
+
+    { "id": "shaper-registry", "kind": "change", "changelog": "refactor(shaping): one shaper registry",
+      "waiver": { "kind": "LIB", "reason": "Internal refactor; behaviour held by the 27-script suite and the byte baseline." } },
+    { "id": "colour-operator-choke-point", "kind": "change", "changelog": "refactor(core): one colour-operator choke point",
+      "waiver": { "kind": "LIB", "reason": "Internal refactor; behaviour held by the CMYK tests and the byte baseline." } },
+    { "id": "kerning-class-form", "kind": "change", "changelog": "perf(fonts): kerning kept in OpenType class form",
+      "waiver": { "kind": "LIB", "reason": "Module size and load time of the engine; the kerning output is covered by the typography item." } },
+
+    { "id": "parse-color-cmyk", "kind": "change", "changelog": "feat(core): `parseColor()` accepts CMYK inputs",
+      "tests": [{ "file": "tests/commands/render-conformance-surface.test.ts", "name": "every CMYK colour option reaches the content stream" }],
+      "samples": ["print/03-cmyk-colours.pdf"] },
+
+    { "id": "output-intent-cmyk-gray", "kind": "change", "changelog": "feat(core): `outputIntent` accepts CMYK and Gray profiles",
+      "tests": [
+        { "file": "tests/commands/render-conformance-surface.test.ts", "name": "a Gray prtr profile is a valid PDF/X-4 intent" },
+        { "file": "tests/commands/render-pdfx.test.ts", "name": "a monitor (mntr) profile is refused" }
+      ],
+      "samples": ["print/06-gray-pdfx4.pdf"] },
+
+    { "id": "tree-shakeable-bundle", "kind": "change", "changelog": "perf(bundle): tree-shakeable output",
+      "waiver": { "kind": "LIB", "reason": "Bundlers of library consumers. The CLI keeps the engine external (tests/tools/bundle-probe.test.ts)." } },
+
+    { "id": "utc-dates", "kind": "change", "changelog": "feat(core): dates written in UTC",
+      "tests": [
+        { "file": "tests/commands/render-typography.test.ts", "name": "without a pin the date is the wall clock, written in UTC" },
+        { "file": "tests/commands/inspect-pdfx.test.ts", "name": "normalises the raw PDF date to ISO 8601" }
+      ],
+      "samples": ["reproducible/01-pinned-date.pdf"] },
+
+    { "id": "validate-pdfx-transfer-functions", "kind": "change", "changelog": "feat(parser): `validatePdfX()` rejects any `/TR`",
+      "tests": [{ "file": "tests/commands/inspect-pdfx-transmission.test.ts", "name": "the 1.8.0 rule change: any /TR is an error, /TR2 /Default is not" }] },
+
+    { "id": "deps-js-yaml", "kind": "change", "changelog": "chore(deps): js-yaml pinned to 4.3.2", "waiver": { "kind": "TOOLING", "reason": "A development dependency of the engine repository; nothing of it reaches the published package the CLI depends on." } },
+    { "id": "deps-vitest", "kind": "change", "changelog": "chore(deps): vitest and @vitest/coverage-v8 4.1.11", "waiver": { "kind": "TOOLING", "reason": "Engine dev dependencies; the CLI pins its own." } },
+    { "id": "ci-on-the-gate", "kind": "change", "changelog": "chore(ci): CI and publish on the gate", "waiver": { "kind": "TOOLING", "reason": "Engine CI; CLI parity in tests/tools/workflows.test.ts." } },
+    { "id": "pinned-font-sources", "kind": "change", "changelog": "chore(fonts): pinned sources, nothing committed", "waiver": { "kind": "TOOLING", "reason": "How the engine repository builds its font modules; the CLI consumes the published modules (tests/utils/fonts.test.ts checks all 31 are present)." } },
+    { "id": "subset-keep-layout-tables", "kind": "change", "changelog": "feat(fonts): `subsetTTF(ttf, gids, { keepLayoutTables })`", "waiver": { "kind": "LIB", "reason": "An option of a JavaScript API the CLI does not call." } },
+    { "id": "repo-gitattributes", "kind": "change", "changelog": "chore(repo):", "waiver": { "kind": "TOOLING", "reason": "Engine repository settings; CLI parity through the eol-lf rule of verify-docs." } },
+    { "id": "agents-config", "kind": "change", "changelog": "chore(agents):", "waiver": { "kind": "TOOLING", "reason": "Engine agent configuration; CLI parity in tests/tools/agent-config.test.ts." } },
+
+    { "id": "fix-sara-am", "kind": "fix", "changelog": "fix(shaping): Thai and Lao sara am under a tone mark",
+      "tests": [
+        { "file": "tests/commands/render-scripts.test.ts", "name": "a shaped cluster extracts as its source letters from UNTAGGED output" },
+        { "file": "tests/commands/render-scripts.test.ts", "name": "reordered glyphs keep every source letter untagged (visual order), and the logical order once tagged" }
+      ],
+      "samples": ["multilang/01-thai.pdf", "multilang/05-lao.pdf"] },
+    { "id": "fix-thai-lao-documents", "kind": "fix", "changelog": "fix(samples): Thai and Lao language documents", "waiver": { "kind": "TOOLING", "reason": "Text of the engine's own samples." } },
+
+    { "id": "fix-acroform-pdfa", "kind": "fix", "changelog": "fix(core): AcroForm fields under a PDF/A claim",
+      "tests": [
+        { "file": "tests/commands/render-conformance-surface.test.ts", "name": "with a Latin font the form passes --strict" },
+        { "file": "tests/commands/render-conformance-surface.test.ts", "name": "without one the fields fall back to a base-14 font, which the diagnostic reports" }
+      ],
+      "samples": ["pdfa/05-form-pdfa2b.pdf"],
+      "note": "Conformance corpus: form-pdfa2b.pdf passes veraPDF, form-pdfa2b-nofonts.pdf is rejected." },
+
+    { "id": "fix-inspect-layout-toc", "kind": "fix", "changelog": "fix(core): `inspectDocumentLayout()` page count with a table of",
+      "tests": [
+        { "file": "tests/commands/render-inspect-layout.test.ts", "name": "the shipped TOC sample" },
+        { "file": "tests/commands/render-inspect-layout.test.ts", "name": "the table of contents is a laid-out block of the report" }
+      ],
+      "samples": ["toc/01-document-with-toc.pdf"] },
+
+    { "id": "fix-set-deflate-impl", "kind": "fix", "changelog": "fix(core): `setDeflateImpl()` documentation", "waiver": { "kind": "LIB", "reason": "JavaScript API documentation and validation." } },
+
+    { "id": "fix-soft-hyphens", "kind": "fix", "changelog": "fix(core): soft hyphens",
+      "tests": [{ "file": "tests/commands/render-typography-surface.test.ts", "name": "a soft hyphen (U+00AD) is a break opportunity, never a character of the text" }],
+      "samples": ["typography/07-soft-hyphen-keep-with-next.pdf", "typography/02-justify-optical-hyphenation.pdf"] },
+
+    { "id": "fix-gsub-single-substitutions", "kind": "fix", "changelog": "fix(fonts): GSUB single substitutions",
+      "tests": [
+        { "file": "tests/commands/render-scripts.test.ts", "name": "CJK modules (GSUB extension lookups) render one character per source character" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "glyphs substituted by a feature still extract as their source characters (onum)" }
+      ],
+      "samples": ["multilang/11-cjk.pdf", "multilang/02-japanese.pdf"] },
+
+    { "id": "fix-gpos-mark-classes", "kind": "fix", "changelog": "fix(fonts): GPOS mark classes",
+      "tests": [{ "file": "tests/commands/render-scripts.test.ts", "name": "stacked clusters draw without .notdef and extract exactly once tagged" }],
+      "samples": ["multilang/10-indic.pdf", "font/02-new-scripts.pdf"],
+      "note": "Mark POSITIONS are a rendering property no command reads back; the byte baseline pins them, the engine's own tests assert the anchors." },
+
+    { "id": "fix-indic-shapers", "kind": "fix", "changelog": "fix(shaping): Indic shapers",
+      "tests": [{ "file": "tests/commands/render-scripts.test.ts", "name": "reordered glyphs keep every source letter untagged (visual order), and the logical order once tagged" }],
+      "samples": ["multilang/10-indic.pdf"] },
+
+    { "id": "fix-bengali-tamil-detection", "kind": "fix", "changelog": "fix(shaping): Bengali and Tamil",
+      "tests": [{ "file": "tests/commands/render-scripts.test.ts", "name": "its font is embedded, a PDF/A-2b --strict render raises nothing, and the text comes back" }],
+      "samples": ["multilang/10-indic.pdf"] },
+
+    { "id": "fix-checksum-adjustment", "kind": "fix", "changelog": "fix(fonts): `head.checkSumAdjustment`", "waiver": { "kind": "tested-upstream", "transmission": "tests/regression/samples.test.ts", "reason": "A byte property of every embedded subset; veraPDF validates the fonts of the conformance corpus and the byte baseline pins them." } },
+    { "id": "fix-compile-font-data-cjs", "kind": "fix", "changelog": "fix(tools): `compileFontData()` CommonJS output", "waiver": { "kind": "LIB", "reason": "Output format of an engine tool." } },
+
+    { "id": "fix-undrawable-glyphs", "kind": "fix", "changelog": "fix(fonts): modules advertised undrawable glyphs",
+      "tests": [{ "file": "tests/commands/render-scripts.test.ts", "name": "the subsetted Latin modules draw every letter they advertise (no .notdef)" }],
+      "samples": ["multilang/08-european-caucasian.pdf"] },
+
+    { "id": "fix-khmer-myanmar-stacks", "kind": "fix", "changelog": "fix(shaping): Khmer subscripts, Myanmar kinzi and stacked marks",
+      "tests": [{ "file": "tests/commands/render-scripts.test.ts", "name": "stacked clusters draw without .notdef and extract exactly once tagged" }],
+      "samples": ["font/02-new-scripts.pdf"],
+      "note": "upstream-limit: untagged extraction of these clusters returns U+FFFD (it.fails in render-scripts.test.ts)." },
+
+    { "id": "fix-arabic-letter-mark", "kind": "fix", "changelog": "fix(shaping): U+061C ARABIC LETTER MARK",
+      "tests": [{ "file": "tests/commands/render-scripts.test.ts", "name": "U+061C ARABIC LETTER MARK is stripped before measuring" }],
+      "samples": ["multilang/09-rtl.pdf"] },
+
+    { "id": "fix-colrv1-sweep-angles", "kind": "fix", "changelog": "fix(fonts): COLRv1 sweep angles",
+      "tests": [{ "file": "tests/commands/render-color-emoji.test.ts", "name": "draw as vector forms with shadings, never as an image" }],
+      "samples": ["font/06-color-emoji-sequences.pdf"],
+      "note": "The angle of a sweep gradient is a rendering property; the byte baseline pins it." },
+
+    { "id": "fix-locale-dependent-samples", "kind": "fix", "changelog": "fix(samples): locale-dependent sample output",
+      "tests": [
+        { "file": "tests/regression/samples.test.ts", "name": "never formats numbers or dates without an explicit locale" },
+        { "file": "tests/regression/samples.test.ts", "name": "runs the generator in UTC" }
+      ] },
+
+    { "id": "fix-emoji-alpha-ramps", "kind": "fix", "changelog": "fix(core): colour-emoji alpha ramps",
+      "tests": [{ "file": "tests/commands/render-color-emoji.test.ts", "name": "draw as vector forms with shadings, never as an image" }],
+      "samples": ["font/06-color-emoji-sequences.pdf"] },
+
+    { "id": "fix-hinting-tables", "kind": "fix", "changelog": "fix(fonts): embedded subsets keep the hinting tables", "waiver": { "kind": "tested-upstream", "transmission": "tests/regression/samples.test.ts", "reason": "A byte property of every embedded subset; pinned by the byte baseline." } },
+
+    { "id": "fix-font-features-glyphs", "kind": "fix", "changelog": "fix(fonts): glyphs introduced by `fontFeatures`",
+      "tests": [
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "glyphs substituted by a feature still extract as their source characters (onum)" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "a feature whose glyphs carry their own code points (subs)" }
+      ],
+      "samples": ["typography/04-kerning-features-metrics.pdf"] },
+
+    { "id": "fix-keep-headings-split", "kind": "fix", "changelog": "fix(core): `keepHeadingsWithNext` with `splitParagraphs`",
+      "tests": [{ "file": "tests/commands/render-typography-surface.test.ts", "name": "keepHeadingsWithNext with splitParagraphs: no heading is stranded at the foot of a page" }],
+      "samples": ["typography/01-paragraph-breaking.pdf", "typography/07-soft-hyphen-keep-with-next.pdf"] },
+
+    { "id": "fix-marks-clearance", "kind": "fix", "changelog": "fix(core): printer's marks clearance",
+      "tests": [
+        { "file": "tests/commands/render-conformance-surface.test.ts", "name": "in a 3 mm bleed (8.5 pt) every mark is drawn and stays inside the MediaBox" },
+        { "file": "tests/commands/render-conformance-surface.test.ts", "name": "below the 6.6 pt strip the registration targets are dropped" }
+      ],
+      "samples": ["print/07-tight-bleed-marks.pdf", "print/06-gray-pdfx4.pdf"] },
+
+    { "id": "fix-justified-text", "kind": "fix", "changelog": "fix(core): justified text",
+      "tests": [{ "file": "tests/commands/render-typography-surface.test.ts", "name": "align: \"justify\" keeps the inter-word spaces in the extracted text" }],
+      "samples": ["typography/02-justify-optical-hyphenation.pdf"] },
+
+    { "id": "fix-no-break-spaces", "kind": "fix", "changelog": "fix(core): no-break spaces",
+      "tests": [{ "file": "tests/commands/render-typography-surface.test.ts", "name": "\"fr\" and \"fr-CA\" are different conventions: different bytes, different extracted spaces" }],
+      "samples": ["typography/03-french-spacing-units-short-words.pdf", "typography/05-french-canadian-spacing.pdf"] },
+
+    { "id": "fix-base14-measurement", "kind": "fix", "changelog": "fix(core): base-14 measurement",
+      "tests": [
+        { "file": "tests/commands/render-base14.test.ts", "name": "\"exact\" moves the line breaks a reader sees in the extracted text" },
+        { "file": "tests/commands/render-typography-surface.test.ts", "name": "degrades to plain spaces on the base-14 path" }
+      ],
+      "samples": ["base14/01-exact-metrics.pdf"] },
+
+    { "id": "fix-pdfx-trimbox", "kind": "fix", "changelog": "fix(core): PDF/X TrimBox",
+      "tests": [{ "file": "tests/commands/render-conformance-surface.test.ts", "name": "a bleedBox with no trimBox gets its TrimBox synthesised under --pdfx" }] },
+
+    { "id": "fix-inline-dict-skip", "kind": "fix", "changelog": "fix(parser): the inline-dict skip in `extractText`",
+      "tests": [{ "file": "tests/commands/render-scripts.test.ts", "name": "its font is embedded, a PDF/A-2b --strict render raises nothing, and the text comes back" }],
+      "note": "Tagged output carries inline property lists before every shown string: 27 scripts extract exactly." },
+
+    { "id": "fix-typography-showcase", "kind": "fix", "changelog": "fix(samples): the typography showcase", "waiver": { "kind": "TOOLING", "reason": "The engine's showcase sample and its manifest." } },
+
+    { "id": "fix-output-intent-validation", "kind": "fix", "changelog": "fix(core): OutputIntent profiles are validated",
+      "tests": [
+        { "file": "tests/commands/render-pdfx.test.ts", "name": "--output-intent-icc refuses a non-ICC file" },
+        { "file": "tests/tools/synthetic-gray-profile.test.ts", "name": "is an ICC v2.1 monochrome output profile whose size field matches its length" }
+      ] },
+
+    { "id": "fix-gsub-parser-locked", "kind": "fix", "changelog": "fix(fonts): the GSUB single-substitution parser is locked", "waiver": { "kind": "TOOLING", "reason": "A test of the engine's font build." } },
+    { "id": "ci-trusted-publishing", "kind": "fix", "changelog": "chore(ci): Trusted Publishing on Node 22", "waiver": { "kind": "TOOLING", "reason": "Engine release workflow; CLI parity in tests/tools/workflows.test.ts." } },
+    { "id": "verify-docs-claims", "kind": "fix", "changelog": "chore(verify): more of the docs' claims are checked", "waiver": { "kind": "TOOLING", "reason": "Engine documentation verifier; the CLI has its own 26 rules." } },
+
+    { "id": "docs-licences", "kind": "docs", "changelog": "docs(licences): per-font third-party notices", "waiver": { "kind": "DOCS", "reason": "Engine documentation; the CLI vendors no font." } },
+    { "id": "docs-discoverability", "kind": "docs", "changelog": "docs(discoverability): 1.8.0 keywords", "waiver": { "kind": "DOCS", "reason": "Keywords and description of the engine npm package; the CLI has its own package metadata." } },
+    { "id": "docs-guides", "kind": "docs", "changelog": "docs(guides): typography guide", "waiver": { "kind": "DOCS", "reason": "Engine guides; the CLI documents the same surface in README.md and docs/KNOWLEDGE_BASE.md." } },
+    { "id": "docs-agents", "kind": "docs", "changelog": "docs(agents): machine contracts for autonomous agents", "waiver": { "kind": "DOCS", "reason": "Engine agent contracts; CLI counterpart: docs/AGENT_CONTRACT.md." } },
+    { "id": "docs-site-card", "kind": "docs", "changelog": "docs(site): typography / CMYK / PDF/X-4 card", "waiver": { "kind": "DOCS", "reason": "A page of the pdfnative.dev website, which belongs to the engine repository." } },
+    { "id": "docs-site-og", "kind": "docs", "changelog": "docs(site): OG and social-preview images", "waiver": { "kind": "DOCS", "reason": "Images of the pdfnative.dev website, which belongs to the engine repository." } },
+    { "id": "docs-instructions", "kind": "docs", "changelog": "docs(instructions): text-shaping rules", "waiver": { "kind": "DOCS", "reason": "Engine contributor instructions." } },
+    { "id": "docs-meta", "kind": "docs", "changelog": "docs(meta):", "waiver": { "kind": "DOCS", "reason": "README, ROADMAP and contributor documents of the engine repository; the CLI keeps its own, held by verify:docs." } },
+    { "id": "docs-language", "kind": "docs", "changelog": "docs(language): English everywhere", "waiver": { "kind": "DOCS", "reason": "Engine policy; CLI parity in tests/docs/prose-language.test.ts." } },
+    { "id": "docs-alphabet-plates", "kind": "docs", "changelog": "docs(samples): alphabet plates", "waiver": { "kind": "DOCS", "reason": "Alphabet plates of the engine sample corpus; the CLI renders every script through its own samples and tests." } }
+  ]
+}

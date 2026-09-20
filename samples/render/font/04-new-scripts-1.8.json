@@ -1,0 +1,23 @@
+{
+  "title": "Font Presets — the five scripts of pdfnative 1.8.0",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "--font lo nod khb tdd cjm: Lao, Tai Tham, New Tai Lue, Tai Le, Cham (27 scripts in all) — demonstration content",
+    "keywords": "fonts, lao, tai tham, new tai lue, tai le, cham"
+  },
+  "blocks": [
+    { "type": "heading", "text": "27 scripts, one flag each", "level": 1 },
+    { "type": "paragraph", "text": "--font <code> registers the bundled Noto module for that script and --lang <code> embeds it. pdfnative 1.8.0 adds lo, nod, khb, tdd and cjm to the 22 codes of 1.7.0; ha, yo, ig and sw are aliases of latin. Run pdfnative doctor to list the inventory and check every module is on disk." },
+    { "type": "table",
+      "headers": ["Code", "Script", "Sample"],
+      "rows": [
+        { "cells": ["lo", "Lao", "ສະບາຍດີ ໂລກ"], "type": "normal", "pointed": false },
+        { "cells": ["nod", "Tai Tham (Lanna)", "ᨲᩫ᩠ᩅᨾᩮᩬᩥᨦ"], "type": "normal", "pointed": false },
+        { "cells": ["khb", "New Tai Lue", "ᦎᦸᧈᦑᦸᧈ ᦍᦲᧂ"], "type": "normal", "pointed": false },
+        { "cells": ["tdd", "Tai Le", "ᥖᥭᥰ ᥘᥫᥴ"], "type": "normal", "pointed": false },
+        { "cells": ["cjm", "Cham", "ꨌꩌ ꨭꨌꨯꨱꨭ"], "type": "normal", "pointed": false }
+      ]
+    },
+    { "type": "paragraph", "text": "Rendered with: pdfnative render --input 04-new-scripts-1.8.json --font lo --font nod --font khb --font tdd --font cjm --font latin --lang lo,nod,khb,tdd,cjm,latin", "fontSize": 10 }
+  ]
+}

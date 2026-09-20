@@ -1,0 +1,26 @@
+{
+  "title": "Typography — Kerning, OpenType Features & Exact Metrics",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "kerning, fontFeatures (onum, smcp, pnum), metrics exact (pdfnative 1.8.0)",
+    "keywords": "typography, kerning, opentype, small caps, old-style figures"
+  },
+  "layout": {
+    "typography": {
+      "kerning": true,
+      "fontFeatures": ["onum", "smcp"],
+      "metrics": "exact"
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "Pair kerning and OpenType features", "level": 1 },
+    { "type": "paragraph", "text": "kerning: true applies the font's pair-kerning table (kern / GPOS) so letter pairs such as AV, WA, To, Ye and VA sit closer: AVAWAY To Ye VA WAVE Tommy Yves. fontFeatures lists OpenType single-substitution features the renderer applies to every run set in a registered font: onum turns 0123456789 into old-style figures, smcp sets lowercase letters as small capitals, pnum requests proportional figures.", "align": "justify" },
+    { "type": "heading", "text": "Figures: 0123456789 in old-style (onum)", "level": 2 },
+    { "type": "paragraph", "text": "Invoice 2026-041, order 0917, reference 3854-1207, quantity 12, total 1450. Old-style figures share the x-height of the lowercase and descend below the baseline, which reads better inside running text." },
+    { "type": "heading", "text": "Small capitals (smcp)", "level": 2 },
+    { "type": "paragraph", "text": "Names and acronyms set in small capitals: nasa, unesco, iso 15930-7, pdf/x-4 — the lowercase letters become small caps, the capitals stay as they are." },
+    { "type": "heading", "text": "Exact base-14 metrics", "level": 2 },
+    { "type": "paragraph", "text": "metrics: \"exact\" replaces the approximate width table of the standard-14 fonts (Helvetica, Times, Courier) with the Adobe Core 14 AFM metrics, so lines set in a base-14 font wrap exactly where a viewer measures them. It changes nothing for a registered font such as Noto Sans, which carries its own advance widths." },
+    { "type": "paragraph", "text": "Tip: request tnum or lnum with Noto Sans and the TYPOGRAPHY_FEATURE_INEFFECTIVE diagnostic tells you the font already uses tabular lining figures — the tag changes nothing. Under --strict that diagnostic fails the render.", "fontSize": 10 }
+  ]
+}

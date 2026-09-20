@@ -1,6 +1,6 @@
 import { createWriteStream } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
-import { CliError } from './error.js';
+import { readFile, stat, writeFile } from 'node:fs/promises';
+import { CliError, ErrorCode } from './error.js';
 
 const JSON_SIZE_LIMIT = 50 * 1024 * 1024; // 50 MB
 
@@ -45,6 +45,32 @@ export async function readFileOrStdin(filePath: string | undefined): Promise<Buf
  */
 export async function readBinaryFile(filePath: string): Promise<Uint8Array> {
     validatePath(filePath);
+    const buf = await readFile(filePath);
+    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+}
+
+/**
+ * Read a binary file with a size cap, checked BEFORE the bytes are read so an
+ * oversized file never lands in memory. Used for payloads the engine parses
+ * (ICC profiles, font programs): the cap is the first line of defence, the
+ * engine's own header validation the second.
+ */
+export async function readBinaryFileCapped(filePath: string, maxBytes: number, label: string): Promise<Uint8Array> {
+    validatePath(filePath);
+    let size: number;
+    try {
+        size = (await stat(filePath)).size;
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new CliError(`Failed to read ${label} "${filePath}": ${msg}`, 1, ErrorCode.IO);
+    }
+    if (size > maxBytes) {
+        throw new CliError(
+            `${label} "${filePath}" is ${(size / 1024 / 1024).toFixed(1)} MB, over the ${(maxBytes / 1024 / 1024).toFixed(0)} MB limit.`,
+            1,
+            ErrorCode.INPUT,
+        );
+    }
     const buf = await readFile(filePath);
     return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }

@@ -1,0 +1,24 @@
+{
+    "annotations": [
+        {
+            "page": 1,
+            "type": "link",
+            "rect": [72, 700, 320, 716],
+            "url": "https://pdfnative.dev"
+        },
+        {
+            "page": 1,
+            "type": "link",
+            "rect": [72, 680, 320, 696],
+            "url": "mailto:hello@pdfnative.dev"
+        },
+        {
+            "page": 1,
+            "type": "highlight",
+            "rect": [72, 700, 320, 716],
+            "color": [0, 0, 100, 0],
+            "contents": "Link target highlighted in process yellow (CMYK)",
+            "title": "Reviewer"
+        }
+    ]
+}

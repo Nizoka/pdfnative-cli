@@ -18,7 +18,7 @@ export interface CommandSpec {
     readonly flags: readonly string[];
 }
 
-export const GLOBAL_FLAGS = ['--help', '--version', '--no-color', '--quiet', '--json', '--dry-run', '--config', '--no-config', '--max-inflate-size'];
+export const GLOBAL_FLAGS = ['--help', '--version', '--no-color', '--quiet', '--json', '--dry-run', '--config', '--no-config', '--max-inflate-size', '--creation-date'];
 
 // Shared password / re-encryption / streaming flags for the page-tree commands
 // (merge, split, extract) — pdfnative 1.6.0.
@@ -36,7 +36,9 @@ export const COMMANDS: readonly CommandSpec[] = [
             '--max-blocks', '--watch', '--template',
             '--variant', '--table-wrap', '--repeat-header', '--zebra', '--min-row-height',
             '--cell-padding', '--layout', '--page-size', '--margin', '--tagged', '--compress',
-            '--lang', '--font', '--outline', '--debug-layout', '--inspect-layout',
+            '--pdfx', '--output-intent-icc', '--output-intent-id', '--trapped',
+            '--split-paragraphs', '--keep-headings-with-next', '--kerning', '--font-features',
+            '--lang', '--font', '--font-file', '--outline', '--debug-layout', '--inspect-layout',
             '--header-left', '--header-center', '--header-right',
             '--footer-left', '--footer-center', '--footer-right',
             '--watermark-text', '--watermark-image', '--watermark-opacity',
@@ -53,7 +55,7 @@ export const COMMANDS: readonly CommandSpec[] = [
         flags: [
             '--input', '--output', '--key', '--cert', '--cert-chain', '--algorithm',
             '--reason', '--name', '--location', '--contact', '--signing-time', '--timestamp',
-            '--timestamp-digest', '--timestamp-nonce', '--allow-multiple', '--field-name',
+            '--timestamp-digest', '--timestamp-nonce', '--timestamp-timeout', '--allow-multiple', '--field-name',
             '--profile', '--digest', '--signature-rect', '--signature-page',
             '--placeholder-bytes', '--pure-crypto',
         ],
@@ -76,7 +78,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     {
         name: 'inspect',
         summary: 'Analyse a PDF and output metadata',
-        flags: ['--input', '--format', '--verbose', '--pages', '--pdfua', '--annotations', '--form-fields', '--encryption', '--signatures', '--password', '--check', '--summary', '--fields', '--pretty'],
+        flags: ['--input', '--format', '--verbose', '--pages', '--pdfua', '--pdfx', '--iso-dates', '--annotations', '--form-fields', '--encryption', '--signatures', '--password', '--check', '--summary', '--fields', '--pretty'],
     },
     {
         name: 'merge',

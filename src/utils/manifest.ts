@@ -17,6 +17,7 @@
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { CliError, ErrorCode } from './error.js';
 import { validatePath } from './io.js';
+import { FORBIDDEN_OBJECT_KEYS } from './layout.js';
 
 /**
  * Commands a manifest task may invoke. Meta/orchestration commands never are.
@@ -45,6 +46,8 @@ const PATH_FLAGS: ReadonlySet<string> = new Set([
     'input', 'i', 'output', 'o', 'output-dir',
     'key', 'cert', 'cert-chain', 'trust',
     'data', 'annotations', 'template', 'layout', 'watermark-image',
+    // v1.5.0: PDF/X output profile and user-shipped font programs
+    'output-intent-icc', 'font-file',
 ]);
 
 export interface ManifestTaskPlan {
@@ -146,7 +149,7 @@ function resolveFlags(
     const dependsOn = new Set<string>();
 
     for (const [key, value] of Object.entries(rawFlags)) {
-        if (key.length === 0 || key.startsWith('-') || /[\s=]/.test(key)) {
+        if (key.length === 0 || key.startsWith('-') || /[\s=]/.test(key) || FORBIDDEN_OBJECT_KEYS.has(key)) {
             throw usageError(
                 `Task "${taskId}": invalid flag name "${key}" (use the bare flag name, `
                 + 'without leading dashes, whitespace or "=").',

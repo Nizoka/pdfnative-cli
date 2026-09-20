@@ -28,9 +28,9 @@
     { "type": "spacer",    "height": 12 },
 
     { "type": "heading",   "text": "Open Feedback", "level": 2 },
-    { "type": "formField", "fieldType": "textarea", "name": "improvements", "label": "What would you most like to see improved?",
+    { "type": "formField", "fieldType": "multilineText", "name": "improvements", "label": "What would you most like to see improved?",
       "placeholder": "Your suggestions..." },
-    { "type": "formField", "fieldType": "textarea", "name": "otherFeedback", "label": "Any other comments?",
+    { "type": "formField", "fieldType": "multilineText", "name": "otherFeedback", "label": "Any other comments?",
       "placeholder": "Additional feedback..." }
   ],
   "footerText": "Thank you for completing this survey.",

@@ -24,10 +24,18 @@ import { dirname, join, resolve } from 'node:path';
 import type { ParsedArgs } from './args.js';
 import { validatePath } from './io.js';
 import { CliError } from './error.js';
+import { FORBIDDEN_OBJECT_KEYS } from './layout.js';
+import { COMMANDS } from '../commands/completion.js';
 
 const CONFIG_FILENAME = '.pdfnativerc.json';
 const CONFIG_SIZE_LIMIT = 1024 * 1024; // 1 MB — config files are small.
-const KNOWN_COMMANDS = ['render', 'sign', 'verify', 'inspect', 'batch'];
+/**
+ * Every command name may head a scoped section (v1.5.0, audit A-44 — five
+ * names were hard-coded before). Derived from the completion table so a new
+ * command is configurable the day it exists. `completion.ts` is a static
+ * table with no import back into `utils/`, so there is no cycle.
+ */
+export const KNOWN_COMMANDS: readonly string[] = COMMANDS.map((c) => c.name);
 
 type ConfigValue = string | boolean | number | readonly (string | number)[];
 type ConfigDefaults = Record<string, string | boolean | string[]>;
@@ -99,6 +107,9 @@ export function loadConfig(
     const global: ConfigDefaults = {};
     const scoped: ConfigDefaults = {};
     for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+        // `{"__proto__": {…}}` parses to an own key; copying it through
+        // `obj[key] = …` would reach the prototype chain. Never a flag name.
+        if (FORBIDDEN_OBJECT_KEYS.has(key)) continue;
         if (
             KNOWN_COMMANDS.includes(key)
             && value !== null
@@ -107,6 +118,7 @@ export function loadConfig(
         ) {
             if (key !== commandName) continue;
             for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+                if (FORBIDDEN_OBJECT_KEYS.has(k)) continue;
                 const c = coerce(v as ConfigValue);
                 if (c !== null) scoped[k] = c;
             }
@@ -126,7 +138,8 @@ export function loadConfig(
 export function applyConfigDefaults(args: ParsedArgs, defaults: ConfigDefaults): ParsedArgs {
     const merged: Record<string, string | boolean | readonly string[]> = { ...args.flags };
     for (const [key, value] of Object.entries(defaults)) {
-        if (merged[key] === undefined) merged[key] = value;
+        if (FORBIDDEN_OBJECT_KEYS.has(key)) continue;
+        if (!Object.hasOwn(merged, key)) merged[key] = value;
     }
     return { flags: merged, positionals: args.positionals };
 }

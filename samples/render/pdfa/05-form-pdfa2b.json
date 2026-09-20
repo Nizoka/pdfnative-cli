@@ -1,0 +1,25 @@
+{
+  "title": "Archivable Registration Form — PDF/A-2b",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "An AcroForm under a PDF/A-2b claim: the fields' default-resources font is the embedded Latin font (pdfnative 1.8.0)",
+    "keywords": "pdfa, pdfa2b, acroform, form, archival, embedded font"
+  },
+  "footerText": "Archived form — PDF/A-2b — ISO 19005-2",
+  "layout": { "tagged": "pdfa2b" },
+  "blocks": [
+    { "type": "heading", "text": "Archivable Registration Form", "level": 1 },
+    { "type": "paragraph", "text": "PDF/A requires every font a file uses to be embedded — including the font an interactive field draws its value with. Until pdfnative 1.8.0 the fields of a PDF/A document referenced Helvetica, a base-14 font that is never embedded, and veraPDF rejected the file. The form's default resources (/DR) now carry the first embedded font that covers basic Latin." },
+    { "type": "paragraph", "text": "Rendered with --font latin --lang latin (the pdfa category flags). Without them the render still succeeds but reports PDFA_UNEMBEDDED_FORM_FONT next to PDFA_NO_FONT_ENTRIES, and --strict refuses it." },
+    { "type": "heading", "text": "Your details", "level": 2 },
+    { "type": "formField", "fieldType": "text", "name": "fullName", "label": "Full name" },
+    { "type": "formField", "fieldType": "text", "name": "email", "label": "E-mail address" },
+    { "type": "formField", "fieldType": "multilineText", "name": "notes", "label": "Notes for the archivist" },
+    { "type": "heading", "text": "Choices", "level": 2 },
+    { "type": "formField", "fieldType": "dropdown", "name": "retention", "label": "Retention period", "options": ["5 years", "10 years", "Permanent"] },
+    { "type": "formField", "fieldType": "listbox", "name": "format", "label": "Delivery format", "options": ["PDF/A-2b", "PDF/A-3b with attachment"] },
+    { "type": "formField", "fieldType": "radio", "name": "access", "label": "Access level", "options": ["Public", "Restricted"] },
+    { "type": "formField", "fieldType": "checkbox", "name": "consent", "label": "I agree to long-term preservation of this record" },
+    { "type": "paragraph", "text": "Fill it with pdfnative fill --data values.json, or freeze the values with --flatten before archiving." }
+  ]
+}

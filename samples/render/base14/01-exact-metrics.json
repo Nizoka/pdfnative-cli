@@ -1,0 +1,24 @@
+{
+  "title": "Exact base-14 metrics",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "layout.typography.metrics: \"exact\" — Adobe Core 14 widths for Helvetica, on the only path where the option acts: no embedded font (pdfnative 1.8.0)",
+    "keywords": "typography, metrics, base-14, helvetica, afm, justification"
+  },
+  "layout": {
+    "typography": {
+      "metrics": "exact",
+      "splitParagraphs": true
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "Exact metrics on the base-14 path", "level": 1 },
+    { "type": "paragraph", "text": "This document is rendered with no --font flag: its text is set in Helvetica, one of the fourteen fonts every PDF viewer supplies, and nothing is embedded. pdfnative measures such text with a compact width table by default. metrics: \"exact\" switches to the Adobe Core 14 widths, glyph by glyph, so a justified line ends exactly where the viewer's Helvetica ends it." },
+    { "type": "paragraph", "text": "The option is inert as soon as a registered font measures the text (--font latin --lang latin): an embedded font always brings its own advance widths. That is why this sample has a category of its own, rendered without the font flags the typography samples need." },
+    { "type": "heading", "text": "Where the two tables disagree", "level": 2 },
+    { "type": "paragraph", "text": "Wide and narrow glyphs — WWWW MMMM against iiii llll — typographic punctuation such as “double” and ‘single’ quotes, the ellipsis… and the en dash – are the characters whose widths differ most. Over a justified paragraph the differences add up to different line breaks: compare this file with a render of the same document without the metrics key.", "align": "justify" },
+    { "type": "paragraph", "text": "Illicit millilitre fillings will jiggle little: fifty-five WWF members hummed “MMM…” while William’s minimum – a million Wm² – became illegible. Illicit millilitre fillings will jiggle little: fifty-five WWF members hummed “MMM…” while William’s minimum – a million Wm² – became illegible. Illicit millilitre fillings will jiggle little: fifty-five WWF members hummed “MMM…” while William’s minimum – a million Wm² – became illegible.", "align": "justify" },
+    { "type": "heading", "text": "When to use it", "level": 2 },
+    { "type": "list", "style": "bullet", "items": ["Small files with no embedded font, where justified text must still look right.", "Documents compared line by line with another producer's Helvetica output.", "Not for PDF/A or PDF/X: both require embedded fonts, which makes the option moot."] }
+  ]
+}

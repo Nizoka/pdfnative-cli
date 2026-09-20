@@ -48,7 +48,7 @@
     { "type": "heading", "text": "Interactive Form Fields", "level": 2 },
     { "type": "formField", "fieldType": "text",     "name": "firstName", "label": "First Name" },
     { "type": "formField", "fieldType": "text",     "name": "lastName",  "label": "Last Name" },
-    { "type": "formField", "fieldType": "textarea", "name": "comments",  "label": "Comments" },
+    { "type": "formField", "fieldType": "multilineText", "name": "comments",  "label": "Comments" },
     { "type": "formField", "fieldType": "checkbox", "name": "agree",     "label": "I agree to the terms" },
     { "type": "formField", "fieldType": "dropdown", "name": "country",   "label": "Country",
       "options": ["United States", "Canada", "United Kingdom", "France", "Germany"] },

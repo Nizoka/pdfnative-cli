@@ -21,11 +21,17 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL }             from 'node:url';
 import { dirname, join, resolve }                  from 'node:path';
 
-import { registerFonts, loadFontData, buildDocumentPDFBytes } from 'pdfnative';
+import { registerFonts, loadFontData, buildDocumentPDFBytes, setDefaultCreationDate } from 'pdfnative';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir   = resolve(__dirname, '..', '..', '..');
-const outDir    = join(rootDir, 'samples', 'output', 'multilang');
+// The reproducible sample corpus (scripts/generate-samples.ts) routes the
+// output elsewhere and pins the creation instant through SOURCE_DATE_EPOCH
+// (integer seconds), the same convention the CLI honours — v1.5.0.
+const outDir    = process.env.PDFNATIVE_SAMPLES_OUT ?? join(rootDir, 'samples', 'output', 'multilang');
+if (/^\d+$/.test(process.env.SOURCE_DATE_EPOCH ?? '')) {
+  setDefaultCreationDate(new Date(Number(process.env.SOURCE_DATE_EPOCH) * 1000));
+}
 
 // Locate the pdfnative/fonts/ directory using import.meta.resolve so the
 // path works regardless of package manager layout (npm, pnpm, Yarn PnP, …).

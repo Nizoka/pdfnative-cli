@@ -63,6 +63,9 @@ import {
  *   ✘ Sign-side LTV (embedding timestamps / DSS) — tracked upstream in pdfnative
  */
 
+/** Pushed to `notes` when an RFC 3161 messageImprint uses SHA-1 (v1.5.0). */
+const WEAK_DIGEST_NOTE = 'weak digest: RFC 3161 messageImprint uses SHA-1 (refused under --strict)';
+
 interface SignatureReport {
     readonly index: number;
     readonly fieldName: string | null;
@@ -84,6 +87,13 @@ interface SignatureReport {
     readonly timestampValid: boolean;
     readonly timestampTime: string | null;
     readonly tsaSubject: string | null;
+    /**
+     * The RFC 3161 messageImprint digest (`sha1`, `sha256`, …) of the
+     * signature timestamp or the /DocTimeStamp token, or null. A `sha1`
+     * imprint is reported as a weak-digest note and refused under --strict
+     * (v1.5.0).
+     */
+    readonly timestampDigest: string | null;
     readonly revocationChecked: boolean;
     readonly revocationStatus: RevocationStatus;
     readonly revocationSource: 'embedded' | 'online' | 'none';
@@ -471,6 +481,7 @@ export async function verify(args: ParsedArgs): Promise<void> {
         let timestampValid = false;
         let timestampTime: string | null = null;
         let tsaSubject: string | null = null;
+        let timestampDigest: string | null = null;
         let revocationChecked = false;
         let revocationStatus: RevocationStatus = 'unknown';
         let revocationSource: 'embedded' | 'online' | 'none' = 'none';
@@ -496,8 +507,12 @@ export async function verify(args: ParsedArgs): Promise<void> {
                 timestampValid = dts.valid;
                 timestampTime = dts.genTime;
                 tsaSubject = dts.tsaSubject;
+                timestampDigest = dts.imprintAlgorithm;
                 chainValid = dts.chainValid;
                 trustedRoot = dts.trusted;
+                if (dts.imprintAlgorithm === 'sha1') {
+                    notes.push(WEAK_DIGEST_NOTE);
+                }
                 if (dts.valid) {
                     notes.push(
                         `document timestamp valid (genTime ${dts.genTime ?? 'unknown'}`
@@ -566,6 +581,10 @@ export async function verify(args: ParsedArgs): Promise<void> {
                         timestampValid = ts.valid;
                         timestampTime = ts.genTime;
                         tsaSubject = ts.tsaSubject;
+                        timestampDigest = ts.imprintAlgorithm;
+                        if (ts.imprintAlgorithm === 'sha1') {
+                            notes.push(WEAK_DIGEST_NOTE);
+                        }
                         if (ts.valid) {
                             notes.push(
                                 `RFC 3161 timestamp valid (genTime ${ts.genTime ?? 'unknown'}`
@@ -628,6 +647,7 @@ export async function verify(args: ParsedArgs): Promise<void> {
             timestampValid,
             timestampTime,
             tsaSubject,
+            timestampDigest,
             revocationChecked,
             revocationStatus,
             revocationSource,
@@ -651,10 +671,15 @@ export async function verify(args: ParsedArgs): Promise<void> {
     // reported but — as with PAdES-T signature timestamps — never block, so
     // a valid B-LTA document passes --strict while a tampered byte range
     // (imprint mismatch) fails it.
+    // v1.5.0: a SHA-1 messageImprint is a weak digest — always a note, and
+    // under --strict it fails the signature (or the /DocTimeStamp) that
+    // carries it, since the timestamp no longer proves what it imprints.
+    const digestOk = (r: SignatureReport): boolean => !strict || r.timestampDigest !== 'sha1';
+
     const reportOk = (r: SignatureReport): boolean =>
         r.isDocTimestamp
-            ? r.integrity && r.signatureValid && r.timestampValid
-            : r.integrity && r.chainValid && r.trustedRoot && r.signatureValid && revocationOk(r);
+            ? r.integrity && r.signatureValid && r.timestampValid && digestOk(r)
+            : r.integrity && r.chainValid && r.trustedRoot && r.signatureValid && revocationOk(r) && digestOk(r);
 
     const allValid = reports.length > 0 && reports.every(reportOk);
 

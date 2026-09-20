@@ -8,8 +8,10 @@ coding agents under the pdfnative Human-in-the-Loop governance policy
 Nothing here is submitted automatically. A human must review, sign off on, and
 manually submit any draft under their own GitHub identity.
 
-Validate a draft before review:
+Start from [TEMPLATE.md](TEMPLATE.md) (copy it to `<slug>.md` here — every other
+`.md` in this directory is git-ignored, so a draft never lands in a commit by
+accident), fill every section, then validate it before review:
 
 ```bash
-pdfnative govern verify-issue ./your-draft.md
+pdfnative govern verify-issue .github/drafts/<slug>.md
 ```

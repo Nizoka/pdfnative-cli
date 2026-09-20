@@ -12,6 +12,7 @@ import {
     openPdf,
     createModifier,
     buildAnnotationBody,
+    validateURL,
 } from '../core-bridge/index.js';
 import type { MarkupAnnotation, AnnotationRect } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, hasFlag } from '../utils/args.js';
@@ -23,11 +24,47 @@ import { resolveSourcePassword, mapPdfError } from '../utils/pdfops.js';
 const ANNOTATION_TYPES = new Set([
     'text', 'highlight', 'underline', 'strikeout', 'squiggly',
     'square', 'circle', 'line', 'freetext',
+    // v1.5.0 — /Link with a URI action (ROADMAP item "link annotations on existing PDFs")
+    'link',
 ]);
+
+/** A `link` entry: an external URI over a click rectangle (ISO 32000-1 §12.5.6.5 / §12.6.4.7). */
+interface LinkSpec {
+    readonly url: string;
+    readonly rect: AnnotationRect;
+}
 
 interface AnnotationSpec {
     readonly page: number; // 1-based
-    readonly annotation: MarkupAnnotation;
+    readonly annotation: MarkupAnnotation | null;
+    /** Set for `type: "link"`; the CLI builds the /Link dictionary itself. */
+    readonly link: LinkSpec | null;
+}
+
+/** Numbers in a PDF dictionary: no exponent, at most two decimals (ISO 32000-1 §7.3.3). */
+function fmtNum(n: number): string {
+    return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '');
+}
+
+/**
+ * Escape a URL for a PDF literal string (ISO 32000-1 §7.3.4.2). `validateURL`
+ * has already rejected control characters and non-http(s)/mailto schemes.
+ */
+function escapeUrlForPdf(url: string): string {
+    return url.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+/**
+ * The /Link dictionary body for `PdfModifier.addAnnotation()`. pdfnative's own
+ * `buildLinkAnnotation()` returns a complete indirect object (`N 0 obj … endobj`)
+ * for the document builder, whereas the modifier takes a dictionary body, so
+ * the CLI emits the same dictionary (Border 0, Print flag, URI action) itself
+ * with the engine's `validateURL` as the security boundary.
+ */
+function buildLinkBody(link: LinkSpec): string {
+    const [x1, y1, x2, y2] = link.rect;
+    return `<< /Type /Annot /Subtype /Link /Rect [${fmtNum(x1)} ${fmtNum(y1)} ${fmtNum(x2)} ${fmtNum(y2)}] `
+        + `/Border [0 0 0] /F 4 /A << /Type /Action /S /URI /URI (${escapeUrlForPdf(link.url)}) >> >>`;
 }
 
 function isNumberArray(value: unknown, length: number): boolean {
@@ -66,6 +103,21 @@ function parseAnnotationEntry(raw: unknown, index: number): AnnotationSpec {
         );
     }
 
+    if (type === 'link') {
+        const url = obj['url'];
+        if (typeof url !== 'string' || url.trim().length === 0) {
+            throw new CliError(`Link annotation #${index + 1} needs a "url" (http:, https: or mailto:).`, 1, ErrorCode.INPUT);
+        }
+        if (!validateURL(url)) {
+            throw new CliError(
+                `Link annotation #${index + 1}: blocked URL — only http:, https: and mailto: schemes without control characters are allowed.`,
+                1,
+                ErrorCode.INPUT,
+            );
+        }
+        return { page, annotation: null, link: { url, rect: obj['rect'] as AnnotationRect } };
+    }
+
     if (type === 'line' && (!isNumberArray(obj['start'], 2) || !isNumberArray(obj['end'], 2))) {
         throw new CliError(
             `Line annotation #${index + 1} needs "start": [x, y] and "end": [x, y].`,
@@ -97,7 +149,7 @@ function parseAnnotationEntry(raw: unknown, index: number): AnnotationSpec {
         if (obj['fontSize'] !== undefined) base['fontSize'] = obj['fontSize'];
     }
 
-    return { page, annotation: base as unknown as MarkupAnnotation };
+    return { page, annotation: base as unknown as MarkupAnnotation, link: null };
 }
 
 function parseAnnotationsJson(text: string): AnnotationSpec[] {
@@ -174,7 +226,9 @@ export async function annotate(args: ParsedArgs): Promise<void> {
 
     const modifier = createModifier(reader);
     for (const spec of specs) {
-        const body = buildAnnotationBody(spec.annotation);
+        const body = spec.link !== null
+            ? buildLinkBody(spec.link)
+            : buildAnnotationBody(spec.annotation as MarkupAnnotation);
         modifier.addAnnotation(spec.page - 1, body);
     }
 

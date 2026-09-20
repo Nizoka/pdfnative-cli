@@ -14,10 +14,9 @@ We will acknowledge receipt within 48 hours and aim to provide a fix within 7 da
 
 | Version | Supported |
 |---------|-----------|
-| 1.4.x   | ✅        |
-| 1.3.x   | ✅        |
-| 1.2.x   | ✅        |
-| < 1.2   | ❌        |
+| 1.5.x   | ✅        |
+| 1.4.x   | ✅ (security fixes) |
+| < 1.4   | ❌        |
 
 ## Security Model
 
@@ -47,12 +46,14 @@ The agent-native contract is a **pure local presentation/validation layer** and 
 
 ### Input Validation
 
-- All file path arguments (`--input`, `--output`, `--output-dir`, `--key`, `--cert`, `--cert-chain`, `--layout`, `--attachment`, `--watermark-image`, `--outline`, `--annotations`, `--trust`, `--data`, `--from-json`, `--manifest`, the positional source paths of `merge` and `compare`, and every path-carrying value inside a `batch --manifest` file) are validated against path traversal (`../`) sequences before any filesystem access.
-- JSON input size is capped at **50 MB** before `JSON.parse` to prevent memory exhaustion (this also covers the `annotate --annotations` spec, `govern verify-issue` drafts, `ltv --data` files and `batch --manifest` files; manifests are additionally capped at 1 000 tasks).
+- All file path arguments (`--input`, `--output`, `--output-dir`, `--key`, `--cert`, `--cert-chain`, `--layout`, `--attachment`, `--watermark-image`, `--outline`, `--annotations`, `--trust`, `--data`, `--from-json`, `--manifest`, `--output-intent-icc`, `--font-file`, the positional source paths of `merge` and `compare`, and every path-carrying value inside a `batch --manifest` file) are validated against path traversal (`../`) sequences before any filesystem access.
+- JSON input size is capped at **50 MB** before `JSON.parse` to prevent memory exhaustion (this also covers `--layout` files, the `annotate --annotations` spec, `govern verify-issue` drafts, `ltv --data` files and `batch --manifest` files; manifests are additionally capped at 1 000 tasks).
+- **Binary inputs are bounded and validated** (v1.5.0): an ICC profile passed with `--output-intent-icc` is capped at 16 MiB and must carry the `acsp` signature (the engine additionally requires a `prtr` CMYK profile for PDF/X); a font passed with `--font-file` is capped at 32 MiB, must start with a TrueType/OpenType magic (`00 01 00 00`, `true`, `OTTO` — collections and WOFF are refused), and is parsed by `parseFontData` and checked by `validateFontData` before it is registered. Neither a document JSON nor a `--layout` file can name a font or profile path — no code or data is loaded from a payload.
+- `--creation-date` and `SOURCE_DATE_EPOCH` are parsed strictly (ISO 8601 / integer seconds); an invalid value is a usage error, never silently ignored, so a reproducibility promise is either honoured or refused.
 - A **manifest has the filesystem access of the user who invokes `batch`** — the same trust level as flags typed on the command line. Only *network* access is additionally gated: any network-reaching flag inside a manifest requires `--allow-network` on the invocation itself, so a manifest obtained from elsewhere can never open a socket on its own.
 - The global `--max-inflate-size <bytes>` flag caps the decompressed size of any single PDF stream while parsing untrusted input (anti zip-bomb; engine default 100 MiB).
 - `merge` / `split` / `extract` enforce an optional `--max-output-size` cap and bound the number of source PDFs; `extract` / `annotate` bounds-check every page reference against the document before writing.
-- `annotate` re-keys only the annotation fields pdfnative's builders understand — the raw JSON is never spread into the emitted dictionary, so unknown keys cannot be injected.
+- `annotate` re-keys only the annotation fields pdfnative's builders understand — the raw JSON is never spread into the emitted dictionary, so unknown keys cannot be injected. A `link` annotation's `url` goes through the engine's `validateURL` (`http`, `https`, `mailto`; no `javascript:`, no control characters) and is escaped as a PDF string before it lands in the `/URI` action.
 - `inspect` JSON output sanitizes all values — no raw binary blobs are emitted in default mode.
 
 ### Code Safety
@@ -63,7 +64,7 @@ The agent-native contract is a **pure local presentation/validation layer** and 
   explicit opt-in flags listed below. The `govern` command (AI-governance / HITL) is
   fully offline: it never contacts GitHub or the network, and `govern verify-issue`
   is a pure local validator. See *Network Access* below.
-- NPM provenance — signed builds via GitHub Actions OIDC.
+- NPM provenance — signed builds via GitHub Actions OIDC (see *Supply chain* below).
 
 ### Network Access (opt-in only)
 
@@ -88,8 +89,9 @@ enforces:
 - an **http/https-only** scheme allow-list;
 - **DNS resolution followed by address vetting** — requests to private (RFC 1918),
   loopback, link-local (incl. the `169.254.169.254` cloud-metadata address),
-  unique-local, CGNAT (`100.64.0.0/10`) and multicast ranges are refused, for both
-  IPv4 and IPv6 (including IPv4-mapped IPv6);
+  unique-local, CGNAT (`100.64.0.0/10`), multicast, benchmarking (`198.18.0.0/15`),
+  documentation (`192.0.2.0/24`, TEST-NET-1) and NAT64 (`64:ff9b::/96`) ranges are
+  refused, for both IPv4 and IPv6 (including IPv4-mapped IPv6);
 - **no redirect following** (a 3xx is refused rather than followed, so a redirect to
   an internal host cannot bypass the address check);
 - a **10 s timeout** and a **5 MiB response cap**;
@@ -123,8 +125,9 @@ The `verify` command verifies, with no network access by default:
 
 Sign-side LTV is available since v1.4.0: `sign --timestamp` (PAdES B-T),
 `ltv collect|embed|add` (B-LT, `/DSS` + `/VRI`) and `doc-timestamp` (B-LTA). The
-engine (pdfnative 1.7.0) verifies every TSA token before embedding it and never
-opens a socket itself — the CLI injects the SSRF-guarded transport.
+engine (pdfnative 1.8.0) verifies every TSA token before embedding it and never
+opens a socket itself — the CLI injects the SSRF-guarded transport, with the
+`sign --timestamp-timeout <ms>` bound on the TSA round-trip (default 10 s).
 
 **Out of scope** (do not rely on for legal / regulatory non-repudiation):
 
@@ -141,10 +144,12 @@ scope above). SHA-1 appears in two deliberate places:
 
 1. **Verification of legacy timestamp imprints** — an existing RFC 3161 token whose
    `messageImprint` was computed with SHA-1 is still *checked* (the digest named by
-   the token's own `hashAlgorithm` is used for the comparison). This affects
-   verification of third-party documents only; the CLI always *requests* SHA-256+
-   imprints when it timestamps (`--timestamp-digest` / `--digest`, default sha256),
-   and the token's TSA signature itself must verify with SHA-256+.
+   the token's own `hashAlgorithm` is used for the comparison), reported as
+   `timestampDigest: "sha1"` with the note `weak digest: RFC 3161 messageImprint uses
+   SHA-1 (refused under --strict)`, and **fails the timestamp under `verify --strict`**
+   (v1.5.0). This affects verification of third-party documents only; the CLI always
+   *requests* SHA-256+ imprints when it timestamps (`--timestamp-digest` / `--digest`,
+   default sha256), and the token's TSA signature itself must verify with SHA-256+.
 2. **The OCSP `CertID`** built by `buildOcspRequest` and matched in
    `ocspCertIdMatches` ([src/utils/revocation.ts](./src/utils/revocation.ts)).
    (SHA-1 of a signature's `/Contents` is also used as the — non-cryptographic —
@@ -167,6 +172,44 @@ because certificate-derived bytes are treated as "sensitive data". This is a
 **reviewed false positive**: the data is public and the hash is not used for any
 security decision. The call sites are annotated in source, and the alert is dismissed
 as *"Won't fix"* in code scanning with this rationale.
+
+### Reproducible builds (v1.5.0)
+
+- The global `--creation-date <iso8601>` (or `SOURCE_DATE_EPOCH=<seconds>`) pins every
+  date the engine writes — `/CreationDate`, `xmp:CreateDate`, the `{date}` placeholder
+  and the trailer `/ID` — in UTC, so the same input produces byte-identical output on
+  every host and in every timezone. A consumer can therefore verify a PDF by hash.
+- Encrypted output is never byte-reproducible (the file key and IVs come from the CSPRNG,
+  by design), and a signed PDF's incremental revision carries a per-revision `/ID` drawn at
+  signing time (see ROADMAP.md). `sign --signing-time` and `metadata --mod-date` are
+  deliberate legal instants and are not pinned by `--creation-date`.
+- The repository proves the promise on itself: every generated sample is held to
+  `tests/regression/baselines/samples.sha256.json` (byte-exact for plain output, semantic
+  for encrypted and signed output) by `npm run verify:samples`, blocking in CI.
+
+### Supply chain
+
+- **Zero extra runtime dependencies** — `pdfnative` is the only one; `npm ci --ignore-scripts`
+  everywhere in CI, `.npmrc` sets `ignore-scripts=true` and `audit-level=high`.
+- **Hardened workflows** — every job runs under `step-security/harden-runner` (egress
+  audited), every action is pinned to a commit SHA, checkouts use `persist-credentials: false`,
+  Dependabot and `dependency-review` gate every dependency change, `npm audit` runs weekly.
+- **Trusted Publishing** — `publish.yml` publishes with npm ≥ 11.5.1 through GitHub OIDC
+  (no long-lived token) and `--provenance`; a CycloneDX SBOM (`npm sbom`) and a build
+  attestation for the tarball and the SBOM are attached to the GitHub release. Verify an
+  install with `npm audit signatures`.
+- **One release gate** — `npx tsx scripts/gate.ts --publish --require-all` runs typecheck,
+  lint, the build, the built-binary smoke test, the bundle-size budget, the bundle probe
+  (the engine stays external; no font data, PEM block, `console.log` or undeclared
+  `require` in `dist/cli.cjs`), the sample generation, the tests with coverage, the docs
+  verifier, the sample baseline, the PDF/A corpus (veraPDF 1.30.2, installer SHA-256
+  verified) and the PDF/X corpus; a skipped step fails the publish.
+- **Branch and tag protection** — `.github/rulesets/main.json` and `tags.json` are the
+  committed copies of the GitHub rulesets (required checks `ci (22)`, `ci (24)`,
+  `sample-regression`; release tags are never deleted or moved).
+- **Agents never publish** — the human-in-the-loop policy (`.github/AGENT_RULES.md`,
+  `pdfnative govern`) is enforced in Claude Code sessions by `.claude/hooks/guard.mjs`,
+  which refuses `npm publish`, `git push`, `git tag`, `gh pr/issue/release` writes.
 
 ## Disclosure Policy
 

@@ -1,0 +1,24 @@
+{
+  "title": "Typography — Justification, Optical Margins & Soft Hyphens",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "align justify, opticalMargins, soft hyphens (U+00AD), hyphenationLanguage (pdfnative 1.8.0)",
+    "keywords": "typography, justify, optical margins, hyphenation"
+  },
+  "layout": {
+    "typography": {
+      "opticalMargins": true,
+      "hyphenationLanguage": "en"
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "Justified text with optical margin alignment", "level": 1 },
+    { "type": "paragraph", "text": "This paragraph is set with align: \"justify\". Every line except the last is stretched to the full measure by widening the inter-word spaces. With opticalMargins the punctuation that lands at a line edge — commas, periods, quotation marks and hyphens — hangs slightly into the margin, so the visual edge of the text block looks straight. \"Quotation marks,\" for instance, and the trailing comma here, are pulled outward; a plain flush-left setting would leave a ragged optical edge. Justification works with the base-14 fonts and with any registered font; the narrow spaces and kerning of the other typography samples need a registered font.", "align": "justify" },
+    { "type": "heading", "text": "Soft hyphens", "level": 2 },
+    { "type": "paragraph", "text": "A soft hyphen (U+00AD) marks a permitted break inside a word and is invisible unless the line breaks there: electro­magnetic, inter­national­isation, micro­processor, hyper­text, tele­communication, photo­synthesis, anti­disestablishment­arianism, counter­revolutionary, thermo­dynamics, extra­ordinary, multi­dimensional, inter­operability. The engine prefers a soft-hyphen break to an over-stretched line; the hyphen glyph appears only where the break happens. hyphenationLanguage is passed to a hyphenation provider when one is installed programmatically (setHyphenationProvider); the CLI ships none, so soft hyphens are the portable way to mark break points.", "align": "justify" },
+    { "type": "heading", "text": "Alignment reference", "level": 2 },
+    { "type": "paragraph", "text": "Left-aligned (the default): the right edge is ragged and the word spacing is even.", "align": "left" },
+    { "type": "paragraph", "text": "Centred: each line is centred on the measure.", "align": "center" },
+    { "type": "paragraph", "text": "Right-aligned: the left edge is ragged.", "align": "right" }
+  ]
+}

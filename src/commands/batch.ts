@@ -345,8 +345,9 @@ export async function batch(args: ParsedArgs): Promise<void> {
         throw new CliError(`No .json files found in ${inputDir}.`, 1, ErrorCode.INPUT);
     }
 
-    // In dry-run we validate every input via render (which short-circuits before
-    // writing); no output directory is created and no PDF is written.
+    // In dry-run every input goes through render, which pre-flights the real
+    // build in memory and discards the bytes (v1.5.0); no output directory is
+    // created and no PDF is written.
     if (!dryRun) {
         await mkdir(outputDir, { recursive: true });
     }

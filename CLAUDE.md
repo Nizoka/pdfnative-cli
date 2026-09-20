@@ -1,105 +1,69 @@
-# CLAUDE.md — working on pdfnative-cli with Claude Code
+@AGENTS.md
 
-Guidance for Claude Code (and any Claude-family agent) contributing to this
-repository. It complements — does not replace — the existing project docs:
+# Claude Code addendum
 
-- **[.github/copilot-instructions.md](.github/copilot-instructions.md)** — the
-  canonical architecture map, entry-point contract, arg-parser contract,
-  security constraints, and code style. **Read it first.**
-- **[AGENTS.md](AGENTS.md)** — the agent-automation contract (process contract,
-  `--json` envelopes, token economy, `schema`, governance/HITL).
-- **[ROADMAP.md](ROADMAP.md)**, **[docs/KNOWLEDGE_BASE.md](docs/KNOWLEDGE_BASE.md)**,
-  **[CONTRIBUTING.md](CONTRIBUTING.md)**, **[SECURITY.md](SECURITY.md)**.
+Everything in AGENTS.md applies. This file adds only what is specific to Claude Code sessions in this repository.
 
-When those documents and this one disagree, they win on architecture/style and
-this file wins on Claude-Code workflow specifics.
+## Token discipline
 
-## Project philosophy (non-negotiable)
+- Run tests through `npx tsx scripts/gate.ts --fast` or `npx vitest run <file>` (the dot reporter is configured); never paste a full test run into context.
+- Never Read `dist/`, `coverage/`, `test-output/`, `samples/output/`, `package-lock.json`, `node_modules/`.
+  The deny list in `.claude/settings.json` applies to Read and, at best effort, to Grep/Glob — prefer `node dist/cli.cjs <command> --help` and `schema manifest` over reading the bundle.
+- Find a command's flags in `src/commands/completion.ts` (COMMANDS) and its usage text in `src/index.ts` (`<NAME>_USAGE`); find an engine symbol's re-export with Grep in `src/core-bridge/index.ts`.
+- Read README.md, ROADMAP.md and docs/KNOWLEDGE_BASE.md by section: `grep -n "^## "` first, then a line range. CHANGELOG.md: only the top entry.
+- `.github/instructions/*.md` are the per-area rules: open the ONE matching the area you touch (table in AGENTS.md §Where is what), not all of them.
+- In plan mode, summarise gate output; do not paste logs.
+- Sample regeneration: `npm run build && npm run test:generate` then `npx tsx scripts/verify-samples.ts`. Any `--update` (rebaseline) must be justified in the release note.
+- Never push, never open PRs/issues/releases, never tag (HITL policy, hook-enforced). No `Co-Authored-By` trailers (`attribution.commit` is `""`).
 
-1. **Zero extra runtime dependencies.** `pdfnative` is the ONLY runtime
-   dependency; all PDF logic lives there. The CLI is a thin, composable dispatch
-   layer over it. Proposing a new npm runtime dep is a hard block (enforced by
-   `pdfnative govern verify-issue`).
-2. **All core imports go through [src/core-bridge/index.ts](src/core-bridge/index.ts).**
-   Never import from `pdfnative` directly in a command or util — add a selective
-   re-export to the bridge instead.
-3. **Agent-first.** stdout = artifact, stderr = diagnostics/envelopes, stable
-   exit codes (0/1/2) and stable `E_*` error codes. Keep the machine contract
-   deterministic; agent mode is a thin presentation layer, never a second runtime.
-4. **Offline by default.** Network I/O happens only behind explicit opt-in
-   flags (`verify --revocation online`, `sign --timestamp`, `doc-timestamp
-   --url`, `ltv --online`, `batch --allow-network`), always through the SSRF
-   guard. `--dry-run` never touches the network.
-5. **Native constant-time crypto** for signing by default (`node:crypto`);
-   `--pure-crypto` opts into pdfnative's portable path. Never log key material or
-   passwords.
-6. **ESM-first TypeScript strict.** Relative imports carry the `.js` extension.
-   No `console.log` (write to `process.stdout`/`process.stderr`), no `any`,
-   prefer `const` and `readonly`.
+## Gate
 
-## Repository shape
+- `npx tsx scripts/gate.ts --fast` — typecheck:all, lint, test, verify:docs. Run before proposing a commit.
+- `npm run gate` — the CI profile (default).
+- `npx tsx scripts/gate.ts --publish --require-all` — everything, incl. test:generate, verify:samples, corpus:pdfa, validate:pdfx, validate:pdfa. Release branches only.
+- `--only <step>` for one step, `--json` for machine output; logs in `test-output/.gate/<step>.log` — open only the failing step's log.
+- When the gate exceeds the Bash timeout, run it in the background; read the result with `--json` and open only the failing step's log.
 
-- `src/index.ts` — entry point: USAGE strings, `loadCommand()` dispatch, global
-  flags, config merge, agent error envelope.
-- `src/commands/*.ts` — one file per command, each exporting a single
-  `async function <name>(args: ParsedArgs): Promise<void>`.
-- `src/utils/*.ts` — arg parsing, io, error codes, agent envelopes, projection
-  (token economy), page selectors, page-tree/crypto helpers (`pdfops.ts`), etc.
-- `src/core-bridge/index.ts` — the single `pdfnative` import point.
-- `tests/**` — vitest; `samples/**` — dual-shell (`.sh` + `.ps1`) runnable demos.
+## Where to look first
 
-## Adding or changing a command (checklist)
+1. `src/commands/completion.ts` — every command and flag (the capability manifest derives from it); `src/commands/schema.ts` — every pinned shape.
+2. AGENTS.md §Where is what — the path → purpose → instruction-file table.
+3. `docs/assets/ecosystem.json` — every count and version; `npm run verify:docs` enforces it.
 
-A new command touches **all** of these — miss one and it half-works:
+## Bundle gotcha
 
-1. `src/commands/<name>.ts` — the implementation (reuse `utils/*`, `core-bridge`).
-2. `src/index.ts` — (a) the top-level `USAGE` command list, (b) a `<NAME>_USAGE`
-   constant + a `case` in the `--help` switch, (c) a `case` in `loadCommand()`.
-3. `src/commands/completion.ts` — add the command + its flags to the `COMMANDS`
-   table (all four shells + the capability manifest derive from it).
-4. `src/commands/schema.ts` — add a subject if the command has a JSON input/output
-   shape agents should validate.
-5. New stable error code? Add it to `src/utils/error.ts` **and**
-   `src/utils/agent.ts` (`DEFAULT_MESSAGE`), and document it.
-6. `tests/**` — command test + integration where a round-trip is meaningful.
-7. `samples/<name>/` — a `.sh` and a `.ps1` (keep them runnable).
-8. Docs — README command reference, `docs/KNOWLEDGE_BASE.md`, `CHANGELOG.md`,
-   `ROADMAP.md`, and `AGENTS.md`/`llms.txt` if the agent surface changed.
+tsup flattens `src/**` into one `dist/cli.cjs`, so a path relative to a source file resolves differently at runtime.
+Resolve the CLI version via `src/utils/version.ts`, never with an ad-hoc `require('../…/package.json')`.
+Always smoke-test the **built** CLI (`node dist/cli.cjs …`), not just source tests, before claiming a change works.
 
-## Build, test, verify
+## Windows session notes
 
-```bash
-npm run typecheck:all   # tsc for src + tests — must be clean
-npm run lint            # eslint src/ — 0 errors
-npm run test            # vitest run — all pass; keep coverage ≥ thresholds
-npm run build           # tsup → dist/cli.cjs (the bin)
-npm run validate:pdfa   # veraPDF gate for PDF/A changes (external veraPDF
-                        # required; absent → exit 0 = SKIP, not a pass —
-                        # VERAPDF_REQUIRED=1 fails closed; blocking in CI)
-```
+- Git Bash is `C:\Program Files\Git\bin\bash.exe` (the `bash` on PATH is the WSL stub); `.sh` samples run there, `.ps1` samples under pwsh.
+- vitest needs the drive letter upper-case (`D:\…`); PowerShell swallows `--` after `npm run` — call the scripts directly with `npx tsx scripts/<name>.ts`.
+- veraPDF: portable install in `%USERPROFILE%\verapdf` with JDK 13; the runner reads `JAVACMD` (set it to the JDK's `java.exe` — `JAVA_HOME` alone is not enough when spawned from Node).
+- `npm install` under npm 10.9 can fail with an arborist `edgesOut` error on a fresh resolution; `npx npm@11.19.1 install` works, `npm ci` is unaffected.
 
-Coverage thresholds live in `vitest.config.ts` (statements/branches/functions/
-lines). Do not lower them to make a change pass — add tests.
+## Hooks and permissions in force
 
-> **Bundle gotcha:** tsup flattens `src/**` into one `dist/cli.cjs`, so a path
-> relative to a source file (`../../package.json`) resolves differently at
-> runtime. Resolve the CLI version via `src/utils/version.ts` (which probes
-> candidates and name-guards), never with an ad-hoc `require('../…/package.json')`.
-> Always smoke-test the **built** CLI (`node dist/cli.cjs …`), not just source
-> tests, before claiming a change works.
+- `.claude/hooks/guard.mjs` (PreToolUse on Bash) denies `npm publish`/`unpublish`/`deprecate`/`dist-tag`/`version <bump>`, `gh pr|issue create|edit|close|comment` (+ `pr merge`),
+  `gh release`, writing `gh api`, any `git push`, `git tag <name>` and `git add --renormalize` — in the whole command, every `&&`/`;`/`|` segment, `$( )`/backticks and
+  `sh -c`/`pwsh -Command`/`node -e`/`npx -c` payloads (a quoted string holding one is refused too — write such strings with Edit, never via echo/heredoc).
+  Those are submitted by the maintainer (.github/AGENT_RULES.md §5) — prepare, then stop. `tests/tools/guard.test.ts` is the rule table's contract.
+- `permissions.deny` in `.claude/settings.json` blocks Read on the generated bulk files listed above and the same GitHub write commands.
+  `permissions.allow` pre-approves `npm run`, `npx vitest`, `npx tsx scripts/*`, `npx tsc`, `npx eslint`, `node -e` and read-only git. `node dist/cli.cjs …` is asked each time: some commands can reach the network.
 
-## Recommended Claude Code workflow
+## Plan mode
 
-- Use **plan mode** for multi-file changes; confirm the command surface before
-  editing eight files.
-- Run **`/code-review`** on the branch diff before opening a PR, and **`/verify`**
-  to drive an affected command end-to-end (render → new command → inspect).
-- Prefer the dedicated tools (Read/Edit/Grep/Glob) over shell equivalents.
+Use plan mode for multi-file changes; plans name the files, the commands and the expected gate outcome; keep gate output to its ≤ 20-line summary. Run `/code-review` on the branch diff before proposing a PR body.
 
-## Governance / HITL (hard rule)
+## Rules and skills
 
-Agents are **draftsmen, never autonomous submitters**. No autonomous GitHub
-writes; every bug needs a local reproduction; a human review gate always
-applies. `pdfnative govern verify-issue <draft>` must pass (no runtime deps, a
-reproduction block) — necessary but not sufficient. See AGENTS.md and
-[.github/AGENT_RULES.md](.github/AGENT_RULES.md).
+- `.claude/rules/*.md` are generated from `.github/instructions/*.instructions.md` by `npm run agents:rules` (scoped by `paths:` = the source `applyTo`).
+  Never edit a rule: edit the instruction file, then regenerate (`verify:docs` rule `claude-rules-sync` fails on drift).
+- `/release-audit [release-notes/vX.Y.Z.md] [previous-tag]` (`.claude/skills/release-audit/`) is the maintainer-invoked pre-release audit:
+  two auditors, an adversarial verifier, an agent-autonomy pass and a GO/NO-GO ledger under `.audit/`.
+
+## Release
+
+Follow CONTRIBUTING.md §Release and `scripts/release-prepare.ts`: prepare everything (version, changelog, release note, manifest,
+PR draft under `release-notes/draft/`, `npx tsx scripts/gate.ts --publish --require-all`) and stop before pushing.

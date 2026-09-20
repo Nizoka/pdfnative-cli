@@ -133,7 +133,7 @@ describe('sign', () => {
 
     it('throws CliError(2) when cert is missing even if key is provided', async () => {
         const pdfPath = await makeTestPdf();
-        const keyPath = path.join(os.tmpdir(), `key-${Date.now()}.pem`);
+        const keyPath = path.join(os.tmpdir(), `sign-test-key-${Date.now()}-${Math.random().toString(36).slice(2)}.pem`);
         tmpFiles.push(keyPath);
         await fs.writeFile(keyPath, TEST_KEY_PEM, 'utf8');
 

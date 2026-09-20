@@ -1,0 +1,28 @@
+{
+  "title": "Soft hyphens, keepWithNext and splittable",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "U+00AD break opportunities and the per-block keep rules: keepWithNext on a heading or paragraph, splittable: false (pdfnative 1.8.0)",
+    "keywords": "typography, soft hyphen, keepWithNext, splittable, pagination, widows, orphans"
+  },
+  "layout": {
+    "typography": {
+      "splitParagraphs": true,
+      "orphans": 3,
+      "widows": 3,
+      "keepHeadingsWithNext": { "minLines": 3 }
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "Soft hyphens are break opportunities", "level": 1 },
+    { "type": "paragraph", "text": "A soft hyphen (U+00AD) marks where a long word may break. It draws nothing until the line ends there, and then it draws one hyphen; text extraction never returns it. pdfnative 1.8.0 fixed the rendering — earlier versions printed every soft hyphen as a permanent one. The CLI ships no hyphenation dictionary: the soft hyphens below were typed into the document." },
+    { "type": "paragraph", "text": "In\u00ADter\u00ADna\u00ADtion\u00ADal\u00ADi\u00ADsa\u00ADtion and an\u00ADti\u00ADcon\u00ADsti\u00ADtu\u00ADtion\u00ADnelle\u00ADment are in\u00ADcom\u00ADpre\u00ADhen\u00ADsi\u00ADbly long words; elec\u00ADtro\u00ADen\u00ADceph\u00ADa\u00ADlo\u00ADgraph\u00ADi\u00ADcal\u00ADly re\u00ADpro\u00ADduc\u00ADi\u00ADble ty\u00ADpog\u00ADra\u00ADphy de\u00ADpends on char\u00ADac\u00ADter\u00ADis\u00ADti\u00ADcal\u00ADly un\u00ADob\u00ADtru\u00ADsive hy\u00ADphen\u00ADa\u00ADtion, par\u00ADtic\u00ADu\u00ADlar\u00ADly in nar\u00ADrow jus\u00ADti\u00ADfied col\u00ADumns where in\u00ADter\u00ADword spac\u00ADing would oth\u00ADer\u00ADwise be\u00ADcome dis\u00ADpro\u00ADpor\u00ADtion\u00ADate\u00ADly con\u00ADspic\u00ADu\u00ADous. In\u00ADter\u00ADna\u00ADtion\u00ADal\u00ADi\u00ADsa\u00ADtion and an\u00ADti\u00ADcon\u00ADsti\u00ADtu\u00ADtion\u00ADnelle\u00ADment are in\u00ADcom\u00ADpre\u00ADhen\u00ADsi\u00ADbly long words; elec\u00ADtro\u00ADen\u00ADceph\u00ADa\u00ADlo\u00ADgraph\u00ADi\u00ADcal\u00ADly re\u00ADpro\u00ADduc\u00ADi\u00ADble ty\u00ADpog\u00ADra\u00ADphy de\u00ADpends on char\u00ADac\u00ADter\u00ADis\u00ADti\u00ADcal\u00ADly un\u00ADob\u00ADtru\u00ADsive hy\u00ADphen\u00ADa\u00ADtion.", "align": "justify" },
+    { "type": "heading", "text": "Keep rules, block by block", "level": 1 },
+    { "type": "paragraph", "text": "layout.typography sets the document-wide rules: paragraphs may split across pages (splitParagraphs) but never leave fewer than three lines at the foot (orphans) or at the head (widows) of a page, and a heading stays with at least three lines of what follows. Two per-block keys refine them." },
+    { "type": "paragraph", "text": "keepWithNext: true — this lead-in sentence is never the last thing on a page; it moves to the next page with the block it introduces:", "keepWithNext": true },
+    { "type": "list", "style": "bullet", "items": ["a list, a table or a figure that needs its introduction;", "a caption written before its illustration;", "a question followed by its answer."] },
+    { "type": "paragraph", "text": "splittable: false — this paragraph is laid out in one piece even though splitParagraphs is on for the rest of the document. Use it for a legal clause, an address block, a short quotation or a code listing: anything a page break would damage. If it does not fit in what remains of the page, the whole paragraph moves to the next one. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.", "splittable": false, "align": "justify" },
+    { "type": "heading", "text": "See the decisions", "level": 2, "keepWithNext": true },
+    { "type": "paragraph", "text": "pdfnative render --inspect-layout prints the page and the position of every block without writing a PDF: the same pagination planner runs for the report and for the render, so the page map is the truth." }
+  ]
+}

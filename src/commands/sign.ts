@@ -132,6 +132,15 @@ export async function sign(args: ParsedArgs): Promise<void> {
         : 'sha256';
     const timestampNonceRaw = getStringFlag(args.flags, 'timestamp-nonce');
     const explicitNonce = timestampNonceRaw !== undefined ? parseNonceHex(timestampNonceRaw) : undefined;
+    // v1.5.0: a per-request TSA timeout (ms) beside the guarded 10 s default,
+    // as `ltv --timeout` / `doc-timestamp --timeout` already offer.
+    const timestampTimeoutRaw = getStringFlag(args.flags, 'timestamp-timeout');
+    const timestampTimeoutMs = timestampTimeoutRaw !== undefined
+        ? parsePositiveInt(timestampTimeoutRaw, 'timestamp-timeout')
+        : undefined;
+    if (timestampTimeoutMs !== undefined && timestampUrl === undefined) {
+        throw new CliError('--timestamp-timeout only applies together with --timestamp <url>.', 2);
+    }
 
     // CMS message digest. pdfnative requires digestAlgorithm to match the
     // algorithm's implied digest, so sha384/sha512 promote rsa-sha256 to the
@@ -297,7 +306,7 @@ export async function sign(args: ParsedArgs): Promise<void> {
             output: outputPath ?? '-',
         };
         if (timestampUrl !== undefined) {
-            envelope['timestamp'] = { url: timestampUrl, digest: timestampDigest };
+            envelope['timestamp'] = { url: timestampUrl, digest: timestampDigest, ...(timestampTimeoutMs !== undefined ? { timeoutMs: timestampTimeoutMs } : {}) };
         }
         emitStatus(envelope);
         return;
@@ -310,7 +319,8 @@ export async function sign(args: ParsedArgs): Promise<void> {
         // injected provider (setTimestampProvider — the tests' seam) beats the
         // CLI's SSRF-guarded HTTP transport. NEVER falls back to an
         // untimestamped signature: any TSA failure aborts the command.
-        const timestampProvider = getTimestampProvider() ?? createTsaProvider(timestampUrl);
+        const timestampProvider = getTimestampProvider()
+            ?? createTsaProvider(timestampUrl, timestampTimeoutMs !== undefined ? { timeoutMs: timestampTimeoutMs } : {});
         const timestampNonce = explicitNonce ?? BigInt('0x' + randomBytes(8).toString('hex'));
         const tsOptions: PdfSignTimestampOptions = {
             ...options,
@@ -349,7 +359,7 @@ export async function sign(args: ParsedArgs): Promise<void> {
         bytes: signedBytes.length,
     };
     if (timestampUrl !== undefined) {
-        envelope['timestamp'] = { url: timestampUrl, digest: timestampDigest };
+        envelope['timestamp'] = { url: timestampUrl, digest: timestampDigest, ...(timestampTimeoutMs !== undefined ? { timeoutMs: timestampTimeoutMs } : {}) };
     }
     emitStatus(envelope);
 }

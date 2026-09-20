@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { loadConfig, applyConfigDefaults } from '../../src/utils/config.js';
+import { loadConfig, applyConfigDefaults, KNOWN_COMMANDS } from '../../src/utils/config.js';
+import { COMMANDS } from '../../src/commands/completion.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { CliError } from '../../src/utils/error.js';
 
@@ -91,6 +92,34 @@ describe('loadConfig', () => {
         dirs.push(dir);
         await fs.writeFile(path.join(dir, '.pdfnativerc.json'), JSON.stringify([1, 2, 3]));
         expect(() => loadConfig('render', undefined, dir)).toThrow(CliError);
+    });
+
+    it('honours a section for every command, not only the historical five (v1.5.0, audit A-44)', async () => {
+        const dir = await mkTempDir();
+        dirs.push(dir);
+        await fs.writeFile(
+            path.join(dir, '.pdfnativerc.json'),
+            JSON.stringify({
+                'doc-timestamp': { digest: 'sha384' },
+                compare: { mode: 'text', 'ignore-whitespace': true },
+                'extract-text': { format: 'json' },
+                metadata: { title: 'FROM-CONFIG' },
+            }),
+        );
+        expect(loadConfig('doc-timestamp', undefined, dir)).toEqual({ digest: 'sha384' });
+        expect(loadConfig('compare', undefined, dir)).toEqual({ mode: 'text', 'ignore-whitespace': true });
+        expect(loadConfig('extract-text', undefined, dir)).toEqual({ format: 'json' });
+        expect(loadConfig('metadata', undefined, dir)).toEqual({ title: 'FROM-CONFIG' });
+        expect(loadConfig('render', undefined, dir)).toEqual({});
+        expect(KNOWN_COMMANDS).toEqual(COMMANDS.map((c) => c.name));
+        expect(KNOWN_COMMANDS).toHaveLength(21);
+    });
+
+    it('treats an object under a non-command key as a global flag value to ignore, not a section', async () => {
+        const dir = await mkTempDir();
+        dirs.push(dir);
+        await fs.writeFile(path.join(dir, '.pdfnativerc.json'), JSON.stringify({ 'not-a-command': { quiet: true } }));
+        expect(loadConfig('render', undefined, dir)).toEqual({});
     });
 
     it('reads an explicit --config path', async () => {

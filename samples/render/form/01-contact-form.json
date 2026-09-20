@@ -15,7 +15,7 @@
     { "type": "heading",   "text": "Enquiry", "level": 2 },
     { "type": "formField", "fieldType": "dropdown", "name": "subject", "label": "Subject *",
       "options": ["General Enquiry", "Technical Support", "Billing", "Partnership", "Other"] },
-    { "type": "formField", "fieldType": "textarea",  "name": "message", "label": "Message *", "placeholder": "Describe your enquiry here..." },
+    { "type": "formField", "fieldType": "multilineText",  "name": "message", "label": "Message *", "placeholder": "Describe your enquiry here..." },
     { "type": "spacer",    "height": 12 },
 
     { "type": "heading",   "text": "Preferences", "level": 2 },

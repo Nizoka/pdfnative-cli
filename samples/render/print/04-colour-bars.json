@@ -1,0 +1,27 @@
+{
+  "title": "Print Production — Colour Bars",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "print.marks.colourBars: CMYK control strip beside the crop marks (pdfnative 1.8.0)",
+    "keywords": "print, colour bars, control strip, registration, bleed",
+    "trapped": "False"
+  },
+  "layout": {
+    "print": {
+      "bleed": 14.17,
+      "marks": { "colourBars": { "tints": true, "size": 12 } }
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "Press sheet with a colour control strip", "level": 1 },
+    { "type": "paragraph", "text": "print.marks accepts an object beside true (pdfnative 1.8.0): colourBars draws a strip of solid C, M, Y and K patches — plus 25/50/75 % tints when tints is true — outside the TrimBox, in the 5 mm bleed area declared by bleed: 14.17. size is the patch edge in points (12 by default, clamped to what the bleed allows). Crop marks and registration targets stop 0.5 pt short of the trim line and the sheet edge.", "align": "justify" },
+    { "type": "heading", "text": "Why a control strip", "level": 2 },
+    { "type": "list", "items": [
+      "The press operator reads ink density from the solid patches with a densitometer.",
+      "The tint patches reveal dot gain: a 50 % patch that measures 68 % means the plate or the stock spreads ink.",
+      "Registration targets on the edge midpoints show plate misalignment as coloured fringes.",
+      "Everything lands outside the TrimBox, so it is cut away."
+    ] },
+    { "type": "paragraph", "text": "Under a PDF/X-4 claim with a CMYK output intent the marks and patches use the registration colour (/Separation /All), which prints on every plate; see 05-pdfx4.json.", "fontSize": 10 }
+  ]
+}

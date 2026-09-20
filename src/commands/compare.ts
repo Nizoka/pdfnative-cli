@@ -26,6 +26,7 @@ import { emitStatus, isJsonMode } from '../utils/agent.js';
 import { serializeJson } from '../utils/projection.js';
 import { mapPdfError } from '../utils/pdfops.js';
 import { parsePageList } from '../utils/pages.js';
+import { decodePdfTextString } from '../utils/pdftext.js';
 
 type DiffKind =
     | 'pageCount' | 'pageSize' | 'box' | 'userUnit' | 'metadata'
@@ -124,7 +125,7 @@ function infoValue(reader: PdfReader, info: PdfDict | null, key: string): string
     if (raw === undefined) return null;
     const val = reader.resolveValue(raw);
     if (typeof val !== 'string') return null;
-    const trimmed = val.trim();
+    const trimmed = decodePdfTextString(val).trim();
     if (trimmed.startsWith('(') && trimmed.endsWith(')')) return trimmed.slice(1, -1);
     return trimmed;
 }
