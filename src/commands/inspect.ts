@@ -7,6 +7,7 @@ import { isJsonMode } from '../utils/agent.js';
 import { selectFields, serializeJson, parseFieldList } from '../utils/projection.js';
 import { resolveSourcePassword, mapPdfError } from '../utils/pdfops.js';
 import { pdfDateToIso } from '../utils/pdfdate.js';
+import { decodePdfTextString } from '../utils/pdftext.js';
 
 /** `--check` assertions; `pdfx` (structural PDF/X-4, pdfnative 1.8.0) since v1.5.0. */
 const VALID_CHECKS = new Set(['pdfa', 'signed', 'encrypted', 'pdfua', 'pdfx']);
@@ -126,7 +127,7 @@ interface CheckResult {
 
 function safeInfoString(value: unknown): string | null {
     if (typeof value !== 'string') return null;
-    const trimmed = value.trim();
+    const trimmed = decodePdfTextString(value).trim();
     if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
         return trimmed.slice(1, -1);
     }
