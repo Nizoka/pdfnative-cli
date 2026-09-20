@@ -7,7 +7,7 @@
 //   --font-file <path.ttf>  a font program the user ships (v1.5.0, guarded)
 
 import { createRequire } from 'node:module';
-import { basename, dirname, extname, join as joinPath } from 'node:path';
+import { dirname, join as joinPath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
     registerFont,
@@ -205,9 +205,19 @@ export function sniffFontFormat(bytes: Uint8Array): 'ttf' | 'otf' | 'ttc' | 'wof
     return null;
 }
 
-/** Derive the registry name from a path: basename without extension, `[a-z0-9-]` only. */
+/**
+ * Derive the registry name from a path: basename without extension,
+ * `[a-z0-9-]` only. Both `/` and `\` end a directory ON EVERY PLATFORM:
+ * `node:path` only knows the host's separator, so the same spelling gave
+ * `a` on Windows and `c-fonts-a` on Linux for `C:\fonts\a.ttf`. The name is
+ * a pure function of the string — it ends up in the rendered bytes and in
+ * the collision check, and must not depend on where the CLI runs.
+ */
 export function defaultFontName(filePath: string): string {
-    const base = basename(filePath, extname(filePath)).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+    const file = filePath.slice(Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')) + 1);
+    const dot = file.lastIndexOf('.');
+    const stem = dot > 0 ? file.slice(0, dot) : file;
+    const base = stem.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
     return base.length > 0 ? base : 'custom-font';
 }
 

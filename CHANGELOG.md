@@ -198,7 +198,7 @@ backward-compatible command surface — every envelope field is additive.
   double-render script proves byte identity across timezones), `inspect --check pdfx` and
   `--iso-dates`, `doctor` capabilities, `annotate link`, `verify` weak digest,
   `sign --timestamp-timeout`, global flags first — each as a dual-shell pair.
-- **Tests** — 1387 tests across 96 files (600 in 1.4.0): every feature above,
+- **Tests** — 1390 tests across 96 files (600 in 1.4.0): every feature above,
   the tools (gate, validators, fingerprints, sample plan, verify-docs, release-prepare, agent
   config, guard, workflows), the sample regression suite, an English-only prose scan, a
   reproducible-build integration test that spawns the built binary under two timezones, and a
@@ -245,6 +245,14 @@ backward-compatible command surface — every envelope field is additive.
   the `status` schema; a typo is still reported as an unknown command). A `null` block is
   refused with `E_INPUT` instead of a `TypeError`. Arguments
   with no command exit 2 (`E_USAGE`); a bare `pdfnative` still prints the usage and exits 0.
+- `--font-file <path>` derived its default registry name with the host's path separator only:
+  `C:\fonts\a.ttf` gave `a` on Windows and `c-fonts-a` on Linux. Both `/` and `\` now end a
+  directory on every platform (the name reaches the rendered bytes and the collision check).
+  Found by the first CI run on Linux.
+- `scripts/lib/markdown-anchors.ts` (the `anchor-parity` slugger): HTML tags are recognised by
+  their leading letter (`a < b and c > d` is no longer read as one), and the angle brackets a
+  single pass can leave behind are removed where the tags are (CodeQL
+  `js/incomplete-multi-character-sanitization`; the slug never reaches HTML).
 - `inspect` reported `title` / `author` / `subject` as `null` — and `compare` printed raw bytes —
   for any `/Info` value outside Latin-1 (an em dash is enough): pdfnative writes those as
   UTF-16BE text strings, whose NUL bytes read as control characters. `utils/pdftext.ts` decodes

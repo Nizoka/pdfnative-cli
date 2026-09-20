@@ -84,6 +84,18 @@ describe('fonts: --font-file posture', () => {
         expect(defaultFontName('/tmp/__.otf')).toBe('custom-font');
     });
 
+    it('derives the SAME name on every platform: both separators end a directory', () => {
+        // node:path only splits on the host separator; the name is part of the rendered
+        // bytes, so a Windows path in a manifest must not name the font differently on Linux.
+        for (const path of ['C:\\fonts\\brand.ttf', 'C:/fonts/brand.ttf', '/usr/share/fonts/brand.ttf', 'fonts\\sub/brand.ttf', 'brand.ttf']) {
+            expect(defaultFontName(path), path).toBe('brand');
+        }
+        expect(defaultFontName('fonts/Brand.Sans.Bold.otf')).toBe('brand-sans-bold');
+        expect(defaultFontName('fonts/noextension')).toBe('noextension');
+        expect(defaultFontName('fonts/.hidden')).toBe('hidden');
+        expect(defaultFontName('fonts/')).toBe('custom-font');
+    });
+
     it('parses <path>[:name], honouring a Windows drive letter', () => {
         expect(parseFontFileSpec('C:\\fonts\\a.ttf')).toEqual({ path: 'C:\\fonts\\a.ttf', name: 'a' });
         expect(parseFontFileSpec('C:\\fonts\\a.ttf:brand')).toEqual({ path: 'C:\\fonts\\a.ttf', name: 'brand' });

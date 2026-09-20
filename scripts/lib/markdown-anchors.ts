@@ -30,7 +30,13 @@ export function githubSlug(heading: string): string {
             .replace(/\s+#+\s*$/, '')                  // closing ATX hashes
             .replace(/`([^`]*)`/g, '$1')               // inline code → its text
             .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1') // links and images → their text
-            .replace(/<[^>]+>/g, ''),                  // HTML tags
+            .replace(/<\/?[A-Za-z][^>]*>/g, '')        // HTML tags (`a < b and c > d` is not one)
+            // One pass over a multi-character pattern can leave a new match behind
+            // (`<<b>script>` → `<script>`), so the brackets themselves go too. The
+            // slug never reaches HTML, and the filter below drops them anyway: this
+            // makes the sanitisation complete where it happens (CodeQL
+            // js/incomplete-multi-character-sanitization), with the same result.
+            .replace(/[<>]/g, ''),
     );
     return text
         .trim()

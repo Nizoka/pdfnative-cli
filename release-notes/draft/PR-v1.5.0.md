@@ -21,7 +21,7 @@ Counts: 21 commands, 19 schema subjects, 12 stable error codes and 14 manifest c
 unchanged; global flags 9 → 10 (`--creation-date`); `render` flags 44 → 57; `inspect`
 14 → 16; `sign` 21 → 23; `--font` 22 → 27 scripts (+ 4 aliases); `--strict` diagnostics
 3 → 9; `doctor` checks 5 → 8; conformance corpus 12 → 22 files; workflows 5 → 9;
-tests 600 → 1387 across 96 files.
+tests 600 → 1390 across 96 files.
 
 ## Changes
 
@@ -101,7 +101,7 @@ tests 600 → 1387 across 96 files.
   `render/reproducible/`, `inspect/09-10`, `doctor/02`, `annotate/02`, `verify/07`,
   `sign/10`, `agent/05`; multilang drivers honour `PDFNATIVE_SAMPLES_OUT` /
   `SOURCE_DATE_EPOCH`; `tests/regression/baselines/samples.sha256.json` (91 sample PDFs).
-- Tests: 1387 across 96 files (was 600) — `tests/helpers/cli-harness.ts`, per-feature
+- Tests: 1390 across 96 files (was 600) — `tests/helpers/cli-harness.ts`, per-feature
   command suites, utils, `integration/{pdfx-roundtrip,reproducible-build}`,
   `tools/{gate,verapdf,pdfx,workflows,sample-plan,verify-docs,cli-surface,agent-config,
   build-claude-rules,release-prepare,guard}`, `regression/samples`, `docs/prose-language`.
@@ -180,7 +180,7 @@ rendered with their font, `metrics: "exact"` inert in its own sample — all clo
 ## Validation (what actually ran on the release branch, Windows 11, Node 22.17.0)
 
 - `npm run typecheck:all` → clean (three configs). `npm run lint` → clean.
-- `npm run test:coverage` → **1387 / 1387 passing across 96 files**; coverage
+- `npm run test:coverage` → **1390 / 1390 passing across 96 files**; coverage
   statements 86.06 % / branches 75.91 % / functions 92.59 % / lines 87.92 %
   (thresholds raised 79/68/83/79 → 82/71/86/82, `min(measured − 2, current + 3)`).
 - `npm run verify:docs` → 26 rules across the documentation corpus, 0 errors
@@ -193,7 +193,7 @@ rendered with their font, `metrics: "exact"` inert in its own sample — all clo
 - `npx tsx scripts/gate.ts --publish --require-all` at `d4d8530` → **14 passed, 0 skipped
   in 437 s** (typecheck:all 26 s, lint 10 s, build 10 s, dist-check, smoke — 21 commands —,
   bundle-size 368 KiB of the 448 KiB budget, bundle-check — 2 externals —, test:generate
-  44 s — 91 sample PDFs —, test:coverage 130 s — 1387 tests, 86.1 % stmts —, verify:docs 8 s,
+  44 s — 91 sample PDFs —, test:coverage 130 s — 1390 tests, 86.1 % stmts —, verify:docs 8 s,
   verify:samples 10 s, corpus:pdfa 30 s — 22 files —, validate:pdfx 11 s, validate:pdfa 158 s).
 - Built binary smoke: `--version` 1.5.0; `doctor --json` (pdfnative 1.8.0, fonts
   31/27, unicode, conformance); PDF/X-4 render → `inspect --check pdfx` exit 0 →

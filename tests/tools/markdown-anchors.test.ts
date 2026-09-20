@@ -16,6 +16,9 @@ describe('githubSlug', () => {
         ['[Ecosystem](https://example.com) links', 'ecosystem-links'],
         ['<code>schema</code> manifest', 'schema-manifest'],
         ['A &amp; B &lt;C&gt;', 'a--b-c'],
+        // A tag that re-forms once the inner one is removed leaves no bracket behind.
+        ['Nested <<b>script>alert</script> tags', 'nested-scriptalert-tags'],
+        ['a < b and c > d', 'a--b-and-c--d'],
         ['snake_case_keeps_underscores', 'snake_case_keeps_underscores'],
         ['  padded  ', 'padded'],
         ['Über Größe', 'über-größe'],
