@@ -2,7 +2,7 @@
 // inventory the verify-docs rule `anchor-parity` relies on (v1.5.0).
 
 import { describe, it, expect } from 'vitest';
-import { githubSlug, markdownAnchors, fragmentLinks } from '../../scripts/lib/markdown-anchors.js';
+import { githubSlug, markdownAnchors, fragmentLinks, stripTags } from '../../scripts/lib/markdown-anchors.js';
 
 describe('githubSlug', () => {
     it.each([
@@ -25,6 +25,45 @@ describe('githubSlug', () => {
         ['v1.5.0 — typography, 27 scripts', 'v150--typography-27-scripts'],
     ])('%j → %j', (heading, slug) => {
         expect(githubSlug(heading)).toBe(slug);
+    });
+});
+
+describe('stripTags', () => {
+    it.each([
+        ['<code>schema</code> manifest', 'schema manifest'],
+        ['a <b class="x">bold</b> word', 'a bold word'],
+        ['a < b and c > d', 'a  b and c  d'],
+        ['unterminated <b tag', 'unterminated b tag'],
+        ['<<b>script>alert(1)</script>', 'scriptalert(1)'],
+        // `<scr<script>` is ONE tag (up to the first `>`): what is left cannot re-form an element.
+        ['<scr<script>ipt>x', 'iptx'],
+        ['plain text', 'plain text'],
+        ['', ''],
+        ['<', ''],
+        ['</', '/'],
+        ['<>', ''],
+    ])('%j → %j', (input, output) => {
+        expect(stripTags(input)).toBe(output);
+    });
+
+    it('never emits an angle bracket, whatever the nesting (the sanitisation is complete in one scan)', () => {
+        const pieces = ['<', '>', '/', 'script', 'b', ' ', '<b>', '</b>', '<<', '>>', 'x', '"', '='];
+        let seed = 0x5EED;
+        const next = (): number => { seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF; return seed; };
+        for (let n = 0; n < 2000; n++) {
+            let input = '';
+            for (let k = 0, len = 1 + (next() % 12); k < len; k++) input += pieces[next() % pieces.length];
+            const out = stripTags(input);
+            expect(out.includes('<') || out.includes('>'), JSON.stringify(input)).toBe(false);
+            expect(stripTags(out)).toBe(out);
+        }
+    });
+
+    it('is linear on hostile input (no backtracking)', () => {
+        const started = performance.now();
+        expect(stripTags('<'.repeat(200_000))).toBe('');
+        expect(stripTags(`<a ${'x'.repeat(200_000)}`).length).toBeGreaterThan(200_000);
+        expect(performance.now() - started).toBeLessThan(2_000);
     });
 });
 

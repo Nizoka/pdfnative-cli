@@ -89,7 +89,7 @@ Adding or changing a command touches ALL of these (`verify:docs` rules `command-
 
 ## Counts and versions
 
-21 commands, 19 subjects, 12 stable error codes, 10 global flags, 27 Unicode scripts (31 font modules), 1390 tests, 91 sample PDFs in the baseline, 22 corpus files.
+21 commands, 19 subjects, 12 stable error codes, 10 global flags, 27 Unicode scripts (31 font modules), 1403 tests, 91 sample PDFs in the baseline, 22 corpus files.
 `docs/assets/ecosystem.json` is the source of every count and version quoted in the docs; run `npm run verify:docs` after touching any of them.
 Coverage: ≥ 82 % statements enforced by CI (the thresholds live once in `vitest.config.ts`). Engine: pdfnative 1.8.0 (`^1.8.0`); Node ≥ 22.
 

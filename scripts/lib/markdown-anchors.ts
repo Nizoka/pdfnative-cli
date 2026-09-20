@@ -17,6 +17,38 @@ function decodeEntities(text: string): string {
     });
 }
 
+const isAsciiLetter = (ch: string | undefined): boolean =>
+    ch !== undefined && ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'));
+
+/**
+ * Drop HTML tags — `<` + optional `/` + a letter … up to the next `>` — and
+ * every angle bracket that is left, in ONE left-to-right scan.
+ *
+ * Deliberately not a `replace(/<[^>]+>/g, '')`: removing a multi-character
+ * pattern in one regex pass can leave a new match behind (`<<b>script>` →
+ * `<script>`), which is what CodeQL reports as
+ * js/incomplete-multi-character-sanitization. A scanner that never emits a
+ * bracket cannot: its output holds no `<` and no `>`, whatever the input.
+ * Linear time, no backtracking. `a < b and c > d` is not a tag: only the two
+ * brackets go.
+ */
+export function stripTags(text: string): string {
+    let out = '';
+    let i = 0;
+    while (i < text.length) {
+        const ch = text[i]!;
+        if (ch === '<') {
+            const nameAt = text[i + 1] === '/' ? i + 2 : i + 1;
+            const close = isAsciiLetter(text[nameAt]) ? text.indexOf('>', nameAt) : -1;
+            i = close === -1 ? i + 1 : close + 1;
+            continue;
+        }
+        if (ch !== '>') out += ch;
+        i++;
+    }
+    return out;
+}
+
 /**
  * The anchor GitHub generates for a heading's raw Markdown text: trailing
  * closing `#`s dropped, inline code kept as its text, links reduced to their
@@ -26,17 +58,12 @@ function decodeEntities(text: string): string {
  */
 export function githubSlug(heading: string): string {
     const text = decodeEntities(
-        heading
-            .replace(/\s+#+\s*$/, '')                  // closing ATX hashes
-            .replace(/`([^`]*)`/g, '$1')               // inline code → its text
-            .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1') // links and images → their text
-            .replace(/<\/?[A-Za-z][^>]*>/g, '')        // HTML tags (`a < b and c > d` is not one)
-            // One pass over a multi-character pattern can leave a new match behind
-            // (`<<b>script>` → `<script>`), so the brackets themselves go too. The
-            // slug never reaches HTML, and the filter below drops them anyway: this
-            // makes the sanitisation complete where it happens (CodeQL
-            // js/incomplete-multi-character-sanitization), with the same result.
-            .replace(/[<>]/g, ''),
+        stripTags(
+            heading
+                .replace(/\s+#+\s*$/, '')                   // closing ATX hashes
+                .replace(/`([^`]*)`/g, '$1')                // inline code → its text
+                .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1'), // links and images → their text
+        ),
     );
     return text
         .trim()
