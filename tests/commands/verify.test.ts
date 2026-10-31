@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { verify } from '../../src/commands/verify.js';
 import { render } from '../../src/commands/render.js';
 import { sign } from '../../src/commands/sign.js';
@@ -237,7 +238,7 @@ describe('verify — enriched (v1.4.0)', () => {
     });
 
     function out(name: string): string {
-        return path.join(dir, `${Date.now()}-${Math.random().toString(36).slice(2)}-${name}`);
+        return path.join(dir, `${randomUUID()}-${name}`);
     }
 
     async function signBase(extra: readonly string[] = []): Promise<string> {

@@ -8,7 +8,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { expect, vi } from 'vitest';
 
 import { render } from '../../src/commands/render.js';
@@ -24,11 +24,22 @@ export const RSA_KEY = path.join(FIXTURES, 'rsa-key.pem');
 export const RSA_CERT = path.join(FIXTURES, 'rsa-cert.pem');
 
 /** A fresh temp path; every path is removed by {@link cleanup}. */
+/**
+ * A unique path under the OS temp directory. The entropy comes from
+ * node:crypto (randomUUID), never Math.random: CodeQL traces every value a
+ * test derives from a weak generator into the command it drives (a password
+ * flag, an owner password), which is a finding on the CLI for a cause in the
+ * tests. One helper, so no suite reintroduces it.
+ */
+export function tmpName(name: string): string {
+    return path.join(os.tmpdir(), `${name}-${process.pid}-${randomUUID()}`);
+}
+
 export class TempFiles {
     private readonly paths: string[] = [];
 
     path(name: string): string {
-        const p = path.join(os.tmpdir(), `pdfcli-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}-${name}`);
+        const p = tmpName(`pdfcli-${name}`);
         this.paths.push(p);
         return p;
     }

@@ -10,6 +10,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } 
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { render } from '../../src/commands/render.js';
 import { sign } from '../../src/commands/sign.js';
 import { ltv } from '../../src/commands/ltv.js';
@@ -104,7 +105,7 @@ afterEach(() => {
 });
 
 function out(name: string): string {
-    return path.join(dir, `${Date.now()}-${Math.random().toString(36).slice(2)}-${name}`);
+    return path.join(dir, `${randomUUID()}-${name}`);
 }
 
 async function fileExists(p: string): Promise<boolean> {

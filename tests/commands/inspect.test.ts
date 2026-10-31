@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import { inspect } from '../../src/commands/inspect.js';
 import { render } from '../../src/commands/render.js';
 import { sign } from '../../src/commands/sign.js';
@@ -500,7 +501,7 @@ describe('inspect', () => {
         }
 
         async function renderWith(params: unknown, extraFlags: readonly string[] = []): Promise<string> {
-            const stamp = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const stamp = `${randomUUID()}`;
             const inputPath = path.join(os.tmpdir(), `inspect14-in-${stamp}.json`);
             const outputPath = path.join(os.tmpdir(), `inspect14-out-${stamp}.pdf`);
             tmpFiles.push(inputPath, outputPath);
@@ -510,7 +511,7 @@ describe('inspect', () => {
         }
 
         async function writeLayout(layout: unknown): Promise<string> {
-            const layoutPath = path.join(os.tmpdir(), `inspect14-layout-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+            const layoutPath = path.join(os.tmpdir(), `inspect14-layout-${randomUUID()}.json`);
             tmpFiles.push(layoutPath);
             await fs.writeFile(layoutPath, JSON.stringify(layout), 'utf8');
             return layoutPath;
@@ -518,7 +519,7 @@ describe('inspect', () => {
 
         async function signedPdf(): Promise<string> {
             const src = await generateTestPdf();
-            const out = path.join(os.tmpdir(), `inspect14-signed-${Date.now()}-${Math.random().toString(36).slice(2)}.pdf`);
+            const out = path.join(os.tmpdir(), `inspect14-signed-${randomUUID()}.pdf`);
             tmpFiles.push(out);
             await sign(parseArgs([
                 '--input', src,

@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import { sign } from '../../src/commands/sign.js';
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
@@ -104,7 +105,7 @@ describe('sign', () => {
 
     /** Sign `pdfPath` with the RSA PEM fixtures plus `extra` flags; returns the output path. */
     async function signFixture(pdfPath: string, extra: readonly string[] = []): Promise<string> {
-        const outPath = path.join(os.tmpdir(), `sign-out-${Date.now()}-${Math.random()}.pdf`);
+        const outPath = path.join(os.tmpdir(), `sign-out-${randomUUID()}.pdf`);
         tmpFiles.push(outPath);
         await sign(parseArgs([
             '--input', pdfPath,
@@ -133,7 +134,7 @@ describe('sign', () => {
 
     it('throws CliError(2) when cert is missing even if key is provided', async () => {
         const pdfPath = await makeTestPdf();
-        const keyPath = path.join(os.tmpdir(), `sign-test-key-${Date.now()}-${Math.random().toString(36).slice(2)}.pem`);
+        const keyPath = path.join(os.tmpdir(), `sign-test-key-${randomUUID()}.pem`);
         tmpFiles.push(keyPath);
         await fs.writeFile(keyPath, TEST_KEY_PEM, 'utf8');
 
@@ -371,7 +372,7 @@ describe('sign', () => {
         it('fails with E_PARSE (exit 1) and writes nothing when the TSA rejects (PKIStatus 2)', async () => {
             setTimestampProvider(createMockTimestampProvider(createMockPki(), { status: 2 }));
             const pdfPath = await makeTestPdf();
-            const outPath = path.join(os.tmpdir(), `sign-tsa-rej-${Date.now()}-${Math.random()}.pdf`);
+            const outPath = path.join(os.tmpdir(), `sign-tsa-rej-${randomUUID()}.pdf`);
             tmpFiles.push(outPath);
             const err = await sign(parseArgs([
                 '--input', pdfPath,
@@ -443,7 +444,7 @@ describe('sign', () => {
                 },
             });
             const pdfPath = await makeTestPdf();
-            const outPath = path.join(os.tmpdir(), `sign-ts-dry-${Date.now()}-${Math.random()}.pdf`);
+            const outPath = path.join(os.tmpdir(), `sign-ts-dry-${randomUUID()}.pdf`);
             tmpFiles.push(outPath);
             await sign(parseArgs([
                 '--input', pdfPath,

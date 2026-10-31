@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as zlib from 'node:zlib';
+import { randomUUID } from 'node:crypto';
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { CliError, ErrorCode } from '../../src/utils/error.js';
@@ -17,7 +18,7 @@ afterEach(async () => {
 });
 
 function tmpPath(name: string): string {
-    const p = path.join(os.tmpdir(), `render12-${Date.now()}-${Math.random().toString(36).slice(2)}-${name}`);
+    const p = path.join(os.tmpdir(), `render12-${randomUUID()}-${name}`);
     tmp.push(p);
     return p;
 }

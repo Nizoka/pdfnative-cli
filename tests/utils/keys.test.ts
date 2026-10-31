@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import {
     pemToDer,
     splitPemBlocks,
@@ -77,7 +78,7 @@ describe('loadPem — env precedence', () => {
     });
 
     it('reads from file when env is unset', async () => {
-        const p = path.join(os.tmpdir(), `keys-test-key-${Date.now()}-${Math.random().toString(36).slice(2)}.pem`);
+        const p = path.join(os.tmpdir(), `keys-test-key-${randomUUID()}.pem`);
         tmp.push(p);
         await fs.writeFile(p, FAKE_PEM, 'utf8');
         const pem = await loadPem('TEST_PEM_ENV', p, 'cert', 'cert');

@@ -15,6 +15,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 
 import { render } from '../../src/commands/render.js';
 import { sign } from '../../src/commands/sign.js';
@@ -80,8 +81,8 @@ describe('sign → verify round-trip', () => {
     });
 
     async function renderUnsigned(): Promise<string> {
-        const inPath = path.join(os.tmpdir(), `rt-in-${Date.now()}-${Math.random()}.json`);
-        const pdfPath = path.join(os.tmpdir(), `rt-src-${Date.now()}-${Math.random()}.pdf`);
+        const inPath = path.join(os.tmpdir(), `rt-in-${randomUUID()}.json`);
+        const pdfPath = path.join(os.tmpdir(), `rt-src-${randomUUID()}.pdf`);
         tmpFiles.push(inPath, pdfPath);
         await fs.writeFile(inPath, minimalParams, 'utf8');
         await render(parseArgs(['--input', inPath, '--output', pdfPath]));
@@ -94,7 +95,7 @@ describe('sign → verify round-trip', () => {
         extraFlags: readonly string[] = [],
     ): Promise<string> {
         const src = await renderUnsigned();
-        const out = path.join(os.tmpdir(), `rt-signed-${Date.now()}-${Math.random()}.pdf`);
+        const out = path.join(os.tmpdir(), `rt-signed-${randomUUID()}.pdf`);
         tmpFiles.push(out);
         const key = algorithm === 'rsa-sha256' ? RSA_KEY : EC_KEY;
         const cert = algorithm === 'rsa-sha256' ? RSA_CERT : EC_CERT;
@@ -168,7 +169,7 @@ describe('sign → verify round-trip', () => {
         setTimestampProvider(createMockTimestampProvider(createMockPki()));
         try {
             const src = await renderUnsigned();
-            const out = path.join(os.tmpdir(), `rt-ts-signed-${Date.now()}-${Math.random()}.pdf`);
+            const out = path.join(os.tmpdir(), `rt-ts-signed-${randomUUID()}.pdf`);
             tmpFiles.push(out);
             await sign(parseArgs([
                 '--input', src,

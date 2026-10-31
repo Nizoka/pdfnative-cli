@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { CliError } from '../../src/utils/error.js';
@@ -13,7 +14,7 @@ const minimalParams = JSON.stringify({
 });
 
 async function withTempFile(ext: string, content: string, fn: (p: string) => Promise<void>): Promise<void> {
-    const p = path.join(os.tmpdir(), `pdfcli-test-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    const p = path.join(os.tmpdir(), `pdfcli-test-${randomUUID()}${ext}`);
     await fs.writeFile(p, content, 'utf8');
     try {
         await fn(p);
