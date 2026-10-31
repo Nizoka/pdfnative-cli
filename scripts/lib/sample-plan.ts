@@ -115,6 +115,24 @@ export const FILE_FLAGS: Readonly<Record<string, readonly string[]>> = {
         '--font', 'latin', '--lang', 'latin',
         '--strict',
     ],
+    // print/ — 08 paints spot colours (/Separation, /DeviceN, per-bar chart
+    // colours) under the same PDF/X-4 recipe; 09 claims PDF/A-2b and PDF/X-4
+    // in one file (pdfnative 1.9.0, v1.6.0).
+    '08-spot-colours.json': [
+        '--pdfx', 'pdfx4',
+        '--output-intent-id', 'Synthetic CMYK (pdfnative test profile)',
+        '--trapped', 'false',
+        '--font', 'latin', '--lang', 'latin',
+        '--strict',
+    ],
+    '09-dual-pdfa2b-pdfx4.json': [
+        '--pdfx', 'pdfx4',
+        '--tagged', 'pdfa2b',
+        '--output-intent-id', 'Synthetic CMYK (pdfnative test profile)',
+        '--trapped', 'false',
+        '--font', 'latin', '--lang', 'latin',
+        '--strict',
+    ],
     // multilang/ — 08-12 are the script families no other sample loads
     // (v1.5.0, 12 in v1.6.0): with 01-07 and font/02, font/04 every one of the
     // 32 script codes is rendered by the corpus (tests/regression/engine-surface.test.ts).
@@ -126,6 +144,8 @@ export const FILE_FLAGS: Readonly<Record<string, readonly string[]>> = {
     '10-indic.json': ['--font', 'hi', '--font', 'bn', '--font', 'ta', '--font', 'latin', '--lang', 'hi,bn,ta,latin'],
     '11-cjk.json': ['--font', 'zh', '--font', 'ko', '--font', 'latin', '--lang', 'zh,ko,latin'],
     '12-five-indic-scripts.json': ['--font', 'gu', '--font', 'pa', '--font', 'kn', '--font', 'ml', '--font', 'or', '--font', 'latin', '--lang', 'gu,pa,kn,ml,or,latin'],
+    // multilang/ — 13 resolves every paragraph's base direction (--direction auto, pdfnative 1.9.0).
+    '13-rtl-direction.json': ['--direction', 'auto', '--font', 'ar', '--font', 'he', '--font', 'latin', '--lang', 'ar,he,latin'],
     // font/ — 06 is colour emoji alone: skin tones, ZWJ sequences, flags.
     '06-color-emoji-sequences.json': ['--font', 'color-emoji', '--font', 'latin', '--lang', 'color-emoji,latin'],
 };
@@ -137,6 +157,8 @@ export const FILE_FLAGS: Readonly<Record<string, readonly string[]>> = {
 export const FILE_ICC: Readonly<Record<string, string>> = {
     '05-pdfx4.json': 'print/synthetic-cmyk.icc',
     '06-gray-pdfx4.json': 'print/synthetic-gray.icc',
+    '08-spot-colours.json': 'print/synthetic-cmyk.icc',
+    '09-dual-pdfa2b-pdfx4.json': 'print/synthetic-cmyk.icc',
 };
 
 /**

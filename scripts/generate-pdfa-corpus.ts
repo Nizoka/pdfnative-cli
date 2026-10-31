@@ -33,7 +33,7 @@ import { join, relative } from 'node:path';
 
 import { REPO_ROOT, parseOutputMode } from './helpers/io.js';
 import { requireDist, runCli } from './helpers/cli.js';
-import { CORPUS, OUT_DIR } from './lib/pdfa-corpus.js';
+import { CORPUS, OUT_DIR, claimsStandard } from './lib/pdfa-corpus.js';
 import type { CorpusFile, CorpusManifest } from './lib/verapdf.js';
 
 function main(): number {
@@ -87,13 +87,14 @@ function main(): number {
             command: entry.command,
             bytes: statSync(dest).size,
             sha256: createHash('sha256').update(bytes).digest('hex'),
-            expectPdfAClaim: entry.claims === 'pdfa',
-            expectCompliant: entry.claims === 'pdfa' && compliant,
-            expectPdfXClaim: entry.claims === 'pdfx',
-            expectPdfXCompliant: entry.claims === 'pdfx' && compliant,
+            expectPdfAClaim: claimsStandard(entry.claims, 'pdfa'),
+            expectCompliant: claimsStandard(entry.claims, 'pdfa') && compliant,
+            expectPdfXClaim: claimsStandard(entry.claims, 'pdfx'),
+            expectPdfXCompliant: claimsStandard(entry.claims, 'pdfx') && compliant,
         };
         files.push(record);
-        const tag = entry.claims === 'none' ? 'no claim' : `${entry.claims === 'pdfa' ? 'PDF/A' : 'PDF/X'}${compliant ? '' : ', NEGATIVE canary'}`;
+        const standard = entry.claims === 'both' ? 'PDF/A + PDF/X' : entry.claims === 'pdfa' ? 'PDF/A' : 'PDF/X';
+        const tag = entry.claims === 'none' ? 'no claim' : `${standard}${compliant ? '' : ', NEGATIVE canary'}`;
         say(`  wrote  ${entry.file.padEnd(28)} ${String(bytes.length).padStart(8)} B  (${tag})`);
     }
 

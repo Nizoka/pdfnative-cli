@@ -2,9 +2,9 @@
   "docTitle": "Financial Transactions — Q1 2026",
   "title": "Transaction Ledger",
   "infoItems": [
-    "Period: Q1 2026 (Jan 1 – Mar 31)",
-    "Currency: USD",
-    "Source: General Ledger Export"
+    { "label": "Period", "value": "Q1 2026 (Jan 1 – Mar 31)" },
+    { "label": "Currency", "value": "USD" },
+    { "label": "Source", "value": "General Ledger Export" }
   ],
   "balanceText": "Closing Balance: $1,238,450.27",
   "countText": "Transactions: 6",

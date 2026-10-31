@@ -17,7 +17,7 @@
 Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library — render JSON to PDF, apply digital signatures, verify them, and inspect PDF conformance, directly from the terminal. Zero extra runtime dependencies.
 
 <!-- verify-docs:allow version-token -->
-> **What's new in v1.5.0** — built on **pdfnative 1.8.0**. `render` gains a **typography
+> **What's new in v1.6.0** — built on **pdfnative 1.9.0**. `render` gains a **typography
 > engine** (widow/orphan control, keep-with-next, justification, optical margins, soft hyphens,
 > French punctuation spacing, kerning and OpenType features — `layout.typography` plus four
 > flags), **CMYK colours** and printer's **colour bars**, **PDF/X-4 output** (`--pdfx pdfx4
@@ -30,7 +30,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 > conformance targets. The repository ships the same engineering as the engine: one quality
 > gate, a byte-exact sample baseline, a PDF/A + PDF/X conformance corpus, hardened CI with
 > attestations, and a documentation verifier. Zero breaking changes.
-> See [release notes](release-notes/v1.5.0.md) and [docs/AGENT_CONTRACT.md](docs/AGENT_CONTRACT.md).
+> See [release notes](release-notes/v1.6.0.md) and [docs/AGENT_CONTRACT.md](docs/AGENT_CONTRACT.md).
 >
 > ⭐ Star [`pdfnative`](https://github.com/Nizoka/pdfnative) — the zero-dependency PDF engine that powers this CLI.
 
@@ -56,7 +56,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 - **Reproducible output (v1.5.0)** — the global `--creation-date <iso8601>` (or
   `SOURCE_DATE_EPOCH`) pins `/CreationDate`, `xmp:CreateDate`, the `{date}` placeholder and
   the trailer `/ID`, all in UTC, so the same input renders to **byte-identical** bytes on every
-  host and in every timezone. The repository's own 91-sample baseline is held to that promise.
+  host and in every timezone. The repository's own 99-sample baseline is held to that promise.
 - **27 scripts & custom fonts (v1.5.0)** — `--font lo|nod|khb|tdd|cjm` add Lao, Tai Tham,
   New Tai Lue, Tai Le and Cham; `ha`/`yo`/`ig`/`sw` alias `latin` for Hausa, Yoruba, Igbo and
   Swahili; `--font-file <path.ttf>[:name]` registers your own TrueType/OpenType file (32 MiB
@@ -135,7 +135,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
   `tests/regression/baselines/samples.sha256.json`), a PDF/A + PDF/X conformance corpus,
   hardened workflows (egress-audited runners, SHA-pinned actions, Trusted Publishing, SBOM +
   build attestations), a documentation verifier (`npm run verify:docs`) and a committed
-  Claude Code layer with a human-in-the-loop guard hook — 1479 tests.
+  Claude Code layer with a human-in-the-loop guard hook — 1480 tests.
 - **AI-governance / HITL** — the **`govern`** command surfaces pdfnative's Human-in-the-Loop
   contract to agents: they act as *draftsmen*, never autonomous submitters. `govern
   verify-issue` gates a local draft; a human always reviews and submits.
@@ -611,7 +611,7 @@ Ready-to-run examples are in [`samples/`](samples/), organized by feature catego
 | [`render/table-smart/`](samples/render/table-smart/), [`table-variant/`](samples/render/table-variant/) | 1 + 1 files | Smart-table flags; `--variant table` (`PdfParams`, fonts embedded since v1.5.0) |
 | [`render/barcode/`](samples/render/barcode/) | 3 files | QR code, Code 128 shipping label, EAN-13 product |
 | [`render/form/`](samples/render/form/) | 2 files | Contact form, survey |
-| [`render/toc/`](samples/render/toc/) | 1 file | Document with auto-generated table of contents |
+| [`render/toc/`](samples/render/toc/) | 2 files | Document with auto-generated table of contents, (v1.6.0) a 160-entry TOC that paginates |
 | [`render/link/`](samples/render/link/) | 1 file | Resource directory with hyperlinks |
 | [`render/watermark/`](samples/render/watermark/) | 3 files | Draft watermark, confidential watermark, CLI-flag styling |
 | [`render/layout/`](samples/render/layout/) | 3 files | US Letter, A5 portrait, A4 landscape |
@@ -622,9 +622,10 @@ Ready-to-run examples are in [`samples/`](samples/), organized by feature catego
 | [`render/math/`](samples/render/math/) | 1 file | Math/technical symbols via `--font math` |
 | [`render/inspect-layout/`](samples/render/inspect-layout/) | scripts | `--inspect-layout` report + `--debug-layout` guides |
 | [`render/font/`](samples/render/font/) | 5 files | Bundled font presets: Latin, the 1.3.0 scripts, emoji, (v1.5.0) the five 1.8.0 scripts, `--font-file`, colour-emoji skin tones / ZWJ sequences / flags |
-| [`render/multilang/`](samples/render/multilang/) | 11 files | Thai, Japanese, multilingual drivers, (v1.5.0) Lao, Tai Tham / New Tai Lue / Tai Le / Cham, Hausa / Yoruba / Igbo / Swahili, and four families (European & Caucasian, right-to-left, Indic, Chinese & Korean) — every one of the 32 script codes is rendered by the corpus |
-| [`render/chart/`](samples/render/chart/) | 5 files | Native vector charts — bar/line/pie/donut plus (v1.4.0) stacked bars, area/scatter, dual axes, log & time axes |
-| [`render/print/`](samples/render/print/) | 7 files | Print production — bleed/trim boxes + printer's marks, viewer preferences, (v1.5.0) CMYK colours, colour bars, PDF/X-4 with a synthetic CMYK profile |
+| [`render/multilang/`](samples/render/multilang/) | 13 files | Thai, Japanese, multilingual drivers, (v1.5.0) Lao, Tai Tham / New Tai Lue / Tai Le / Cham, Hausa / Yoruba / Igbo / Swahili, and four families (European & Caucasian, right-to-left, Indic, Chinese & Korean) — every one of the 32 script codes is rendered by the corpus |
+| [`render/chart/`](samples/render/chart/) | 6 files | Native vector charts — bar/line/pie/donut plus (v1.4.0) stacked bars, area/scatter, dual axes, log & time axes |
+| [`render/print/`](samples/render/print/) | 9 files | Print production — bleed/trim boxes + printer's marks, viewer preferences, (v1.5.0) CMYK colours, colour bars, PDF/X-4 with a synthetic CMYK profile |
+| [`render/images/`](samples/render/images/) | 1 file | (v1.6.0) JPEG 2000 image block passed through as `/JPXDecode` (pdfnative ≥ 1.9.0) |
 | [`render/typography/`](samples/render/typography/) | 7 files | (v1.5.0) Paragraph breaking, justify + optical margins + soft hyphens, French (`fr`, `fr-CA`) and custom punctuation spacing, unit binding, kerning + OpenType features, per-block `keepWithNext` / `splittable` |
 | [`render/base14/`](samples/render/base14/) | 1 file | (v1.5.0) `layout.typography.metrics: "exact"` on the base-14 path — rendered with no `--font` flag, the only place the option acts |
 | [`render/reproducible/`](samples/render/reproducible/) | 2 files | (v1.5.0) `--creation-date` / `SOURCE_DATE_EPOCH` — the double-render script proves byte identity across timezones |
@@ -640,7 +641,7 @@ Ready-to-run examples are in [`samples/`](samples/), organized by feature catego
 | [`compare/`](samples/compare/) | scripts | Diff two PDFs by text + structure |
 | [`annotate/`](samples/annotate/) | 2 pairs | Attach markup annotations (incremental save); (v1.5.0) `link` annotations |
 | [`govern/`](samples/govern/) | scripts | AI-governance / HITL: rules, policy, verify-issue |
-| [`sign/`](samples/sign/) | 10 pairs | Digital signature incl. timestamp (B-T), LTV ladder, multi-signatures, native vs pure-JS crypto, (v1.5.0) `--timestamp-timeout` (Bash + PowerShell) |
+| [`sign/`](samples/sign/) | 11 pairs | Digital signature incl. timestamp (B-T), LTV ladder, multi-signatures, native vs pure-JS crypto, (v1.5.0) `--timestamp-timeout` (Bash + PowerShell) |
 | [`verify/`](samples/verify/) | 7 pairs | Signature verification: trust roots, revocation, strict mode, (v1.5.0) weak-digest note |
 | [`inspect/`](samples/inspect/) | 10 pairs | JSON & text inspection incl. `--annotations`, `--signatures`, (v1.5.0) `--check pdfx` and `--iso-dates` (Bash + PowerShell) |
 | [`batch/`](samples/batch/) | 3 pairs | Directory render and `--manifest` pipelines |
@@ -651,7 +652,7 @@ Ready-to-run examples are in [`samples/`](samples/), organized by feature catego
 **Render every sample at once** (the same run the CI baseline uses):
 
 ```bash
-npm run build && npm run test:generate     # → test-output/samples/ (91 sample PDFs, byte-stable)
+npm run build && npm run test:generate     # → test-output/samples/ (99 sample PDFs, byte-stable)
 npx tsx scripts/verify-samples.ts          # compare with tests/regression/baselines/samples.sha256.json
 ```
 

@@ -9,7 +9,10 @@
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { setDefaultCreationDate, extractText } from '../../src/core-bridge/index.js';
-import { TempFiles, MINIMAL_DOC, renderTo, renderJson, inspectLayoutTo, diagnosticCodes, latin1 } from '../helpers/cli-harness.js';
+import { TempFiles, MINIMAL_DOC, renderTo, renderJson, inspectLayoutTo, diagnosticCodes, latin1, expectCliError, captured } from '../helpers/cli-harness.js';
+import { render } from '../../src/commands/render.js';
+import { parseArgs } from '../../src/utils/args.js';
+import { ErrorCode } from '../../src/utils/error.js';
 
 const tmp = new TempFiles();
 afterEach(async () => {
@@ -109,6 +112,20 @@ describe('render: layout fixes observed through --inspect-layout (pdfnative 1.9.
 });
 
 describe('render: the table variant and chart series (pdfnative 1.9.0)', { timeout: 60_000 }, () => {
+    // infoItems is { label, value }[] by type; 1.8.0 rendered a bare string as
+    // "undefined", 1.9.0's base-14 emitter throws a TypeError on it (the
+    // v1.5.0 table-variant sample carried strings). The CLI refuses the shape
+    // first, with E_INPUT and the remedy — the engine never sees it.
+    it('--variant table: an infoItems entry that is not { label, value } is E_INPUT before the engine, and so is a malformed row', async () => {
+        const base = { docTitle: 'Shape', title: 'Ledger', balanceText: '', countText: '', footerText: '', headers: ['A'], rows: [{ type: 'data', pointed: false, cells: ['x'] }] };
+        const strings = await tmp.json('strings.json', { ...base, infoItems: ['Period: Q1 2026'] });
+        await expectCliError(() => captured(() => render(parseArgs(['--input', strings, '--output', tmp.path('x.pdf'), '--variant', 'table']))), 1, ErrorCode.INPUT, 'infoItems[0]');
+        const rows = await tmp.json('rows.json', { ...base, infoItems: [], rows: [['x']] });
+        await expectCliError(() => captured(() => render(parseArgs(['--input', rows, '--output', tmp.path('x.pdf'), '--variant', 'table']))), 1, ErrorCode.INPUT, 'rows[0]');
+        const good = await renderTo(tmp, { ...base, infoItems: [{ label: 'Period', value: 'Q1 2026' }] }, ['--variant', 'table', ...PINNED], 'good.pdf');
+        expect(latin1(good.bytes)).toContain('(Period :) Tj');
+    });
+
     it('--variant table: a column of kind "amount" right-aligns its figures (ColumnDef.kind)', async () => {
         const table = {
             docTitle: 'Amounts', title: 'Ledger', infoItems: [], balanceText: '', countText: '', footerText: '',

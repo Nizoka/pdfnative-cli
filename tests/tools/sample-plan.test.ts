@@ -44,7 +44,7 @@ describe('sample plan', () => {
     it('fills the absolute paths of the attachment payload and the PDF/X profile', () => {
         const attachment = jobs.find((j) => j.category === 'attachments');
         expect(attachment?.args.join(' ')).toContain('invoice.xml:application/xml:Source');
-        expect(Object.keys(FILE_ICC).sort()).toEqual(['05-pdfx4.json', '06-gray-pdfx4.json']);
+        expect(Object.keys(FILE_ICC).sort()).toEqual(['05-pdfx4.json', '06-gray-pdfx4.json', '08-spot-colours.json', '09-dual-pdfa2b-pdfx4.json']);
         for (const [file, profile] of Object.entries(FILE_ICC)) {
             const job = jobs.find((j) => j.file === file);
             const at = job?.args.indexOf('--output-intent-icc') ?? -1;

@@ -74,6 +74,10 @@ const STEPS: readonly Step[] = [
     { category: 'sign', out: 'sign/rsa-sha384.pdf', env: signingEnv('rsa'), args: (o) => ['sign', '--input', 'document/04-invoice.pdf', '--output', o, '--digest', 'sha384', '--signing-time', SAMPLE_CREATION_ISO] },
     // ECDSA through pdfnative's pure-JS path: RFC 6979 deterministic nonces.
     { category: 'sign', out: 'sign/ecdsa-pure.pdf', env: signingEnv('ec'), args: (o) => ['sign', '--input', 'document/05-technical-spec.pdf', '--output', o, '--algorithm', 'ecdsa-sha256', '--pure-crypto', '--signing-time', SAMPLE_CREATION_ISO] },
+    // ── ltv embed from offline material (pdfnative 1.9.0 composeLtvData) ──
+    // The signer certificate from disk, attributed with --match chain: a /DSS
+    // without any network. Fingerprinted semantically like its signed source.
+    { category: 'sign', out: 'sign/rsa-pkcs7-ltv-offline.pdf', args: (o) => ['ltv', 'embed', '--input', 'sign/rsa-pkcs7.pdf', '--output', o, '--cert', join(FIXTURES, 'rsa-cert.pem'), '--match', 'chain'] },
 ];
 
 export function generate(ctx: GenerateContext, cli: string, category: string | null): void {

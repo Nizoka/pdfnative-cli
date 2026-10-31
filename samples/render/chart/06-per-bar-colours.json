@@ -1,0 +1,25 @@
+{
+  "blocks": [
+    { "type": "heading", "text": "Per-bar colours and an unlabelled series (pdfnative ≥ 1.9.0)", "level": 1 },
+    { "type": "paragraph", "text": "ChartSeries.colors paints one colour per value on bar, barH, stackedBar and stackedBarH charts — the legend swatch keeps the series colour. A series without a label is listed as Series N. Colours accept every PdfColor form: hex, RGB tuples, CMYK percentages." },
+    {
+      "type": "chart",
+      "chartType": "bar",
+      "title": "Response time by region (ms)",
+      "categories": ["EU", "US", "APAC", "LATAM"],
+      "series": [
+        { "label": "p95", "values": [120, 95, 210, 180], "colors": ["#2b6cb0", "#2f855a", "#c05621", [160, 30, 60]] }
+      ]
+    },
+    { "type": "spacer", "height": 18 },
+    {
+      "type": "chart",
+      "chartType": "barH",
+      "title": "Ink usage per plate (%)",
+      "categories": ["Cyan", "Magenta", "Yellow", "Black"],
+      "series": [
+        { "values": [38, 52, 27, 71], "colors": [[100, 0, 0, 0], [0, 100, 0, 0], [0, 0, 100, 0], [0, 0, 0, 100]] }
+      ]
+    }
+  ]
+}

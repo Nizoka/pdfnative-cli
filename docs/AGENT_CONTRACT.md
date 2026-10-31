@@ -1,6 +1,6 @@
 # Agent contract — driving pdfnative-cli from autonomous agents
 
-_Verified on 2026-09-17 · pdfnative-cli v1.5.0 · pdfnative 1.8.0_
+_Verified on 2026-10-31 · pdfnative-cli v1.6.0 · pdfnative 1.9.0_
 
 `pdfnative-cli` is built so that an autonomous AI agent — or any program — can
 drive it inside a larger automated process **deterministically and safely**.
@@ -276,9 +276,9 @@ the XMP without the PDF/X identification (an upstream limit — re-check after e
 `npm run build && npm run corpus:pdfa && npm run validate:pdfx && npm run validate:pdfa`
 for any change touching PDF/A or PDF/X behaviour (render, fonts, metadata/XMP, signing
 over claiming files, the `samples/render/pdfa/` and `print/` inputs): it generates the
-22 corpus files (18 claiming PDF/A, four of them negative canaries veraPDF must reject;
-4 PDF/X-4, one of them a negative canary) and validates every file against the profile it
-claims. Mind the skip semantics — **without veraPDF installed `validate:pdfa` exits 0 as a
+26 corpus files (21 claiming PDF/A, five of them negative canaries veraPDF must reject;
+6 PDF/X-4, one of them a negative canary; one file claims PDF/A-2b and PDF/X-4 at once) and
+validates every file against the profile it claims. Mind the skip semantics — **without veraPDF installed `validate:pdfa` exits 0 as a
 SKIP, not a pass**; `npx tsx scripts/gate.ts --publish --require-all` turns the skip into
 a failure. The same gate runs blocking in CI and pre-publish. For rendering, the PDF/A
 recipe is `--tagged pdfa<level> --font latin --lang latin` (ISO 19005 requires embedded

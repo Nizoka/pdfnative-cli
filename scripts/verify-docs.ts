@@ -69,7 +69,7 @@ import {
     unpairedSampleScripts,
     usageCommandList,
 } from './lib/cli-surface.js';
-import { CORPUS } from './lib/pdfa-corpus.js';
+import { CORPUS, claimsStandard } from './lib/pdfa-corpus.js';
 import { AI_GOVERNANCE_POLICY, AGENT_RULES_TEXT } from '../src/utils/governance.js';
 import { markdownAnchors, fragmentLinks } from './lib/markdown-anchors.js';
 
@@ -412,8 +412,8 @@ export async function verifyDocs(root: string, options: VerifyOptions = {}): Pro
         }
     }
     {
-        const pdfa = CORPUS.filter((e) => e.claims === 'pdfa').length;
-        const pdfx = CORPUS.filter((e) => e.claims === 'pdfx').length;
+        const pdfa = CORPUS.filter((e) => claimsStandard(e.claims, 'pdfa')).length;
+        const pdfx = CORPUS.filter((e) => claimsStandard(e.claims, 'pdfx')).length;
         if (manifest.declared['pdfaSamples'] !== pdfa) fail(MANIFEST_REL, 1, 'derived-counts', `declared.pdfaSamples says ${String(manifest.declared['pdfaSamples'])} but the corpus table claims PDF/A for ${pdfa} files`);
         if (manifest.declared['pdfxSamples'] !== pdfx) fail(MANIFEST_REL, 1, 'derived-counts', `declared.pdfxSamples says ${String(manifest.declared['pdfxSamples'])} but the corpus table claims PDF/X for ${pdfx} files`);
     }

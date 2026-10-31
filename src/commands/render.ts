@@ -80,6 +80,38 @@ function isPdfParamsLike(value: unknown): value is PdfParams {
     );
 }
 
+/**
+ * The shapes `PdfParams` types but the engine does not validate: `infoItems`
+ * is `{ label, value }[]` (a bare string rendered as "undefined" in 1.8.0
+ * and crashes the base-14 emitter of 1.9.0 with a TypeError), `rows[i].cells`
+ * is `string[]`. Refused here with E_INPUT, like `formField.fieldType`.
+ */
+function assertTableParamsShape(params: PdfParams): void {
+    const items = (params as { infoItems?: unknown }).infoItems;
+    if (items !== undefined) {
+        if (!Array.isArray(items)) {
+            throw new CliError('infoItems must be an array of { label, value } objects.', 1, ErrorCode.INPUT);
+        }
+        items.forEach((item, index) => {
+            const it = item as { label?: unknown; value?: unknown } | null;
+            if (typeof it !== 'object' || it === null || typeof it.label !== 'string' || typeof it.value !== 'string') {
+                throw new CliError(
+                    `infoItems[${index}]: expected { label: string, value: string }, got ${JSON.stringify(item ?? null)}. `
+                    + 'Write "Period: Q1" as { "label": "Period", "value": "Q1" }.',
+                    1,
+                    ErrorCode.INPUT,
+                );
+            }
+        });
+    }
+    params.rows.forEach((row, index) => {
+        const cells = (row as { cells?: unknown } | null)?.cells;
+        if (!Array.isArray(cells) || !cells.every((c) => typeof c === 'string')) {
+            throw new CliError(`rows[${index}]: expected { cells: string[], type, pointed }.`, 1, ErrorCode.INPUT);
+        }
+    });
+}
+
 /** Best-effort structural guard for `DocumentParams`. */
 function isDocumentParamsLike(value: unknown): value is DocumentParams {
     if (typeof value !== 'object' || value === null) return false;
@@ -498,6 +530,7 @@ async function renderOnce(cfg: RenderConfig, template: unknown): Promise<void> {
                 ErrorCode.INPUT,
             );
         }
+        assertTableParamsShape(parsedInput);
         let tableParams: PdfParams = applyTrapped(parsedInput, cfg.trapped);
         // v1.5.0: the table variant embeds fonts too (`PdfParams.fontEntries`),
         // so a `--tagged`/`--pdfx` claim can be conformant on this path.

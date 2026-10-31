@@ -107,7 +107,7 @@ scripts/                  # (v1.5.0) repository tooling — TypeScript, run with
 tests/
 ├── commands/ utils/ integration/ tools/ regression/ docs/   # vitest suites (helpers/cli-harness.ts, fixtures/)
 ├── helpers/der.ts + mock-pki.ts   # (v1.4.0) Offline mock PKI: in-process RFC 3161 TSA + OCSP/CRL responders
-└── regression/baselines/samples.sha256.json   # (v1.5.0) the sample baseline — 91 sample PDFs, chained by `since`
+└── regression/baselines/samples.sha256.json   # (v1.5.0) the sample baseline — 99 sample PDFs, chained by `since`
 ```
 
 ### Data Flow
@@ -1226,13 +1226,13 @@ npm test
 npm run test:coverage
 
 # Samples — the byte baseline (tests/regression/baselines/samples.sha256.json)
-npm run test:generate          # 91 sample PDFs into test-output/samples/ with the BUILT CLI, TZ=UTC, pinned date
+npm run test:generate          # 99 sample PDFs into test-output/samples/ with the BUILT CLI, TZ=UTC, pinned date
 npm run verify:samples         # compare; `npx tsx scripts/verify-samples.ts --update` rebaselines (declare it)
 
 # Engine surface — tests/regression/engine-surface.json maps every pdfnative changelog bullet to tests + samples
 npx vitest run tests/regression/engine-surface.test.ts
 
-# Conformance corpus — 22 corpus files (PDF/A via veraPDF, an external tool; PDF/X in-process)
+# Conformance corpus — 26 corpus files (PDF/A via veraPDF, an external tool; PDF/X in-process)
 npm run corpus:pdfa            # generate test-output/pdfa/ (needs a prior npm run build)
 npm run validate:pdfx          # PDF/X-4 entries — never skipped
 npm run validate:pdfa          # PDF/A entries — SKIPs with exit 0 without veraPDF (see CONTRIBUTING.md)
@@ -1292,7 +1292,7 @@ Complete, runnable examples live in [`samples/`](../samples/), organized by feat
 Generate every sample at once — the same run the CI baseline uses:
 
 ```bash
-npm run build && npm run test:generate      # 91 sample PDFs → test-output/samples/ (byte-stable)
+npm run build && npm run test:generate      # 99 sample PDFs → test-output/samples/ (byte-stable)
 npx tsx scripts/verify-samples.ts           # compare with the committed baseline
 ```
 
@@ -1638,4 +1638,4 @@ See [SECURITY.md](../SECURITY.md) for the full policy.
 
 ---
 
-*Verified on 2026-09-17 · pdfnative-cli v1.5.0 · pdfnative 1.9.0*
+*Verified on 2026-10-31 · pdfnative-cli v1.6.0 · pdfnative 1.9.0*

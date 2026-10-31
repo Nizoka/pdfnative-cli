@@ -1,0 +1,25 @@
+{
+  "title": "Right-to-left paragraphs under direction: auto",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "layout.direction auto (full UAX #9, pdfnative ≥ 1.9.0): Arabic and Hebrew paragraphs aligned to the right and justified in visual order, a Latin paragraph set left to right, one paragraph overriding the base direction — demonstration content",
+    "keywords": "arabic, hebrew, bidi, right-to-left, uax9, direction, actualtext"
+  },
+  "layout": { "direction": "auto" },
+  "blocks": [
+    { "type": "heading", "text": "Right-to-left paragraphs under direction: auto", "level": 1 },
+    { "type": "paragraph", "text": "Rendered with --direction auto --font ar --font he --font latin --lang ar,he,latin. Each paragraph resolves its own base direction from its first strong character (UAX #9 P2–P3): the Arabic and Hebrew paragraphs below are right-aligned and justified in visual order, this Latin one is not. Untagged output carries every right-to-left run as /Span /ActualText, so extract-text returns the lines as typed.", "align": "justify" },
+    { "type": "heading", "text": "Arabic (ar)", "level": 2 },
+    { "type": "paragraph", "text": "السلام عليكم ورحمة الله وبركاته. هذه الفقرة مكتوبة من اليمين إلى اليسار، وتُضبط محاذاتها إلى اليمين تلقائياً. تحتوي على أرقام مثل 2026 وكلمات لاتينية مثل pdfnative داخل الجملة.", "align": "justify" },
+    { "type": "paragraph", "text": "مرحباً بالعالم — الأقواس (مثل هذه) والنقاط الأخيرة تتبع اتجاه الفقرة، كما تنص القاعدتان N1 وN2." },
+    { "type": "heading", "text": "Hebrew (he)", "level": 2 },
+    { "type": "paragraph", "text": "שלום עולם, ברוכים הבאים. פסקה זו נכתבת מימין לשמאל ומיושרת לימין באופן אוטומטי; היא כוללת מספרים כמו 2026 ומילים לטיניות כמו pdfnative בתוך המשפט.", "align": "justify" },
+    { "type": "heading", "text": "An explicit left-to-right paragraph", "level": 2 },
+    { "type": "paragraph", "text": "هذه الفقرة العربية تُجبر على الاتجاه من اليسار إلى اليمين عبر direction: ltr على الكتلة نفسها.", "direction": "ltr" },
+    { "type": "table", "headers": ["Language", "Sample"], "rows": [
+      { "cells": ["Arabic", "كتاب مكتبة بيت عين"], "type": "normal", "pointed": false },
+      { "cells": ["Hebrew", "כ/ך מ/ם נ/ן פ/ף צ/ץ שלום"], "type": "normal", "pointed": false },
+      { "cells": ["Mixed", "ISO 32000-1 — عربي — עברית"], "type": "normal", "pointed": false }
+    ] }
+  ]
+}

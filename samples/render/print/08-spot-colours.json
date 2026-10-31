@@ -1,0 +1,44 @@
+{
+  "title": "Print Production — Spot Colours",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "Spot colours under PDF/X-4 (ISO 15930-7): /Separation inks, a /DeviceN mix, per-bar chart colours (pdfnative ≥ 1.9.0)",
+    "keywords": "print, spot colour, separation, devicen, pdf/x-4, prepress",
+    "trapped": "False"
+  },
+  "layout": {
+    "print": {
+      "bleed": 14.17,
+      "marks": { "colourBars": true },
+      "spotColours": [
+        { "name": "PANTONE 300 C", "alternate": [100, 44, 0, 0] },
+        { "name": "PANTONE 1235 C", "alternate": [0, 31, 98, 0] },
+        { "name": "Spot Varnish", "alternate": [0, 0, 0, 8] }
+      ]
+    },
+    "outputIntent": {
+      "outputConditionIdentifier": "Synthetic CMYK (pdfnative test profile)",
+      "registryName": "http://www.color.org",
+      "info": "A structurally valid, colourimetrically meaningless CMYK press profile shipped with the samples. Ask your printer for their ICC profile (e.g. ISO Coated v2, GRACoL)."
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "Brand blue on its own plate", "level": 1, "color": { "spot": "PANTONE 300 C" } },
+    { "type": "paragraph", "text": "Rendered with: pdfnative render --input 08-spot-colours.json --pdfx pdfx4 --output-intent-icc synthetic-cmyk.icc --font latin --lang latin --trapped false --strict. Every ink a colour names is declared in layout.print.spotColours with its CMYK alternate; a RIP that knows the ink puts it on its own plate, a composite proof paints the alternate.", "align": "justify", "color": [0, 0, 0, 100] },
+    { "type": "paragraph", "text": "This paragraph is PANTONE 300 C at 100 %: a /Separation colour space named after the ink, with [100, 44, 0, 0] as the alternate.", "color": { "spot": "PANTONE 300 C" } },
+    { "type": "paragraph", "text": "The same ink at a 40 % tint — one number in the content stream; the tint transform does the rest.", "color": { "spot": "PANTONE 300 C", "tint": 0.4 } },
+    { "type": "paragraph", "text": "PANTONE 1235 C, the brand yellow, as a second separation.", "color": { "spot": "PANTONE 1235 C" } },
+    { "type": "paragraph", "text": "Blue over a spot varnish: a /DeviceN space over both inks (five-element array, /Colorants attributes) whose type-4 tint transform adds the two alternates.", "color": { "inks": { "PANTONE 300 C": 1, "Spot Varnish": 1 } } },
+    { "type": "heading", "text": "Ink coverage per plate", "level": 2, "color": [0, 0, 0, 100] },
+    {
+      "type": "chart",
+      "chartType": "bar",
+      "title": "Each bar painted in its plate's ink (ChartSeries.colors)",
+      "categories": ["Cyan", "Magenta", "Yellow", "Black", "PANTONE 300 C"],
+      "series": [
+        { "label": "Coverage (%)", "values": [38, 52, 27, 71, 100], "colors": [[100, 0, 0, 0], [0, 100, 0, 0], [0, 0, 100, 0], [0, 0, 0, 100], { "spot": "PANTONE 300 C" }] }
+      ]
+    },
+    { "type": "paragraph", "text": "An undeclared ink, or a mix of inks with different alternate spaces, is refused by the engine before any byte is written (E_INPUT); --dry-run reports the same refusal.", "align": "justify", "color": [0, 0, 0, 100] }
+  ]
+}

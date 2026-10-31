@@ -41,7 +41,13 @@ export const SPECS_DIR = join(OUT_DIR, '.specs');
 const SAMPLES = join(REPO_ROOT, 'samples', 'render');
 const FIXTURES = join(REPO_ROOT, 'tests', 'fixtures');
 
-export type Claim = 'pdfa' | 'pdfx' | 'none';
+/** `both` (pdfnative 1.9.0): one file claiming PDF/A-2b|2u AND PDF/X-4 — counted by both validators. */
+export type Claim = 'pdfa' | 'pdfx' | 'both' | 'none';
+
+/** Does an entry's XMP carry the given standard's claim? */
+export function claimsStandard(claim: Claim, standard: 'pdfa' | 'pdfx'): boolean {
+    return claim === standard || claim === 'both';
+}
 
 export interface CorpusEntry {
     readonly file: string;
@@ -59,6 +65,8 @@ export interface CorpusEntry {
 }
 
 const pdfaSample = (name: string): string => join(SAMPLES, 'pdfa', name);
+const printSample = (name: string): string => join(SAMPLES, 'print', name);
+const imageSample = (name: string): string => join(SAMPLES, 'images', name);
 const PINNED = ['--creation-date', SAMPLE_CREATION_ISO] as const;
 /** The embedding recipe every positive entry uses (see the header comment). */
 const STRICT_FONTS = ['--strict', '--font', 'latin', '--lang', 'latin'] as const;
@@ -286,9 +294,34 @@ export const CORPUS: readonly CorpusEntry[] = [
         before: () => { writeSpec('bad-annotation.json', BAD_ANNOTATION_SPEC); },
         args: (out) => ['annotate', '--input', out('pdfx4-print.pdf'), '--output', out('pdfx4-bad-annotation.pdf'), '--annotations', join(SPECS_DIR, 'bad-annotation.json')],
     },
+    // ── pdfnative 1.9.0: spot colours, the dual claim, JPEG 2000 ────────
+    {
+        file: 'pdfx4-spot-colours.pdf', claims: 'pdfx',
+        command: 'render samples/render/print/08-spot-colours.json --pdfx pdfx4 --output-intent-icc synthetic-cmyk.icc --trapped false --strict --font latin --lang latin',
+        args: (out) => ['render', '--input', printSample('08-spot-colours.json'), '--output', out('pdfx4-spot-colours.pdf'), ...PDFX_FLAGS, ...STRICT_FONTS, ...PINNED],
+    },
+    {
+        // PDF/A-2b and PDF/X-4 in one file: veraPDF validates the PDF/A half, validatePdfX() the PDF/X half.
+        file: 'dual-pdfa2b-pdfx4.pdf', claims: 'both',
+        command: 'render samples/render/print/09-dual-pdfa2b-pdfx4.json --pdfx pdfx4 --tagged pdfa2b --output-intent-icc synthetic-cmyk.icc --trapped false --strict --font latin --lang latin',
+        args: (out) => ['render', '--input', printSample('09-dual-pdfa2b-pdfx4.json'), '--output', out('dual-pdfa2b-pdfx4.pdf'), ...PDFX_FLAGS, '--tagged', 'pdfa2b', ...STRICT_FONTS, ...PINNED],
+    },
+    {
+        // A JPEG 2000 image under PDF/A-2b: /JPXDecode is allowed (ISO 19005-2 §6.2.8.3), one colour channel, no alpha.
+        file: 'jpx-pdfa2b.pdf', claims: 'pdfa',
+        command: 'render samples/render/images/01-jpeg2000.json --tagged pdfa2b --strict --font latin --lang latin',
+        args: (out) => ['render', '--input', imageSample('01-jpeg2000.json'), '--output', out('jpx-pdfa2b.pdf'), '--tagged', 'pdfa2b', ...STRICT_FONTS, ...PINNED],
+    },
+    {
+        // NEGATIVE canary: the same image under PDF/A-1b — /JPXDecode is not a PDF 1.4 filter (PDFA1_JPX_IMAGE); veraPDF must reject.
+        file: 'jpx-pdfa1b.pdf', claims: 'pdfa', expectCompliant: false,
+        command: 'render samples/render/images/01-jpeg2000.json --tagged pdfa1b --font latin --lang latin',
+        args: (out) => ['render', '--input', imageSample('01-jpeg2000.json'), '--output', out('jpx-pdfa1b.pdf'), '--tagged', 'pdfa1b', '--font', 'latin', '--lang', 'latin', ...PINNED],
+    },
 ];
 
 /** Number of entries claiming a given standard — the coverage canaries' expectation. */
 export function claimingCount(claim: Claim): number {
+    if (claim === 'pdfa' || claim === 'pdfx') return CORPUS.filter((e) => claimsStandard(e.claims, claim)).length;
     return CORPUS.filter((e) => e.claims === claim).length;
 }

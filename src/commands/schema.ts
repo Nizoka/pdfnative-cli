@@ -155,9 +155,28 @@ function renderSchema(): JsonSchema {
             + '--pdfx claim can be conformant.',
         required: ['title', 'headers', 'rows'],
         properties: {
+            docTitle: { type: 'string', description: 'The /Info /Title (the visible title is `title`).' },
             title: { type: 'string' },
+            infoItems: {
+                type: 'array',
+                description: 'Key/value lines under the title. Each entry is { label, value } — a bare '
+                    + 'string is refused with E_INPUT (v1.6.0; the engine renders item.label and item.value).',
+                items: {
+                    type: 'object',
+                    required: ['label', 'value'],
+                    properties: { label: { type: 'string' }, value: { type: 'string' } },
+                },
+            },
+            balanceText: { type: 'string', description: 'Text of the highlighted balance box ("" for none).' },
+            countText: { type: 'string', description: 'Text under the balance box, e.g. "42 operations".' },
             headers: { type: 'array', items: { type: 'string' } },
-            rows: { type: 'array', items: { type: 'array' } },
+            rows: {
+                type: 'array',
+                description: 'Rows as { cells: string[], type: "data" | "credit" | "debit" | "normal", pointed: boolean } '
+                    + 'objects (a row that is not that shape is E_INPUT, v1.6.0).',
+                items: { type: 'object', required: ['cells'], properties: { cells: { type: 'array', items: { type: 'string' } }, type: { type: 'string' }, pointed: { type: 'boolean' } } },
+            },
+            footerText: { type: 'string' },
             fontEntries: { type: 'array', items: { type: 'object' } },
             metadata: {
                 type: 'object',

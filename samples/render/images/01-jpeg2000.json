@@ -1,0 +1,14 @@
+{
+  "title": "Images — JPEG 2000",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "A JPEG 2000 image block passed through as /JPXDecode (pdfnative ≥ 1.9.0) — the codestream is never decoded",
+    "keywords": "image, jpeg 2000, jp2, jpx, jpxdecode"
+  },
+  "blocks": [
+    { "type": "heading", "text": "JPEG 2000 pass-through", "level": 1 },
+    { "type": "paragraph", "text": "An image block whose src is a .jp2 file (or a raw .j2k codestream) is embedded with the /JPXDecode filter, with the colour space and opacity its header declares; the header of the file is raised to PDF 1.5. The image below is the engine's minimal 8 × 8 RGB codestream (a flat mid-grey) — the point is the filter, not the picture.", "align": "justify" },
+    { "type": "image", "src": "minimal-rgb.jp2", "width": 120, "height": 120, "alt": "An 8 by 8 JPEG 2000 image, flat mid-grey" },
+    { "type": "paragraph", "text": "Under PDF/A-1 the filter is not allowed (PDFA1_JPX_IMAGE); under PDF/A-2 and PDF/A-3 an opacity channel or an unusual channel count is reported (PDFA_JPX_IMAGE). --strict turns either into E_CHECK_FAILED.", "align": "justify" }
+  ]
+}
