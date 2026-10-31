@@ -11,7 +11,7 @@ import { readFileOrStdin } from '../utils/io.js';
 import { CliError } from '../utils/error.js';
 import { isJsonMode } from '../utils/agent.js';
 import { selectFields, serializeJson, parseFieldList } from '../utils/projection.js';
-import { resolveSourcePassword, mapPdfError } from '../utils/pdfops.js';
+import { resolveSourcePassword, mapPdfError, parseStreamErrorPolicy } from '../utils/pdfops.js';
 import { parsePageList } from '../utils/pages.js';
 
 const VALID_FORMATS = new Set(['text', 'json', 'ndjson']);
@@ -45,6 +45,7 @@ export async function extractTextCmd(args: ParsedArgs): Promise<void> {
     const pagesSpec = getStringFlag(args.flags, 'pages');
     const password = resolveSourcePassword(args.flags);
     const maxTextLength = parseMaxLength(getStringFlag(args.flags, 'max-length'));
+    const onStreamError = parseStreamErrorPolicy(getStringFlag(args.flags, 'on-stream-error'));
 
     if (!VALID_FORMATS.has(format)) {
         throw new CliError(
@@ -60,6 +61,7 @@ export async function extractTextCmd(args: ParsedArgs): Promise<void> {
     if (password !== undefined) opts.password = password;
     if (includeRuns) opts.includeRuns = true;
     if (maxTextLength !== undefined) opts.maxTextLength = maxTextLength;
+    if (onStreamError !== undefined) opts.onStreamError = onStreamError;
 
     // A --pages selector is 1-based (like split/extract); extractText wants
     // 0-based indices. Resolve the page count first for friendly bounds errors.

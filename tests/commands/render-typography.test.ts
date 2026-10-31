@@ -1,5 +1,5 @@
 // render: typography flags + layout.typography passthrough, CMYK colours,
-// the 27-script allow-list, reproducible dates and the table-variant fonts
+// the 32-script allow-list, reproducible dates and the table-variant fonts
 // (v1.5.0, pdfnative 1.8.0).
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
@@ -129,13 +129,18 @@ describe('render CMYK colours (pdfnative 1.8.0)', () => {
     });
 });
 
-describe('render --font: 27 scripts + aliases (pdfnative 1.8.0)', () => {
+describe('render --font: 32 scripts + aliases (pdfnative 1.9.0)', () => {
     it.each([
         ['lo', 'ສະບາຍດີ ໂລກ'],
         ['nod', 'ᨲᩫ᩠ᩅᨾᩮᩬᩥᨦ'],
         ['khb', 'ᦎᦸᧈᦑᦸᧈ'],
         ['tdd', 'ᥖᥭᥰ ᥘᥫᥴ'],
         ['cjm', 'ꨌꩌ ꨭꨌꨯꨱꨭ'],
+        ['gu', 'ગુજરાતી ભાષા'],
+        ['pa', 'ਪੰਜਾਬੀ ਭਾਸ਼ਾ'],
+        ['kn', 'ಕನ್ನಡ ಭಾಷೆ'],
+        ['ml', 'മലയാളം ഭാഷ'],
+        ['or', 'ଓଡ଼ିଆ ଭାଷା'],
     ])('registers %s and renders a paragraph in that script', async (code, text) => {
         const { bytes, stderr } = await renderTo(tmp, { title: code, blocks: [{ type: 'paragraph', text }] }, ['--font', code, '--lang', code]);
         expect(bytes.subarray(0, 4).toString('ascii')).toBe('%PDF');
@@ -149,7 +154,7 @@ describe('render --font: 27 scripts + aliases (pdfnative 1.8.0)', () => {
         expect(bytes.subarray(0, 4).toString('ascii')).toBe('%PDF');
     });
 
-    it('the allow-list error names 27 script codes', async () => {
+    it('the allow-list error names 32 script codes', async () => {
         const input = await tmp.json('in.json', MINIMAL_DOC);
         try {
             await render(parseArgs(['--input', input, '--output', tmp.path('x.pdf'), '--font', 'klingon']));
@@ -158,8 +163,9 @@ describe('render --font: 27 scripts + aliases (pdfnative 1.8.0)', () => {
             const message = (e as CliError).message;
             const allowed = /Allowed: ([^(]+)/.exec(message)?.[1] ?? '';
             const codes = allowed.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
-            expect(codes).toHaveLength(31);
+            expect(codes).toHaveLength(36);
             expect(codes).toContain('cjm');
+            expect(codes).toContain('ml');
         }
     });
 

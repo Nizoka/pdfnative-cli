@@ -226,6 +226,29 @@ export function workflowJobs(workflowTexts: readonly string[]): { jobs: Set<stri
     return { jobs, matrixValues };
 }
 
+/**
+ * Has `release-notes/v<version>.md` shipped, with the next release under way?
+ * True when the tag `v<version>` exists in the checkout AND `CHANGELOG.md`
+ * carries text under `## [Unreleased]` — the two signals of a release branch
+ * on top of a published version. Either one alone keeps the note in the
+ * corpus: a tagged tree with an empty `[Unreleased]` is `main` after a
+ * release, where the note and the manifest must agree; a runner without
+ * tags (shallow checkout) never exempts anything.
+ */
+export function releaseNoteShipped(root: string, version: string): boolean {
+    if (version === '') return false;
+    const tag = spawnSync('git', ['-C', root, 'tag', '-l', `v${version}`], { encoding: 'utf8', windowsHide: true });
+    if (tag.status !== 0 || tag.stdout.trim() !== `v${version}`) return false;
+    const changelog = join(root, 'CHANGELOG.md');
+    if (!existsSync(changelog)) return false;
+    const text = readFileSync(changelog, 'utf8').replace(/\r\n/g, '\n');
+    const start = text.indexOf('\n## [Unreleased]');
+    if (start === -1) return false;
+    const next = text.indexOf('\n## [', start + 1);
+    const body = text.slice(start + '\n## [Unreleased]'.length, next === -1 ? undefined : next);
+    return body.trim() !== '';
+}
+
 function walk(dir: string, filter: (p: string) => boolean, out: string[] = []): string[] {
     if (!existsSync(dir)) return out;
     for (const entry of readdirSync(dir)) {
@@ -284,10 +307,17 @@ export async function verifyDocs(root: string, options: VerifyOptions = {}): Pro
     const coreVersion = manifest.packages['pdfnative']?.version ?? '';
 
     // ── The documentation corpus ──────────────────────────────────
+    // The release note of the manifest's version is live documentation —
+    // until it has shipped. Once its tag exists AND the CHANGELOG carries an
+    // `[Unreleased]` entry, the next release is in progress: the counts in
+    // the manifest describe the tree, the shipped note describes its own
+    // release (AGENTS.md §Never touch), and the two are allowed to differ.
+    // On a runner without tags the note stays in the corpus, where it must
+    // agree with the manifest, as on main after a release.
     const DOC_FILES: string[] = [
         ...['README.md', 'ROADMAP.md', 'AGENTS.md', 'CLAUDE.md', 'CONTRIBUTING.md', 'SECURITY.md', 'llms.txt',
             '.github/copilot-instructions.md', '.github/AGENT_RULES.md', 'samples/README.md', 'tests/fixtures/README.md',
-            `release-notes/v${cliVersion}.md`]
+            ...(releaseNoteShipped(root, cliVersion) ? [] : [`release-notes/v${cliVersion}.md`])]
             .map((f) => join(root, f))
             .filter(existsSync),
         ...walk(join(root, 'docs'), (p) => p.endsWith('.md')),

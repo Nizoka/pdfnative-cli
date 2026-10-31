@@ -115,9 +115,9 @@ export const FILE_FLAGS: Readonly<Record<string, readonly string[]>> = {
         '--font', 'latin', '--lang', 'latin',
         '--strict',
     ],
-    // multilang/ — 08-11 are the script families no other sample loads
-    // (v1.5.0): with 01-07 and font/02, font/04 every one of the 27 script
-    // codes is rendered by the corpus (tests/regression/engine-surface.test.ts).
+    // multilang/ — 08-12 are the script families no other sample loads
+    // (v1.5.0, 12 in v1.6.0): with 01-07 and font/02, font/04 every one of the
+    // 32 script codes is rendered by the corpus (tests/regression/engine-surface.test.ts).
     '08-european-caucasian.json': [
         '--font', 'el', '--font', 'ru', '--font', 'ka', '--font', 'hy', '--font', 'pl', '--font', 'tr', '--font', 'vi', '--font', 'latin',
         '--lang', 'el,ru,ka,hy,pl,tr,vi,latin',
@@ -125,6 +125,7 @@ export const FILE_FLAGS: Readonly<Record<string, readonly string[]>> = {
     '09-rtl.json': ['--font', 'ar', '--font', 'he', '--font', 'latin', '--lang', 'ar,he,latin'],
     '10-indic.json': ['--font', 'hi', '--font', 'bn', '--font', 'ta', '--font', 'latin', '--lang', 'hi,bn,ta,latin'],
     '11-cjk.json': ['--font', 'zh', '--font', 'ko', '--font', 'latin', '--lang', 'zh,ko,latin'],
+    '12-five-indic-scripts.json': ['--font', 'gu', '--font', 'pa', '--font', 'kn', '--font', 'ml', '--font', 'or', '--font', 'latin', '--lang', 'gu,pa,kn,ml,or,latin'],
     // font/ — 06 is colour emoji alone: skin tones, ZWJ sequences, flags.
     '06-color-emoji-sequences.json': ['--font', 'color-emoji', '--font', 'latin', '--lang', 'color-emoji,latin'],
 };

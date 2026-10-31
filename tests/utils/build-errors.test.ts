@@ -23,14 +23,30 @@ describe('classifyBuildError', () => {
     });
 
     it('classifies every build error pdfnative documents as E_INPUT', () => {
-        const unclassified = fixture.messages.filter((m) => classifyBuildError(m.message, false) !== ErrorCode.INPUT);
+        // Two 1.9.0 entries are not builder refusals: the annotation-type check
+        // (annotate validates the type first) and PdfStreamLimitError (classified
+        // by instance in utils/pdfops.ts mapPdfError, never by its text).
+        const builder = fixture.messages.filter((m) => m.thrownBy?.startsWith('buildDocumentPDFBytes'));
+        expect(builder.length).toBeGreaterThan(25);
+        const unclassified = builder.filter((m) => classifyBuildError(m.message, false) !== ErrorCode.INPUT);
         expect(unclassified.map((m) => m.message)).toEqual([]);
+    });
+
+    it('classifies the spot-colour and dual-claim refusals (pdfnative 1.9.0) as E_INPUT', () => {
+        for (const m of [
+            'Spot colour \'PANTONE 300 C\' is not declared — add { name: \'PANTONE 300 C\', alternate: [c, m, y, k] } to layout.print.spotColours',
+            'Ink mix PANTONE 300 C + Spot Varnish: every ink of a mix needs the same alternate space (all CMYK or all RGB)',
+            'print.spotColours: ink \'Varnish\' is declared twice',
+            'layout.pdfx cannot be combined with tagged: \'pdfa1b\' — PDF/A-1 is PDF 1.4 and PDF/X-4 is PDF 1.6; claim \'pdfa2b\' or \'pdfa2u\' alongside PDF/X-4',
+            'layout.pdfx cannot be combined with tagged: \'pdfa3b\' — PDF/A-3 allows embedded files, which PDF/X-4 forbids; claim \'pdfa2b\' or \'pdfa2u\' alongside PDF/X-4',
+        ]) {
+            expect(classifyBuildError(m, false), m).toBe(ErrorCode.INPUT);
+        }
     });
 
     it('classifies the PDF/X coherence errors (pdfnative 1.8.0) as E_INPUT', () => {
         for (const m of [
             'layout.pdfx: unknown target \'pdfx1a\' — use one of pdfx4',
-            'layout.pdfx and layout.tagged cannot be combined — pdfnative writes one conformance claim per file; drop one of them',
             'PDF/X forbids encryption (ISO 15930-7) — drop layout.encryption or layout.pdfx',
             'PDF/X-4 requires layout.outputIntent: the ICC profile of the printing condition',
             'PDF/X requires the trapping state to be known — set metadata.trapped to \'True\' or \'False\', or omit it for \'False\'',

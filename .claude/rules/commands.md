@@ -56,7 +56,7 @@ paths:
 - Streaming flags are mutually exclusive: `--stream`, `--stream-page-by-page`, `--stream-true`;
   `--stream` and `--stream-true` reject TOC blocks and `{pages}`.
 - **Fonts (`utils/fonts.ts`):** `--font` allow-list = `latin`, `emoji`, `color-emoji`, `math` and
-  the 27 script codes of `BUNDLED_FONT_MODULES` (31 modules); `ha`/`yo`/`ig`/`sw` alias `latin`
+  the 32 script codes of `BUNDLED_FONT_MODULES` (36 modules); `ha`/`yo`/`ig`/`sw` alias `latin`
   (`resolveFontAlias`, applied to `--font` and `--lang`). `--font-file <path.ttf>[:name]`
   registers a TTF/OTF from disk only: `validatePath`, 32 MiB cap, magic bytes (`00 01 00 00`,
   `true`, `OTTO`; never `ttcf`/`wOFF`), `parseFontData` + `validateFontData` → `E_INPUT`;
@@ -64,10 +64,18 @@ paths:
   fonts through `fontEntries`.
 - **Conformance:** `--tagged pdfa1b|2b|2u|3b` (`--conformance` is the deprecated alias),
   `--pdfx pdfx4` + `--output-intent-icc <file>` (+ `--output-intent-id`, default basename) and
-  `--trapped true|false|unknown`. Pre-checks (exit 2): `--pdfx` × `--tagged`, `--pdfx` × any
-  encryption flag. `--strict` escalates every diagnostic (`PDFA_*`, `PDFX_*`,
-  `TYPOGRAPHY_FEATURE_INEFFECTIVE`) to `E_CHECK_FAILED`; the envelope carries `pdfx` and
-  `creationDate` when set.
+  `--trapped true|false|unknown`. PDF/A-2b|2u and PDF/X-4 may be claimed together (pdfnative
+  ≥ 1.9.0): no CLI pre-check — the engine's level-specific refusals for pdfa1b/pdfa3b are
+  `E_INPUT` (prefix `layout.pdfx`). Pre-check (exit 2): `--pdfx` × any encryption flag.
+  `--strict` escalates every diagnostic (`PDFA_*`, `PDFA1_*`, `PDFX_*`,
+  `TYPOGRAPHY_FEATURE_INEFFECTIVE`, `TEXT_GLYPH_NOT_COVERED` — 13 codes, each with a trigger in
+  `tests/helpers/diagnostic-triggers.ts`) to `E_CHECK_FAILED`; the envelope carries `pdfx`,
+  `tagged`, `direction`, `actualText` (only `false`) and `creationDate` when set.
+- **Direction and ActualText (pdfnative ≥ 1.9.0):** `--direction auto|ltr|rtl` → `layout.direction`
+  (`VALID_DIRECTIONS`); `--actual-text [true|false]` → `layout.actualText`. Spot colours are
+  JSON-only (`layout.print.spotColours`, `{spot, tint}` / `{inks}` values); their engine
+  refusals (`Spot colour …`, `Ink mix …`) are in `INPUT_ERROR_PREFIXES`. JPEG 2000 image
+  bytes pass through untouched (no extension check — the engine sniffs the format).
 - **Typography:** `layout.typography` passthrough plus `--split-paragraphs`,
   `--keep-headings-with-next`, `--kerning`, `--font-features <tag,…>` (each tag `/^[a-z0-9]{4}$/i`).
 - Colours (`--watermark-color`, `--zebra`, chart/table colours) accept hex, `r g b`, `[r,g,b]`,
@@ -101,10 +109,12 @@ paths:
   `utils/pdfdate.ts`. `--check` allow-list: `pdfa`, `signed`, `encrypted`, `pdfua`, `pdfx`,
   `signatures>=N` (exit 0/1, `E_CHECK_FAILED`). `--summary` = `{ pages, encrypted, signatures,
   pdfa, pdfx }`.
-- `extract-text`: `text | json | ndjson`, `--runs`, `--password`; tagged input yields the
-  `/ActualText` source text.
+- `extract-text`: `text | json | ndjson`, `--runs`, `--password`; tagged input — and, since
+  pdfnative ≥ 1.9.0, untagged shaped / right-to-left runs — yields the `/ActualText` source
+  text. `--on-stream-error limit|throw|skip` (`parseStreamErrorPolicy` in `utils/pdfops.ts`);
+  a `PdfStreamLimitError` is `E_INPUT` by instance (`mapPdfError`), never by its text.
 - `compare`: text + structure diff, exit 1 / `E_CHECK_FAILED` on difference; `--tolerance`,
-  `--ignore-whitespace`, `--format json`.
+  `--ignore-whitespace`, `--format json`, `--on-stream-error` (same policy for both PDFs).
 
 ## Page tree, forms, metadata, encryption
 

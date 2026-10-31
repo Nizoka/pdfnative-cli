@@ -16,7 +16,8 @@ and the engine's build-error message corpus.
 | `ec-cert.pem` | Self-signed X.509 cert for the above |
 | `synthetic-cmyk.icc` | Synthetic ICC v2 `prtr` CMYK profile (9 968 bytes) — the output intent of every PDF/X-4 test, corpus entry and sample |
 | `synthetic-gray.icc` | Synthetic ICC v2 `prtr` Gray profile (408 bytes) — the Gray output intent, and the non-CMYK PDF/X intent that triggers `PDFX_DEVICE_CMYK` |
-| `pdfnative-build-errors.json` | The coherence messages pdfnative 1.8.0's builders throw (PDF/X, print geometry, OutputIntent, attachments, watermark) — each must classify as `E_INPUT` |
+| `pdfnative-build-errors.json` | The 33 messages pdfnative ≥ 1.9.0 documents (PDF/X and the dual claim, spot colours, print geometry, OutputIntent, attachments, watermark; plus the annotation-type check and `PdfStreamLimitError`) — every builder message must classify as `E_INPUT` |
+| `minimal-gray.jp2`, `minimal-rgb.jp2`, `minimal-rgba.jp2`, `minimal.j2k` | Minimal JPEG 2000 images (8 × 8, flat mid-grey codestreams; the `rgba` one carries an opacity channel) — the `/JPXDecode` pass-through of pdfnative ≥ 1.9.0 and the `PDFA1_JPX_IMAGE` / `PDFA_JPX_IMAGE` triggers |
 
 These fixtures are committed for deterministic CI runs (no `openssl`
 dependency on the runner). The keys are **only valid for the test suite** and
@@ -44,10 +45,19 @@ must never be reused outside it; the same key pair signs the sample corpus
   can also write is never committed: tests and the conformance corpus build it on
   the fly to prove that PDF/A-1b refuses it (`PDFA_ICC_PROFILE_VERSION`).
 - **`pdfnative-build-errors.json`** is derived from `docs/data/errors.json →
-  buildErrors` of the pdfnative repository (1.8.0), with the `${…}` placeholders
+  buildErrors` of the pdfnative repository (1.9.0), with the `${…}` placeholders
   substituted by representative values. `tests/utils/build-errors.test.ts` feeds
-  every message to `classifyBuildError()`; refresh it from the engine's registry
-  when the pin moves.
+  every builder message (`thrownBy` starting with `buildDocumentPDFBytes`) to
+  `classifyBuildError()`; the annotation-type check and the stream-limit error are
+  classified elsewhere (`annotate` validates the type first; `mapPdfError` matches
+  `PdfStreamLimitError` by instance). Refresh it from the engine's registry when
+  the pin moves.
+- **`minimal-*.jp2` / `minimal.j2k`** are written by the engine's own
+  deterministic helpers (`scripts/helpers/images.ts` of the pdfnative repository
+  at 1.9.0: `makeMinimalJP2(components, { alpha, size: 8 })` and
+  `makeMinimalJ2K(1, 8)`) — a JP2 signature box, file-type and header boxes and a
+  minimal codestream the engine passes through without decoding. Regenerate them
+  with the same calls; their bytes are held by the JPEG 2000 render tests.
 
 ## Regeneration
 

@@ -3,7 +3,7 @@
 ## Overview
 
 Official CLI companion to the `pdfnative` library (engine pinned at `^1.8.0`). Exposes 21 commands
-over the document lifecycle: `render` (JSON → PDF, incl. PDF/A, PDF/X-4, typography, 27 Unicode
+over the document lifecycle: `render` (JSON → PDF, incl. PDF/A, PDF/X-4, typography, 32 Unicode
 scripts, charts, print production, streaming), `fill`, `annotate`, `metadata`, `merge` / `split` /
 `extract`, `sign` / `verify` / `ltv` / `doc-timestamp` (the PAdES ladder), `encrypt` / `decrypt`,
 `inspect` / `extract-text` / `compare`, `batch`, `doctor`, `schema`, `completion` and `govern`.
@@ -61,7 +61,7 @@ src/
 │   ├── projection.ts          # compact JSON, --summary, --fields
 │   ├── config.ts / colors.ts / version.ts / manifest.ts
 │   ├── layout.ts              # --layout / flags → PdfLayoutOptions (PDF/A, PDF/X-4, output intent, typography)
-│   ├── fonts.ts               # BUNDLED_FONT_MODULES (31 modules / 27 scripts), aliases, --font-file loading
+│   ├── fonts.ts               # BUNDLED_FONT_MODULES (36 modules / 32 scripts), aliases, --font-file loading
 │   ├── reproducible.ts        # --creation-date / SOURCE_DATE_EPOCH resolution
 │   ├── build-errors.ts        # classifies pdfnative's thrown coherence messages into E_INPUT
 │   ├── pages.ts / pdfops.ts / pdfdate.ts                 # page selectors, page-tree/crypto helpers, PDF date → ISO

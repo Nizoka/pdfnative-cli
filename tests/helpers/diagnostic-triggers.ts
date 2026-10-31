@@ -1,10 +1,15 @@
-// One minimal trigger per diagnostic code pdfnative 1.8.0 can emit through
+// One minimal trigger per diagnostic code pdfnative 1.9.0 can emit through
 // `render`. tests/commands/render-diagnostics.test.ts executes every entry
 // (warning in the --json envelope, E_CHECK_FAILED under --strict) and
 // tests/regression/engine-surface.test.ts holds the key set to the codes
 // `schema status` lists — a code the docs name is a code a test TRIGGERS.
 
-import { SYNTHETIC_CMYK_ICC, SYNTHETIC_GRAY_ICC } from './cli-harness.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { FIXTURES, SYNTHETIC_CMYK_ICC, SYNTHETIC_GRAY_ICC } from './cli-harness.js';
+
+/** The JPEG 2000 fixtures (tests/fixtures/README.md), inline as the `dataBase64` an image block takes. */
+const jp2 = (name: string): string => readFileSync(join(FIXTURES, name)).toString('base64');
 
 export interface DiagnosticTrigger {
     /** The document to render. */
@@ -77,5 +82,31 @@ export const DIAGNOSTIC_TRIGGERS: Readonly<Record<string, DiagnosticTrigger>> = 
         doc: doc([para('Tabular figures 0123456789 that Noto Sans does not carry.')]),
         argv: () => [...LATIN, '--font-features', 'tnum'],
         message: /tnum/,
+    },
+    // pdfnative 1.9.0
+    TEXT_GLYPH_NOT_COVERED: {
+        // An arrow on the base-14 path: outside WinAnsi, written as "?".
+        doc: doc([para('A \u2192 B')]),
+        argv: () => [],
+        message: /U\+2192/,
+    },
+    PDFA_GLYPH_WITHOUT_UNICODE: {
+        // Level U: a character the registered font does not cover is glyph 0, which no ToUnicode CMap names.
+        doc: doc([para('Latin \u0E01')]),
+        argv: () => ['--tagged', 'pdfa2u', ...LATIN],
+        message: /ToUnicode|Unicode/,
+        alongside: ['TEXT_GLYPH_NOT_COVERED'],
+    },
+    PDFA1_JPX_IMAGE: {
+        // JPEG 2000 under PDF/A-1: /JPXDecode is a PDF 1.5 filter.
+        doc: doc([para('A JPEG 2000 image under pdfa1b.'), { type: 'image', dataBase64: jp2('minimal-gray.jp2'), width: 40, height: 40 }]),
+        argv: () => ['--tagged', 'pdfa1b', ...LATIN],
+        message: /JPEG 2000|JPX/,
+    },
+    PDFA_JPX_IMAGE: {
+        // An opacity channel (/SMaskInData 1) under PDF/A-2.
+        doc: doc([para('A JPEG 2000 image with alpha under pdfa2b.'), { type: 'image', dataBase64: jp2('minimal-rgba.jp2'), width: 40, height: 40 }]),
+        argv: () => ['--tagged', 'pdfa2b', ...LATIN],
+        message: /opacity|SMaskInData|channel/i,
     },
 };

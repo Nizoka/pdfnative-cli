@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { basename, join, resolve } from 'node:path';
 import {
     MANIFEST_REL,
     OFFLINE_RULES,
     isSuppressed,
     lineOf,
+    releaseNoteShipped,
     semverLess,
     verifyDocs,
     workflowJobs,
@@ -49,6 +51,32 @@ describe('verify-docs — helpers', () => {
         const { jobs, matrixValues } = workflowJobs([ci, 'jobs:\n  sample-regression:\n    steps: []\n']);
         expect([...jobs].sort()).toEqual(['ci', 'other', 'sample-regression']);
         expect([...matrixValues.get('ci')!]).toEqual(['22', '24']);
+    });
+
+    // v1.6.0 — a shipped release note leaves the count-checked corpus only when
+    // BOTH signals of a release in progress are present: its tag, and text under
+    // `## [Unreleased]`.
+    it('exempts the current release note only once its tag exists and the CHANGELOG has an [Unreleased] entry', () => {
+        const repo = mkdtempSync(join(tmpdir(), 'verify-docs-shipped-'));
+        try {
+            const git = (...args: string[]): void => {
+                const r = spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8', windowsHide: true });
+                if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
+            };
+            const changelog = (unreleased: string): void => writeFileSync(join(repo, 'CHANGELOG.md'), `# Changelog\n\n## [Unreleased]\n${unreleased}\n## [1.5.0] – 2026-09-17\n\n- shipped\n`);
+            git('init', '-q');
+            git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'init');
+            changelog('');
+            expect(releaseNoteShipped(repo, '1.5.0'), 'no tag yet').toBe(false);
+            git('tag', 'v1.5.0');
+            expect(releaseNoteShipped(repo, '1.5.0'), 'tag, but an empty [Unreleased] (main after a release)').toBe(false);
+            changelog('\n### Added\n\n- the next release\n');
+            expect(releaseNoteShipped(repo, '1.5.0'), 'tag and a non-empty [Unreleased]').toBe(true);
+            expect(releaseNoteShipped(repo, '1.6.0'), 'the version under way has no tag').toBe(false);
+            expect(releaseNoteShipped(repo, ''), 'no version').toBe(false);
+        } finally {
+            rmSync(repo, { recursive: true, force: true });
+        }
     });
 });
 

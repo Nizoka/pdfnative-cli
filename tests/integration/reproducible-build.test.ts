@@ -92,6 +92,6 @@ describe.runIf(haveDist)('dist/cli.cjs reproducible output', () => {
         expect(r.status).toBe(0);
         const report = JSON.parse(r.stdout) as { ok: boolean; checks: { name: string; value: string }[] };
         expect(report.ok).toBe(true);
-        expect(report.checks.find((c) => c.name === 'fonts')?.value).toBe('31 modules / 27 scripts');
+        expect(report.checks.find((c) => c.name === 'fonts')?.value).toBe('36 modules / 32 scripts');
     });
 });

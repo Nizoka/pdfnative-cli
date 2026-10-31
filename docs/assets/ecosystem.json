@@ -23,16 +23,16 @@
     }
   },
   "declared": {
-    "tests": 1403,
+    "tests": 1437,
     "coverageStatements": 82,
     "coverageMeasured": 86.06,
     "bundleBudgetBytes": 458752,
     "pdfaSamples": 18,
     "pdfxSamples": 4,
-    "unicodeScripts": 27,
-    "bundledFontModules": 31,
+    "unicodeScripts": 32,
+    "bundledFontModules": 36,
     "chartTypes": 9,
-    "diagnosticCodes": 9
+    "diagnosticCodes": 13
   },
   "derived": {
     "commands": 21,
@@ -50,7 +50,7 @@
     "pdfaCorpus": 22,
     "fontAliases": 4,
     "testFiles": 96,
-    "renderSamples": 75,
+    "renderSamples": 76,
     "sampleScripts": 85,
     "samplePdfs": 91
   },

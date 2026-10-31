@@ -361,7 +361,7 @@ SHA-1 imprint as a weak digest; under `--strict` that timestamp is refused (`E_V
   the global `--max-inflate-size <bytes>` caps the decompressed size of any single PDF
   stream while parsing untrusted input (anti zip-bomb; default 100 MiB). Prefer
   `--output <file>` over shell redirection for large PDFs.
-- **Fonts are loaded only from flags.** `--font <code>` selects one of the 27 Unicode
+- **Fonts are loaded only from flags.** `--font <code>` selects one of the 32 Unicode
   scripts bundled with pdfnative (plus `latin`, `emoji`, `color-emoji`, `math`, and the
   `ha`/`yo`/`ig`/`sw` aliases of `latin`); `--font-file <path.ttf>[:name]` registers a
   TrueType/OpenType file from disk. Neither a document JSON nor a `--layout` file can

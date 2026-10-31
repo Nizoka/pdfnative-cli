@@ -4,8 +4,8 @@
 // (pre-flight before attempting an operation — notably `encrypt`, which needs a
 // Web Crypto CSPRNG). Reports the CLI version, Node version, Web Crypto
 // availability, the resolved `pdfnative` version, the registered command
-// count and — since v1.5.0 — the bundled font inventory (31 modules / 27
-// scripts, each file probed on disk), the Universal Shaping Engine's Unicode
+// count and — since v1.5.0 — the bundled font inventory (36 modules / 32
+// scripts since pdfnative 1.9.0, each file probed on disk), the Universal Shaping Engine's Unicode
 // version and the conformance targets (`--tagged` / `--pdfx`).
 // Text by default; `--json` emits `{ ok, checks: [{ name, status, value, detail }] }`.
 // Exit code 0 when all checks pass, 1 otherwise.

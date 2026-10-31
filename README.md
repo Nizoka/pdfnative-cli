@@ -20,7 +20,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 > engine** (widow/orphan control, keep-with-next, justification, optical margins, soft hyphens,
 > French punctuation spacing, kerning and OpenType features — `layout.typography` plus four
 > flags), **CMYK colours** and printer's **colour bars**, **PDF/X-4 output** (`--pdfx pdfx4
-> --output-intent-icc <cmyk.icc> --trapped`) checked by `inspect --check pdfx`, **27 Unicode
+> --output-intent-icc <cmyk.icc> --trapped`) checked by `inspect --check pdfx`, **32 Unicode
 > scripts** (+ Lao, Tai Tham, New Tai Lue, Tai Le, Cham; `ha`/`yo`/`ig`/`sw` aliases) and
 > **custom fonts** (`--font-file`). Output is now **byte-reproducible**: a global
 > `--creation-date` (or `SOURCE_DATE_EPOCH`) pins every date in UTC. Global flags may now
@@ -36,7 +36,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 ## Highlights
 
 - **`render`** — pipe a JSON document into a production-ready PDF. Encryption (AES-128/256),
-  watermarks (text + image), page templates, PDF/A archival, **27 Unicode scripts + COLRv1
+  watermarks (text + image), page templates, PDF/A archival, **32 Unicode scripts + COLRv1
   colour emoji + a bundled math font (`--font math`)**, **native vector charts** (bar, barH,
   line, pie, donut — pdfnative ≥ 1.6.0), **PDF bookmarks** (`--outline`), **layout introspection**
   (`--inspect-layout` / `--debug-layout`), streaming (single-pass, page-by-page, or **true
@@ -134,7 +134,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
   `tests/regression/baselines/samples.sha256.json`), a PDF/A + PDF/X conformance corpus,
   hardened workflows (egress-audited runners, SHA-pinned actions, Trusted Publishing, SBOM +
   build attestations), a documentation verifier (`npm run verify:docs`) and a committed
-  Claude Code layer with a human-in-the-loop guard hook — 1403 tests.
+  Claude Code layer with a human-in-the-loop guard hook — 1437 tests.
 - **AI-governance / HITL** — the **`govern`** command surfaces pdfnative's Human-in-the-Loop
   contract to agents: they act as *draftsmen*, never autonomous submitters. `govern
   verify-issue` gates a local draft; a human always reviews and submits.
@@ -198,7 +198,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 | Custom page sizes | ✅ | `--page-size A4\|Letter\|…` or `WxH` in points |
 | Custom margins | ✅ | `--margin <N>` or `--margin <t,r,b,l>` |
 | PDF/A-3 attachments | ✅ | `--attachment <path>:<mime>:<rel>:<desc>` (repeatable) |
-| Multilingual fonts | ✅ | 27 Unicode scripts via `--font <code> --lang <code>` (e.g. `th`, `ja`, `ar`, `te`, `si`, `km`, `lo`, `cjm`); Latin built-in |
+| Multilingual fonts | ✅ | 32 Unicode scripts via `--font <code> --lang <code>` (e.g. `th`, `ja`, `ar`, `te`, `si`, `km`, `lo`, `cjm`); Latin built-in |
 | Table-centric variant (`PdfParams`) | ✅ | `--variant table` |
 | Full `PdfLayoutOptions` | ✅ | `--layout <file.json>` |
 | **Signing (v0.2.0)** | | |
@@ -226,7 +226,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 | PDF/UA structural validation | ✅ | `inspect --pdfua` / `--check pdfua` (ISO 14289-1) — developer-time gate, not a substitute for veraPDF |
 | `--watch` re-render on file change | ✅ | 200 ms debounce, requires file `--output` |
 | `--template <file.json>` | ✅ | Deep-merge base under input (caller wins) |
-| `--font` bundled shortcuts | ✅ | Repeatable allow-list: `latin`, `emoji`, `color-emoji`, `math`, 27 script codes + 4 `latin` aliases (`ha`, `yo`, `ig`, `sw`) |
+| `--font` bundled shortcuts | ✅ | Repeatable allow-list: `latin`, `emoji`, `color-emoji`, `math`, 32 script codes + 4 `latin` aliases (`ha`, `yo`, `ig`, `sw`) |
 | **Page-tree & annotations (v1.2.0)** | | |
 | Merge PDFs | ✅ | `merge <a.pdf> <b.pdf> …` (or repeatable `--input`) → `--output` |
 | Split PDF | ✅ | `split --output-dir <dir>` per-page, or `--pages 1-2,3-4` per-range |
@@ -291,7 +291,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 | Printer's colour bars | ✅ | `layout.print.marks.colourBars: true \| { tints, size }` |
 | PDF/X-4 output | ✅ | `render --pdfx pdfx4 --output-intent-icc <cmyk.icc> [--output-intent-id <s>] [--trapped true\|false\|unknown]`; coherence errors → `E_INPUT`, `PDFX_*` diagnostics → `--strict` / `E_CHECK_FAILED`; envelope carries `pdfx` |
 | PDF/X check | ✅ | `inspect --pdfx` (full report) and `--check pdfx` (exit 0/1); `pdfxConformance` always reported; `--summary` adds `pdfx` |
-| 27 Unicode scripts | ✅ | + `lo` (Lao), `nod` (Tai Tham), `khb` (New Tai Lue), `tdd` (Tai Le), `cjm` (Cham); `ha` / `yo` / `ig` / `sw` alias `latin` |
+| 32 Unicode scripts | ✅ | + `lo` (Lao), `nod` (Tai Tham), `khb` (New Tai Lue), `tdd` (Tai Le), `cjm` (Cham); `ha` / `yo` / `ig` / `sw` alias `latin` |
 | Custom fonts | ✅ | `render --font-file <path.ttf>[:name]` (repeatable; 32 MiB cap, magic bytes, `parseFontData` + `validateFontData`; never from JSON) |
 | Table variant fonts | ✅ | `--variant table --font latin --lang latin` embeds fonts, so table renders can claim PDF/A |
 | Reproducible dates | ✅ | Global `--creation-date <iso8601>` (or `SOURCE_DATE_EPOCH`) pins `/CreationDate`, `xmp:CreateDate`, `{date}`, trailer `/ID`, in UTC; envelope carries `creationDate` |
@@ -301,7 +301,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
 | TSA timeout | ✅ | `sign --timestamp-timeout <ms>` (with `--timestamp`); envelope `timestamp.timeoutMs` |
 | Weak timestamp digest | ✅ | `verify` reports `timestampDigest` and notes a SHA-1 messageImprint; refused under `--strict` |
 | Global flags first | ✅ | `pdfnative --json --dry-run <command> …` — every global flag is accepted before the command name |
-| `doctor` capabilities | ✅ | `fonts` (31 modules / 27 scripts probed on disk), `unicode` (`USE_UNICODE_VERSION`), `conformance` (`pdfa1b,pdfa2b,pdfa2u,pdfa3b,pdfx4`) |
+| `doctor` capabilities | ✅ | `fonts` (36 modules / 32 scripts probed on disk), `unicode` (`USE_UNICODE_VERSION`), `conformance` (`pdfa1b,pdfa2b,pdfa2u,pdfa3b,pdfx4`) |
 | SSRF ranges | ✅ | Benchmarking `198.18.0.0/15`, TEST-NET-1 `192.0.2.0/24` and NAT64 `64:ff9b::/96` join the blocked ranges |
 | Layout file cap | ✅ | `--layout` files share the 50 MB JSON cap; ICC profiles 16 MiB (`acsp` signature checked) |
 
@@ -621,7 +621,7 @@ Ready-to-run examples are in [`samples/`](samples/), organized by feature catego
 | [`render/math/`](samples/render/math/) | 1 file | Math/technical symbols via `--font math` |
 | [`render/inspect-layout/`](samples/render/inspect-layout/) | scripts | `--inspect-layout` report + `--debug-layout` guides |
 | [`render/font/`](samples/render/font/) | 5 files | Bundled font presets: Latin, the 1.3.0 scripts, emoji, (v1.5.0) the five 1.8.0 scripts, `--font-file`, colour-emoji skin tones / ZWJ sequences / flags |
-| [`render/multilang/`](samples/render/multilang/) | 11 files | Thai, Japanese, multilingual drivers, (v1.5.0) Lao, Tai Tham / New Tai Lue / Tai Le / Cham, Hausa / Yoruba / Igbo / Swahili, and four families (European & Caucasian, right-to-left, Indic, Chinese & Korean) — every one of the 27 script codes is rendered by the corpus |
+| [`render/multilang/`](samples/render/multilang/) | 11 files | Thai, Japanese, multilingual drivers, (v1.5.0) Lao, Tai Tham / New Tai Lue / Tai Le / Cham, Hausa / Yoruba / Igbo / Swahili, and four families (European & Caucasian, right-to-left, Indic, Chinese & Korean) — every one of the 32 script codes is rendered by the corpus |
 | [`render/chart/`](samples/render/chart/) | 5 files | Native vector charts — bar/line/pie/donut plus (v1.4.0) stacked bars, area/scatter, dual axes, log & time axes |
 | [`render/print/`](samples/render/print/) | 7 files | Print production — bleed/trim boxes + printer's marks, viewer preferences, (v1.5.0) CMYK colours, colour bars, PDF/X-4 with a synthetic CMYK profile |
 | [`render/typography/`](samples/render/typography/) | 7 files | (v1.5.0) Paragraph breaking, justify + optical margins + soft hyphens, French (`fr`, `fr-CA`) and custom punctuation spacing, unit binding, kerning + OpenType features, per-block `keepWithNext` / `splittable` |
@@ -693,7 +693,7 @@ The 21 commands are grouped by purpose (the global `pdfnative --help` shows the 
 | `--output-intent-icc <file.icc>` | — | (v1.5.0) ICC profile for `layout.outputIntent.iccProfile` (16 MiB cap, `acsp` signature checked; `prtr` CMYK required for PDF/X) |
 | `--output-intent-id <s>` | ICC file basename | (v1.5.0) `outputIntent.outputConditionIdentifier` |
 | `--trapped true\|false\|unknown` | — | (v1.5.0) `/Trapped` + `pdf:Trapped` (PDF/X-4 requires `true` or `false`) |
-| `--strict` | false | Escalate the 9 diagnostic codes — PDF/A (`PDFA_NO_FONT_ENTRIES`, `PDFA_UNEMBEDDED_FORM_FONT`, `PDFA_DEVICE_CMYK_IMAGE`, `PDFA_*`), PDF/X (`PDFX_NO_FONT_ENTRIES`, `PDFX_DEVICE_CMYK`, `PDFX_ANNOTATIONS`) and `TYPOGRAPHY_FEATURE_INEFFECTIVE` — into an error (exit 1, `E_CHECK_FAILED`) **before** any output byte; without it they are stderr warnings + a `diagnostics[]` array in the `--json` envelope |
+| `--strict` | false | Escalate the 13 diagnostic codes — PDF/A (`PDFA_NO_FONT_ENTRIES`, `PDFA_UNEMBEDDED_FORM_FONT`, `PDFA_DEVICE_CMYK_IMAGE`, `PDFA_*`), PDF/X (`PDFX_NO_FONT_ENTRIES`, `PDFX_DEVICE_CMYK`, `PDFX_ANNOTATIONS`) and `TYPOGRAPHY_FEATURE_INEFFECTIVE` — into an error (exit 1, `E_CHECK_FAILED`) **before** any output byte; without it they are stderr warnings + a `diagnostics[]` array in the `--json` envelope |
 | `--split-paragraphs` | false | (v1.5.0) `layout.typography.splitParagraphs` — long paragraphs may break across pages (widow/orphan rules apply) |
 | `--keep-headings-with-next` | false | (v1.5.0) `layout.typography.keepHeadingsWithNext` — a heading never ends a page alone |
 | `--kerning` | false | (v1.5.0) `layout.typography.kerning` — GPOS pair kerning for embedded fonts |
@@ -711,7 +711,7 @@ The 21 commands are grouped by purpose (the global `pdfnative --help` shows the 
 | _(legacy aliases)_ | — | `--encrypt-algorithm`, `--encrypt-owner-pass`, `--encrypt-user-pass`, `--encrypt-permissions` still work |
 | `--attachment <path>[:mime[:rel[:desc]]]` _(repeatable)_ | — | PDF/A-3 file attachment |
 | `--lang <code,code>` | — | Activate registered font loaders for non-Latin scripts (`th`, `ja`, `ar`, `te`, `si`, `km`, `lo`, …); Latin is built-in. Aliases `ha`, `yo`, `ig`, `sw` resolve to `latin` |
-| `--font <name>` _(repeatable)_ | — | Register a bundled font shortcut. Allow-list: `latin`, `emoji`, `color-emoji`, `math`, and the 27 script codes `ar hy bn ru hi am ka el he ja km ko my pl zh si ta te th bo tr vi` + (v1.5.0) `lo nod khb tdd cjm`; `ha yo ig sw` alias `latin`. The name doubles as the `--lang` code. `--variant table` embeds them too |
+| `--font <name>` _(repeatable)_ | — | Register a bundled font shortcut. Allow-list: `latin`, `emoji`, `color-emoji`, `math`, and the 32 script codes `ar hy bn ru hi am ka el he ja km ko my pl zh si ta te th bo tr vi` + (v1.5.0) `lo nod khb tdd cjm`; `ha yo ig sw` alias `latin`. The name doubles as the `--lang` code. `--variant table` embeds them too |
 | `--font-file <path.ttf>[:name]` _(repeatable)_ | — | (v1.5.0) Register a custom TrueType/OpenType font from disk (name defaults to the file stem, `[a-z0-9-]`; added to `--lang`). 32 MiB cap, magic bytes (`00 01 00 00` / `true` / `OTTO` — collections and WOFF refused), parsed and validated by pdfnative before use; a name colliding with the allow-list is a usage error. Never loadable from a JSON payload |
 | `--outline auto\|<file.json>` | — | Add a PDF bookmark tree: `auto` derives it from headings; a path loads an explicit `OutlineItem[]` tree |
 | `--inspect-layout` | false | Emit a `LayoutInspection` JSON report instead of a PDF (document variant only) |
@@ -1066,7 +1066,7 @@ Environment / capability preflight — for humans (onboarding) and agents (pre-f
 
 Checks: `cli` version, `node` version (≥ 22), `webcrypto` (CSPRNG) availability, resolved
 `pdfnative` version, registered `commands` count, and (v1.5.0) `fonts` — the bundled font
-inventory (`31 modules / 27 scripts`, each module probed on disk; `error` when one is
+inventory (`36 modules / 32 scripts`, each module probed on disk; `error` when one is
 missing), `unicode` — the engine's `USE_UNICODE_VERSION`, and `conformance` — the claimable
 targets (`pdfa1b,pdfa2b,pdfa2u,pdfa3b,pdfx4`).
 

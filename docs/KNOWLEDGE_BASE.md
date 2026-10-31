@@ -68,7 +68,7 @@ src/
 │   ├── args.ts           # Zero-dep argument parser (booleanFlags table for the global flags)
 │   ├── argv.ts           # (v1.5.0) splitCommandArgv — finds the command wherever the global flags sit
 │   ├── io.ts             # stdin/stdout/file I/O helpers, path-traversal guard, readBinaryFileCapped
-│   ├── fonts.ts          # (v1.5.0) BUNDLED_FONT_MODULES (31 modules / 27 scripts), FONT_ALIASES, --font-file loading + validation
+│   ├── fonts.ts          # (v1.5.0) BUNDLED_FONT_MODULES (36 modules / 32 scripts), FONT_ALIASES, --font-file loading + validation
 │   ├── reproducible.ts   # (v1.5.0) --creation-date / SOURCE_DATE_EPOCH resolution (strict; invalid → exit 2)
 │   ├── build-errors.ts   # (v1.5.0) classifyBuildError — the engine's PDF/X / print / OutputIntent coherence messages → E_INPUT
 │   ├── pdfdate.ts        # (v1.5.0) pdfDateToIso — D:YYYYMMDDHHmmSS+HH'mm' → ISO 8601 (inspect --iso-dates)
@@ -261,7 +261,7 @@ pdfnative render [--input <file.json>] [--output <out.pdf>] [--stream|--stream-p
 | `--stream-page-by-page` | boolean | false | Object-boundary streaming; TOC- and `{pages}`-compatible |
 | `--stream-true` | boolean | false | True constant-memory streaming (`buildDocumentPDFStreamTrue`); parts freed as emitted; byte-identical |
 | `--max-blocks` | integer | 100000 | Maximum document blocks (`layout.maxBlocks`) before pdfnative aborts |
-| `--font` | string (repeatable) | — | Register a bundled font shortcut (`latin`, `emoji`, `color-emoji`, `math`, 27 script codes; `ha`/`yo`/`ig`/`sw` alias `latin`) |
+| `--font` | string (repeatable) | — | Register a bundled font shortcut (`latin`, `emoji`, `color-emoji`, `math`, 32 script codes; `ha`/`yo`/`ig`/`sw` alias `latin`) |
 | `--lang` | string (comma list) | — | Preferred font code per script (`th`, `ja`, `ar`, `lo`, …); aliases resolve to `latin` |
 | `--font-file` | `<path.ttf>[:name]` (repeatable) | — | (v1.5.0) Register a custom TrueType/OpenType font from disk: `validatePath`, 32 MiB cap, magic bytes (`00 01 00 00` / `true` / `OTTO`), `parseFontData` + `validateFontData` → `E_INPUT`; the name (file stem, `[a-z0-9-]`) joins `--lang`; a bundled name is a usage error. Never from JSON |
 | `--pdfx` | `pdfx4` | — | (v1.5.0) PDF/X-4 claim (`layout.pdfx`); needs a `prtr` CMYK output intent; refused with `--tagged` / `--conformance` or any encryption flag (exit 2); envelope `pdfx` |
@@ -341,7 +341,7 @@ pdfnative render [--input <file.json>] [--output <out.pdf>] [--stream|--stream-p
 - Every colour field and colour flag (`--watermark-color`, `--zebra`, chart series, table styles, annotation colours) accepts CMYK as `"c m y k"` (components 0–1) or `[c, m, y, k]` (percent) beside hex / `r g b` / `[r,g,b]`; the content stream then carries `k` / `K` operators.
 - `layout.pdfx: "pdfx4"` (`--pdfx pdfx4`) requires a `prtr` (output-class) `outputIntent` — CMYK for a colour job, Gray for a one-ink job (`samples/render/print/06-gray-pdfx4.json`); device colour must match it (`PDFX_DEVICE_CMYK`) — embedded fonts (`--font latin --lang latin`), `trapped` `true` or `false`, and no encryption or PDF/A in the same file; the engine's coherence messages map to `E_INPUT` (`src/utils/build-errors.ts`), the `PDFX_*` diagnostics to `--strict`. The XMP carries `pdfxid:GTS_PDFXVersion`; `inspect --pdfx` / `--check pdfx` re-validate with `validatePdfX` (structural, not a certified preflight). `metadata` rewrites the XMP without the PDF/X identification (upstream limit — see ROADMAP.md).
 
-**The nine diagnostics (v1.5.0, pdfnative 1.8.0).** A diagnostic is a warning — `warning: [CODE] …` on stderr and `diagnostics[]` in the `--json` envelope, the file is still written — until `--strict` turns it into `E_CHECK_FAILED` (exit 1, nothing written). `tests/helpers/diagnostic-triggers.ts` holds one minimal trigger per code.
+**The thirteen diagnostics (v1.6.0, pdfnative ≥ 1.9.0).** A diagnostic is a warning — `warning: [CODE] …` on stderr and `diagnostics[]` in the `--json` envelope, the file is still written — until `--strict` turns it into `E_CHECK_FAILED` (exit 1, nothing written). `tests/helpers/diagnostic-triggers.ts` holds one minimal trigger per code.
 
 | Code | Raised when | Fix |
 |------|-------------|-----|
@@ -373,7 +373,7 @@ the lowest peak memory and is byte-identical to the buffered builders. Each writ
 
 The `--font <code>` flag (repeatable) registers a **bundled** pdfnative font for the duration of
 the render — no wrapper script required. The allow-list (`src/utils/fonts.ts`,
-`BUNDLED_FONT_MODULES`, 31 modules) is `latin`, `emoji`, `color-emoji`, `math`, and the 27
+`BUNDLED_FONT_MODULES`, 36 modules) is `latin`, `emoji`, `color-emoji`, `math`, and the 32
 script codes `ar hy bn ru hi am ka el he ja km ko my pl zh si ta te th bo tr vi` + (v1.5.0)
 `lo nod khb tdd cjm`; `ha`, `yo`, `ig` and `sw` are aliases of `latin` (`FONT_ALIASES`,
 applied to `--font` and `--lang` with de-duplication). Each name doubles as its `--lang`
@@ -450,7 +450,7 @@ const pdf = buildDocumentPDFBytes(params);
 writeFileSync('output.pdf', pdf);
 ```
 
-All Noto font data packages (`noto-thai-data.js`, `noto-jp-data.js`, `noto-arabic-data.js`, `noto-cyrillic-data.js`, `noto-devanagari-data.js`, `noto-lao-data.js`, `noto-cham-data.js`, … — the 31 font modules) are **bundled with pdfnative** — no external file downloads needed.
+All Noto font data packages (`noto-thai-data.js`, `noto-jp-data.js`, `noto-arabic-data.js`, `noto-cyrillic-data.js`, `noto-devanagari-data.js`, `noto-lao-data.js`, `noto-cham-data.js`, … — the 36 font modules) are **bundled with pdfnative** — no external file downloads needed.
 
 See [`samples/render/multilang/`](../samples/render/multilang/) for complete working examples:
 - `03-thai.js` + `03-thai.json` — full Thai monthly report
@@ -918,7 +918,7 @@ pdfnative govern verify-issue <draft.md> [--json]   # gate a draft
 pdfnative doctor [--format json|text]
 ```
 
-Reports the CLI version, Node version (≥ 22), Web Crypto (CSPRNG) availability — required by `encrypt` — the resolved `pdfnative` version, the registered command count, and (v1.5.0) `fonts` (`31 modules / 27 scripts`; each module of `BUNDLED_FONT_MODULES` is probed under the engine's `fonts/` directory — `error` when one is missing; `getRegisteredLangs()` is empty in a fresh process, so the allow-list is what is reported), `unicode` (`USE_UNICODE_VERSION`) and `conformance` (`pdfa1b,pdfa2b,pdfa2u,pdfa3b,pdfx4` from `PDF_A_*` / `PDF_X_CONFORMANCE_TARGETS`). `--format json` (or global `--json`) emits `{ ok, checks: [{ name, status, value, detail }] }` — the shape is additive only. Exit code **0** when all checks pass, **1** otherwise — so an agent can gate `encrypt` or `--pdfx` on `doctor` first.
+Reports the CLI version, Node version (≥ 22), Web Crypto (CSPRNG) availability — required by `encrypt` — the resolved `pdfnative` version, the registered command count, and (v1.5.0) `fonts` (`36 modules / 32 scripts`; each module of `BUNDLED_FONT_MODULES` is probed under the engine's `fonts/` directory — `error` when one is missing; `getRegisteredLangs()` is empty in a fresh process, so the allow-list is what is reported), `unicode` (`USE_UNICODE_VERSION`) and `conformance` (`pdfa1b,pdfa2b,pdfa2u,pdfa3b,pdfx4` from `PDF_A_*` / `PDF_X_CONFORMANCE_TARGETS`). `--format json` (or global `--json`) emits `{ ok, checks: [{ name, status, value, detail }] }` — the shape is additive only. Exit code **0** when all checks pass, **1** otherwise — so an agent can gate `encrypt` or `--pdfx` on `doctor` first.
 
 ---
 
@@ -1184,7 +1184,7 @@ With `--stream`, the entire PDF must be consumed before the process exits. Use `
 | `render --pdfx` (v1.5.0) | `layout.pdfx` (`PdfXConformanceTarget`, `PDF_X_CONFORMANCE_TARGETS`) + `layout.outputIntent` | — | PDF/X-4 claim; the builders' coherence errors → `classifyBuildError` → `E_INPUT`; `PDFX_*` diagnostics |
 | `inspect --pdfx` / `--check pdfx` (v1.5.0) | `validatePdfX(bytes)` | `PdfXValidationResult` | Structural PDF/X-4 validation (`{ valid, target, errors, warnings }`); XMP `pdfxid:GTS_PDFXVersion` read by the CLI |
 | `render --font-file` (v1.5.0) | `parseFontData(bytes)` (`pdfnative/tools`) + `validateFontData(fd)` + `registerFont(name, loader)` | `FontData` | Custom fonts from disk; capped, magic-checked, validated |
-| `render --font` aliases (v1.5.0) | `registerFonts({ … })` over `BUNDLED_FONT_MODULES` | — | 31 modules / 27 scripts; `ha`/`yo`/`ig`/`sw` → `latin` |
+| `render --font` aliases (v1.5.0) | `registerFonts({ … })` over `BUNDLED_FONT_MODULES` | — | 36 modules / 32 scripts; `ha`/`yo`/`ig`/`sw` → `latin` |
 | `annotate` `link` (v1.5.0) | `validateURL(url)` + `modifier.addAnnotation(page, body)` | `Uint8Array` | `/Link` + `/URI` body built by the CLI; incremental save |
 | `doctor` (v1.5.0) | `USE_UNICODE_VERSION`, `PDF_A_*` + `PDF_X_CONFORMANCE_TARGETS` | — | Unicode and conformance checks |
 | `inspect` (open) | `openPdf(bytes)` | `PdfReader` | Returns reader with `.getCatalog()`, `.getInfo()`, `.pageCount` etc. |

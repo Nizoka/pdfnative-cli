@@ -437,13 +437,18 @@ async function loadTemplate(templatePath: string): Promise<unknown> {
 }
 
 /**
- * Conformance fields of the success envelope: the PDF/X target when one is
- * claimed, and the pinned creation instant when output is reproducible
- * (from --creation-date, layout.creationDate or SOURCE_DATE_EPOCH).
+ * Conformance fields of the success envelope: the PDF/X target and the PDF/A
+ * level when claimed (both at once since pdfnative 1.9.0), the base text
+ * direction and the /ActualText opt-out when set (v1.6.0), and the pinned
+ * creation instant when output is reproducible (from --creation-date,
+ * layout.creationDate or SOURCE_DATE_EPOCH).
  */
 function conformanceFields(layout: Partial<PdfLayoutOptions>): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     if (layout.pdfx !== undefined) out.pdfx = layout.pdfx;
+    if (layout.tagged !== undefined && layout.tagged !== false) out.tagged = layout.tagged;
+    if (layout.direction !== undefined) out.direction = layout.direction;
+    if (layout.actualText === false) out.actualText = false;
     const pinned = layout.creationDate ?? getDefaultCreationDate() ?? null;
     if (pinned !== null) out.creationDate = pinned.toISOString();
     return out;

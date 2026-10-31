@@ -125,7 +125,7 @@ describe('engine-surface matrix: every reference is real', () => {
 
 describe('engine-surface: named means exercised', () => {
     it('every diagnostic code the status schema names has a trigger that a test executes', () => {
-        const named = [...new Set(read('src/commands/schema.ts').match(/\b(?:PDFA|PDFX|TYPOGRAPHY)_[A-Z0-9_]+\b/g) ?? [])].sort();
+        const named = [...new Set(read('src/commands/schema.ts').match(/\b(?:PDFA1?|PDFX|TYPOGRAPHY|TEXT)_[A-Z0-9_]+\b/g) ?? [])].sort();
         expect(Object.keys(DIAGNOSTIC_TRIGGERS).sort()).toEqual(named);
         expect(named).toHaveLength(ecosystem.declared['diagnosticCodes']!);
         // The table is executed, not just declared.

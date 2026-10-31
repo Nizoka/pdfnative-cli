@@ -29,6 +29,10 @@ export const INPUT_ERROR_PREFIXES: readonly string[] = [
     // pdfnative 1.8.0 — PDF/X coherence
     'layout.pdfx',
     'PDF/X',
+    // pdfnative 1.9.0 — spot colours: an undeclared ink, a mix across
+    // alternate spaces (print.spotColours: … already matches 'print.')
+    'Spot colour ',
+    'Ink mix ',
 ];
 
 /** Prefix of a strict-mode diagnostic escalation (→ E_CHECK_FAILED under --strict). */

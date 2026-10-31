@@ -79,17 +79,25 @@ describe('fuzz: PDF bytes through the read commands', { timeout: 60_000 }, () =>
         expect((await onlyCliErrorAsync(() => inspectFile(p), READ_CODES)).outcome).toBe('ok');
     });
 
-    it('an inflate bomb under --max-inflate-size is never materialised (the engine drops the stream); above the cap its text comes back', async () => {
+    it('an inflate bomb under --max-inflate-size is never materialised: E_INPUT by default, an empty page under --on-stream-error skip; above the cap its text comes back', async () => {
         // ~1 MiB of text operators deflating to ~3 KB. Under the cap the
-        // engine's inflate throws "potential zip bomb" and extractText drops
-        // the stream (audit V-01: silently — the command answers ok with no
-        // text; surfacing it is upstream work). What the CLI guarantees is
-        // the bound itself: nothing past the cap is ever allocated.
+        // engine's inflate throws PdfStreamLimitError (pdfnative 1.9.0, code
+        // PDF_STREAM_LIMIT); extractText rethrows it by default — the 1.8.0
+        // engine dropped the stream silently (audit V-01) — and the CLI
+        // answers E_INPUT, naming the two remedies. --on-stream-error skip is
+        // the 1.8.0 lenience. What the CLI guarantees either way is the bound
+        // itself: nothing past the cap is ever allocated.
         const p = file('bomb.pdf', buildFlatePdf(textBombPayload(30_000)));
         setMaxInflateOutputSize(1024);
         const capped = await onlyCliErrorAsync(() => captured(() => extractText(parseArgs(['--input', p]))), READ_CODES);
-        expect(capped.outcome).toBe('ok');
-        if (capped.outcome === 'ok') expect(capped.value.stdout).not.toContain('bomb');
+        expect(capped.outcome).toBe('error');
+        if (capped.outcome === 'error') {
+            expect(capped.error.code).toBe(ErrorCode.INPUT);
+            expect(capped.error.message).toMatch(/--on-stream-error skip/);
+        }
+        const skipped = await onlyCliErrorAsync(() => captured(() => extractText(parseArgs(['--input', p, '--on-stream-error', 'skip']))), READ_CODES);
+        expect(skipped.outcome).toBe('ok');
+        if (skipped.outcome === 'ok') expect(skipped.value.stdout).not.toContain('bomb');
         setMaxInflateOutputSize(2 * 1024 * 1024);
         const open = await onlyCliErrorAsync(() => captured(() => extractText(parseArgs(['--input', p]))), READ_CODES);
         expect(open.outcome).toBe('ok');

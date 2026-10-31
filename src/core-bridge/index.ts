@@ -264,3 +264,40 @@ export { MAX_XREF_CHAIN, MAX_PARSE_DEPTH } from 'pdfnative';
 // bridge so tests never import 'pdfnative' directly.
 export { derSequence, derSetOf, derOid, derInteger, derBitString, derOctetString, derGeneralizedTime } from 'pdfnative';
 export { sha1, rsaSignHash } from 'pdfnative';
+
+// ── pdfnative 1.9.0 ──────────────────────────────────────────────────
+// Right-to-left and per-paragraph direction (full UAX #9): `render
+// --direction` → layout.direction; spot colours (`/Separation`,
+// `/DeviceN`) are declared in layout.print.spotColours and painted by
+// { spot, tint? } / { inks } colour values — JSON-only, like every
+// `print.*` option; the types document `schema render`.
+export type { TextDirection, SpotColourDef, PdfSpotColor, PdfInkMix } from 'pdfnative';
+
+// extractText() throws PdfStreamLimitError (code PDF_STREAM_LIMIT) on an
+// over-cap stream since 1.9.0 (C13); `extract-text` / `compare
+// --on-stream-error limit|throw|skip` pass the policy through. Classified
+// by instance in utils/pdfops.ts mapPdfError — never by the message text,
+// which differs between FlateDecode and the fixed-cap filters.
+export { PdfStreamLimitError } from 'pdfnative';
+export type { StreamErrorPolicy } from 'pdfnative';
+
+// ISO 32000-1 §7.9.2.2 text-string decoding (UTF-16BE / UTF-8 BOM /
+// PDFDocEncoding) for /Info, outlines, page labels and signature /T —
+// replaces the decoder the CLI carried in 1.5.0 (#85).
+export { decodePdfTextString } from 'pdfnative';
+
+// Offline LTV material (`ltv embed --cert/--ocsp/--crl --match`):
+// composeLtvData() builds the /DSS data from files on disk, no network;
+// ocspResponseMatchesCertificate() is what `match: 'chain'` applies (#90).
+export { composeLtvData, ocspResponseMatchesCertificate } from 'pdfnative';
+export type { LtvMaterial, ComposeLtvOptions } from 'pdfnative';
+
+// Markup annotations incl. { type: 'link' } (#91): LinkMarkupAnnotation is
+// the engine's own /Link + /URI body, built by buildAnnotationBody (above);
+// the CLI only validates the URL first (validateURL).
+export type { LinkMarkupAnnotation } from 'pdfnative';
+
+// Synthetic ICC profiles on pdfnative/tools (#86): the Gray and CMYK
+// `prtr` fixtures and the conformance corpus derive from these builders;
+// the CLI no longer vendors a generator of its own.
+export { buildSyntheticGrayProfile, buildSyntheticCmykProfile } from 'pdfnative/tools';

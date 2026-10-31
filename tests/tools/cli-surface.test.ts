@@ -131,7 +131,7 @@ describe('cli-surface — the real tree', () => {
         expect(errorCodeValues().every((c) => /^E_[A-Z_]+$/.test(c))).toBe(true);
     });
 
-    it('derives the 1.5.0 surface counts from the source constants', () => {
+    it('derives the 1.6.0 surface counts from the source constants', () => {
         const d = computeDerived(ROOT);
         expect(d).toMatchObject({
             commands: 21,
@@ -140,8 +140,8 @@ describe('cli-surface — the real tree', () => {
             globalFlags: 10,
             manifestCommands: 14,
             pdfaCorpus: 22,
-            bundledFontModules: 31,
-            unicodeScripts: 27,
+            bundledFontModules: 36,
+            unicodeScripts: 32,
             fontAliases: 4,
         });
         expect(d.samplePdfs).toBe(baselineEntryCount(ROOT));

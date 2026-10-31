@@ -220,7 +220,7 @@ This document outlines the planned development direction for pdfnative-cli. Prio
   --output-intent-icc --output-intent-id --trapped`, coherence pre-checks, `PDFX_*` diagnostics
   under `--strict`, envelope `pdfx`; `inspect --pdfx` / `--check pdfx` / `pdfxConformance`;
   `validate:pdfx` over a 3-file PDF/X corpus (incl. a negative canary) in the gate.
-- [x] **27 Unicode scripts + `--font-file`** — `lo nod khb tdd cjm`, the `ha yo ig sw` aliases,
+- [x] **The 27 scripts of pdfnative 1.8.0 + `--font-file`** — `lo nod khb tdd cjm`, the `ha yo ig sw` aliases,
   custom TTF/OTF fonts from disk (validated, capped, never from JSON), and font embedding on
   `--variant table` (closes the table-variant PDF/A gap; the canary became a positive).
 - [x] **Reproducible output** — global `--creation-date` / `SOURCE_DATE_EPOCH` via
@@ -234,8 +234,8 @@ This document outlines the planned development direction for pdfnative-cli. Prio
   classification of every PDF/X and print coherence message (`utils/build-errors.ts`).
 - [x] **The whole 1.8.0 surface, exercised through the CLI** — `tests/regression/engine-surface.json`
   maps every bullet of the engine's changelog entry to named tests and baseline samples (or a
-  motivated waiver) and its suite fails when the pin moves without it: 9 diagnostic codes
-  triggered, 27 script codes and 12 typography keys rendered by a sample, 91 sample PDFs, a
+  motivated waiver) and its suite fails when the pin moves without it: 9 diagnostic codes <!-- verify-docs:allow count-tokens -->
+  triggered, 27 script codes and 12 typography keys <!-- verify-docs:allow count-tokens --> rendered by a sample, 91 sample PDFs, a
   `validatePdfX` transmission contract, a generated Gray `prtr` ICC profile, and `inspect` /
   `compare` decoding UTF-16 `/Info` strings (a bug the new samples exposed).
 - [x] **Engineering parity with pdfnative 1.8.0** — `scripts/gate.ts` (fast / CI / publish,

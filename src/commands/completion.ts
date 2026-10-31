@@ -37,6 +37,7 @@ export const COMMANDS: readonly CommandSpec[] = [
             '--variant', '--table-wrap', '--repeat-header', '--zebra', '--min-row-height',
             '--cell-padding', '--layout', '--page-size', '--margin', '--tagged', '--compress',
             '--pdfx', '--output-intent-icc', '--output-intent-id', '--trapped',
+            '--direction', '--actual-text',
             '--split-paragraphs', '--keep-headings-with-next', '--kerning', '--font-features',
             '--lang', '--font', '--font-file', '--outline', '--debug-layout', '--inspect-layout',
             '--header-left', '--header-center', '--header-right',
@@ -98,7 +99,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     {
         name: 'extract-text',
         summary: 'Extract reading-order text (text|json|ndjson)',
-        flags: ['--input', '--format', '--pages', '--runs', '--password', '--max-length', '--summary', '--fields', '--pretty'],
+        flags: ['--input', '--format', '--pages', '--runs', '--password', '--max-length', '--on-stream-error', '--summary', '--fields', '--pretty'],
     },
     {
         name: 'fill',
@@ -128,7 +129,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     {
         name: 'compare',
         summary: 'Diff two PDFs by text and structure',
-        flags: ['--mode', '--format', '--tolerance', '--ignore-whitespace', '--pages', '--password-a', '--password-b', '--pretty'],
+        flags: ['--mode', '--format', '--tolerance', '--ignore-whitespace', '--pages', '--password-a', '--password-b', '--on-stream-error', '--pretty'],
     },
     {
         name: 'batch',

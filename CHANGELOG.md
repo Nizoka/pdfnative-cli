@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### `render`
+
+- **pdfnative 1.9.0 surface** — `--direction auto|ltr|rtl` (full UAX #9: right-to-left
+  paragraphs aligned and justified in visual order; per-paragraph `direction` in the JSON),
+  `--actual-text [true|false]` (the untagged `/Span /ActualText` runs that make `extract-text`
+  return shaped and right-to-left text in logical order; `false` restores the bare 1.8.0 runs),
+  five more Indic scripts `gu pa kn ml or` (Gujarati, Gurmukhi, Kannada, Malayalam, Odia —
+  32 Unicode scripts, 36 font modules), spot colours (`layout.print.spotColours` and the
+  `{spot, tint}` / `{inks}` colour values, `/Separation` and `/DeviceN`; an undeclared ink is
+  `E_INPUT`), the PDF/A-2b|2u + PDF/X-4 dual claim (`--tagged pdfa2b --pdfx pdfx4`; the CLI
+  pre-check that refused the pair is gone, the engine's level-specific refusals for pdfa1b and
+  pdfa3b are `E_INPUT`), JPEG 2000 image blocks and watermarks (`.jp2` files and raw `.j2k`
+  codestreams, `/JPXDecode`), per-value chart `colors` and an optional series `label`.
+- **Four 1.9.0 diagnostics** under `--strict` / in the `--json` envelope:
+  `PDFA_GLYPH_WITHOUT_UNICODE`, `PDFA1_JPX_IMAGE`, `PDFA_JPX_IMAGE`, `TEXT_GLYPH_NOT_COVERED`
+  (13 diagnostic codes); the envelope gains `tagged`, `direction` and `actualText`.
+
+#### `extract-text`, `compare`
+
+- **`--on-stream-error limit|throw|skip`** — pdfnative 1.9.0 reports a content or font stream
+  past `--max-inflate-size` instead of silently returning the page without its text
+  (`PdfStreamLimitError`, code `PDF_STREAM_LIMIT`): the default `limit` fails with `E_INPUT`
+  naming both remedies, `throw` fails on any undecodable stream, `skip` is the 1.8.0 lenience.
+
+### Changed
+
+- **Engine behaviour inherited from pdfnative 1.9.0** — untagged shaped and right-to-left
+  runs extract in logical order (the `it.fails` markers for Khmer, Myanmar and CJK extraction
+  are gone), `subs`/`sups` glyphs extract as their source characters, every embedded subset
+  is lean and compact (bytes shrink; one rebaseline, declared in the release note), subset
+  font names carry the six-letter tag, a character no registered font covers is reported.
+- **`verify:docs`** — a shipped release note (its tag exists, the CHANGELOG has an
+  `[Unreleased]` entry) is frozen history and leaves the count-checked corpus.
+
+### Security
+
+- **Dev toolchain** — vitest 4.1.12, vite 8.3.5, brace-expansion 1.1.21 / 5.0.12, source-map-js
+  1.2.2 (Dependabot alerts 18–26, all development scope, none shipped); the lockfile is
+  regenerated with npm 11.19.1. The remaining moderate advisory (minimatch < 11.0.1,
+  GHSA-g3hv-75wg-m249) has no fix inside the eslint 9 / typescript-eslint 8 lines.
+
+### Internal
+
+- **Line endings** — every tracked text blob is LF (155 CRLF blobs rewritten in one commit,
+  listed in `.git-blame-ignore-revs`); `verify:docs` rule `eol-lf` is an error from now on.
+
 ## [1.5.0] – 2026-09-17
 
 Built on **pdfnative 1.8.0**. Exposes every 1.8.0 engine feature — the typography engine,

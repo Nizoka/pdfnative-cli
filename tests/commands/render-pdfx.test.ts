@@ -74,9 +74,29 @@ describe('render --pdfx pdfx4', () => {
         await expect(fs.stat(output)).rejects.toThrow();
     });
 
-    it('--pdfx with --tagged is a usage error (one conformance claim per file)', async () => {
+    it.each(['pdfa2b', 'pdfa2u'])('--pdfx pdfx4 --tagged %s writes both claims (pdfnative 1.9.0): pdfaid and pdfxid in XMP, two OutputIntents, validatePdfX() accepts it', async (level) => {
+        const { bytes, stderr } = await renderTo(tmp, PRINT_DOC, [...PDFX_FLAGS, '--tagged', level, '--strict']);
+        const raw = bytes.toString('latin1');
+        expect(raw).toContain('pdfaid:part');
+        expect(raw).toContain('pdfxid:GTS_PDFXVersion');
+        expect(raw).toContain('/GTS_PDFA1');
+        expect(raw).toContain('/GTS_PDFX');
+        expect(stderr).not.toContain('warning:');
+        const result = validatePdfX(new Uint8Array(bytes));
+        expect(result.errors).toEqual([]);
+        expect(result.valid).toBe(true);
+    });
+
+    it('--json: the envelope carries tagged next to pdfx for the dual claim', async () => {
         const input = await tmp.json('in.json', PRINT_DOC);
-        await expectCliError(() => render(parseArgs(['--input', input, '--output', tmp.path('x.pdf'), ...PDFX_FLAGS, '--tagged', 'pdfa2b'])), 2, ErrorCode.USAGE, 'mutually exclusive');
+        const output = tmp.path('dual.pdf');
+        const { envelope } = await withJsonEnvelope(() => render(parseArgs(['--input', input, '--output', output, ...PDFX_FLAGS, '--tagged', 'pdfa2b'])));
+        expect(envelope).toMatchObject({ ok: true, pdfx: 'pdfx4', tagged: 'pdfa2b' });
+    });
+
+    it.each(['pdfa1b', 'pdfa3b'])('--pdfx with --tagged %s is the engine\'s level-specific refusal → E_INPUT (C14)', async (level) => {
+        const input = await tmp.json('in.json', PRINT_DOC);
+        await expectCliError(() => render(parseArgs(['--input', input, '--output', tmp.path('x.pdf'), ...PDFX_FLAGS, '--tagged', level])), 1, ErrorCode.INPUT, `cannot be combined with tagged: '${level}'`);
     });
 
     it('--pdfx with encryption is a usage error', async () => {
@@ -84,8 +104,8 @@ describe('render --pdfx pdfx4', () => {
         await expectCliError(() => render(parseArgs(['--input', input, '--output', tmp.path('x.pdf'), ...PDFX_FLAGS, '--encrypt', '--owner-password', 'x'])), 2, ErrorCode.USAGE, 'encryption');
     });
 
-    it('layout.pdfx + layout.tagged from the document JSON is the engine\'s coherence error → E_INPUT', async () => {
-        const doc = { ...PRINT_DOC, layout: { ...PRINT_DOC.layout, pdfx: 'pdfx4', tagged: 'pdfa2b' } };
+    it('layout.pdfx + layout.tagged pdfa3b from the document JSON is the engine\'s coherence error → E_INPUT', async () => {
+        const doc = { ...PRINT_DOC, layout: { ...PRINT_DOC.layout, pdfx: 'pdfx4', tagged: 'pdfa3b' } };
         const input = await tmp.json('in.json', doc);
         await expectCliError(
             () => render(parseArgs(['--input', input, '--output', tmp.path('x.pdf'), '--output-intent-icc', SYNTHETIC_CMYK_ICC, '--font', 'latin', '--lang', 'latin'])),

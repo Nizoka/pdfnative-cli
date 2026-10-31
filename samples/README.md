@@ -89,6 +89,7 @@ samples/
 │   │   ├── 09-rtl.json           (v1.5.0) Arabic and Hebrew — bidi, contextual forms, marks
 │   │   ├── 10-indic.json         (v1.5.0) Hindi, Bengali, Tamil — the 1.8.0 Indic OpenType engine
 │   │   ├── 11-cjk.json           (v1.5.0) Chinese and Korean
+│   │   ├── 12-five-indic-scripts.json (v1.6.0) Gujarati, Punjabi, Kannada, Malayalam, Odia
 │   │   └── 08-language-families.*  (v1.5.0) Renders 08–11 with the --font / --lang list of each family
 │   ├── table-variant/            (v0.2.0) Table-centric PdfParams (--variant table; fonts embedded since v1.5.0)
 │   ├── font/                     (v0.3.0) `--font` / `--lang` flag demo (latin preset)
@@ -341,11 +342,11 @@ This is the Factur-X / ZUGFeRD pattern — a human-readable PDF/A-3 with a machi
 
 ### `render/multilang/` — Non-Latin Scripts & Multilingual PDFs (v0.2.0)
 
-pdfnative ships Noto Sans font data for 27 Unicode scripts (plus a math font and
-COLRv1 colour emoji — 31 font modules) inside the package itself
+pdfnative ships Noto Sans font data for 32 Unicode scripts (plus a math font and
+COLRv1 colour emoji — 36 font modules) inside the package itself
 (`pdfnative/dist/../fonts/noto-*-data.js`). No external font files, no network
 access, no extra dependencies. Font data is loaded lazily on first use and cached.
-The `render --font <code>` allow-list covers all 27 script codes plus the
+The `render --font <code>` allow-list covers all 32 script codes plus the
 `ha` / `yo` / `ig` / `sw` aliases of `latin` — see the README feature table.
 
 `--font <code> --lang <code>` registers a bundled script for the duration of one
@@ -370,10 +371,11 @@ can include their output in the baseline.
 | [09-rtl.json](render/multilang/09-rtl.json) | (v1.5.0) **Arabic and Hebrew** — contextual forms, lam-alef, harakat, niqqud, mixed direction, and an ARABIC LETTER MARK (U+061C) the engine strips before measuring |
 | [10-indic.json](render/multilang/10-indic.json) | (v1.5.0) **Hindi, Bengali, Tamil** — the 1.8.0 Indic OpenType engine: reph, rakar, conjuncts, pre-base and two-part vowel signs |
 | [11-cjk.json](render/multilang/11-cjk.json) | (v1.5.0) **Chinese and Korean** — a Simplified Chinese statement table and Hangul with complex finals (Japanese is `02-japanese.json`) |
+| [12-five-indic-scripts.json](render/multilang/12-five-indic-scripts.json) | (v1.6.0) **Gujarati, Punjabi, Kannada, Malayalam, Odia** — the five scripts pdfnative ≥ 1.9.0 adds to its Indic engine: reph, subjoined and half forms, two-part vowel signs, legacy and atomic chillus, the sentence-final danda; untagged output extracts in logical order (`/ActualText`). `--font gu --font pa --font kn --font ml --font or --font latin --lang gu,pa,kn,ml,or,latin` |
 | [08-language-families.sh](render/multilang/08-language-families.sh) | (v1.5.0) Renders `08`–`11`, each with the `--font` / `--lang` list of its family |
 | [08-language-families.ps1](render/multilang/08-language-families.ps1) | (v1.5.0) PowerShell equivalent |
 
-The native text of `05`–`11` and of `render/font/04` is demonstration content taken from the language documents of the pdfnative repository (`scripts/data/language-docs-data.ts`, MIT, same author); with `01`–`04`, `render/font/02` and `render/font/04` **every one of the 27 script codes is rendered by the corpus** (`tests/regression/engine-surface.test.ts` holds the plan to it).
+The native text of `05`–`11` and of `render/font/04` is demonstration content taken from the language documents of the pdfnative repository (`scripts/data/language-docs-data.ts`, MIT, same author); with `01`–`04`, `render/font/02` and `render/font/04` **every one of the 32 script codes is rendered by the corpus** (`tests/regression/engine-surface.test.ts` holds the plan to it).
 
 #### Node.js driver scripts (Font loader + render)
 
@@ -452,7 +454,7 @@ const pdf = buildDocumentPDFBytes({
 | Cham | `cjm` | `noto-cham-data.js` (1.8.0) |
 | Hausa / Yoruba / Igbo / Swahili | `ha` `yo` `ig` `sw` | aliases of `latin` (`noto-sans-data.js`) |
 
-`pdfnative doctor` lists the whole inventory (`fonts: 31 modules / 27 scripts`) and checks every module is on disk.
+`pdfnative doctor` lists the whole inventory (`fonts: 36 modules / 32 scripts`) and checks every module is on disk.
 
 ### `render/table-variant/` — Table-centric API (v0.2.0)
 
@@ -620,7 +622,7 @@ Passwords are read from `$PDFNATIVE_ENCRYPT_OWNER_PASS` / `$PDFNATIVE_ENCRYPT_US
 |------|-------------|
 | [01-doctor.sh](doctor/01-doctor.sh) | Human-readable + `--format json` capability report (agent pre-flight) |
 | [01-doctor.ps1](doctor/01-doctor.ps1) | PowerShell equivalent |
-| [02-capabilities.sh](doctor/02-capabilities.sh) | (v1.5.0) Projects the `fonts` (31 modules / 27 scripts), `unicode` and `conformance` checks with `--fields` — the pre-flight an agent runs before `--pdfx` or `--font lo` |
+| [02-capabilities.sh](doctor/02-capabilities.sh) | (v1.5.0) Projects the `fonts` (36 modules / 32 scripts), `unicode` and `conformance` checks with `--fields` — the pre-flight an agent runs before `--pdfx` or `--font lo` |
 | [02-capabilities.ps1](doctor/02-capabilities.ps1) | (v1.5.0) PowerShell equivalent |
 
 `doctor` checks the CLI/Node/pdfnative versions, Web Crypto (CSPRNG) availability — which `encrypt` requires — the registered command count and, since v1.5.0, the bundled font inventory (each module probed on disk), the engine's Unicode version and the claimable conformance targets (`pdfa1b,pdfa2b,pdfa2u,pdfa3b,pdfx4`). Exit code 0 when all checks pass, 1 otherwise. Fully offline.

@@ -1,7 +1,7 @@
 # pdfnative-cli
 
 > Official command-line interface for **pdfnative** — an agent-native PDF toolkit.
-> Render JSON to PDF (typography, PDF/A, PDF/X-4, CMYK, 27 Unicode scripts), extract
+> Render JSON to PDF (typography, PDF/A, PDF/X-4, CMYK, 32 Unicode scripts), extract
 > text, fill/flatten AcroForms, merge/split/extract pages, encrypt/decrypt, sign and
 > verify (CMS, LTV), inspect and compare — with a deterministic process contract
 > designed to be driven by autonomous AI agents, and byte-reproducible output.
@@ -44,12 +44,12 @@ docs/AGENT_CONTRACT.md.
 
 ## Commands (21 commands)
 
-- `render` — JSON document/table → PDF (27 Unicode scripts + `--font-file`, math,
+- `render` — JSON document/table → PDF (32 Unicode scripts + `--font-file`, math,
   colour emoji, bookmarks, native charts, watermarks, PDF/A, PDF/X-4
   (`--pdfx pdfx4 --output-intent-icc <cmyk.icc> --trapped false`), CMYK colours,
   typography (`layout.typography`; `--split-paragraphs`, `--keep-headings-with-next`,
-  `--kerning`, `--font-features`), encryption, streaming). `--strict` turns the 9
-  diagnostic codes into `E_CHECK_FAILED`. PDF/A outputs are validated against veraPDF
+  `--kerning`, `--font-features`), encryption, streaming). `--strict` turns the
+  13 diagnostic codes into `E_CHECK_FAILED`. PDF/A outputs are validated against veraPDF
   in CI (blocking); recipe: `--tagged pdfa<level> --font latin --lang latin`.
 - `extract-text` — reading-order Unicode text as `text | json | ndjson`
   (`--runs` for positioned runs, `--password` for encrypted PDFs). No OCR; tagged
@@ -96,7 +96,7 @@ docs/AGENT_CONTRACT.md.
   (bash|zsh|fish|powershell).
 - `doctor` — offline environment/capability preflight (`--format json`): CLI /
   Node / pdfnative versions, Web Crypto CSPRNG (required by `encrypt`), command
-  count, font inventory (31 font modules / 27 scripts), Unicode version, conformance
+  count, font inventory (36 font modules / 27 scripts), Unicode version, conformance
   targets. Exit 0/1 — run it as an agent pre-flight.
 
 ## Governance (read before autonomous use)
