@@ -211,12 +211,12 @@ times with two orders; `--tag` ran under the wrong allow-list; a config read fai
   PDF/X-only files), exit 0 — the dual claim and the JPX under PDF/A-2b accepted.
 - `npm run compat:previous` (tag `v1.5.0`) → 67 files, 839 cases of the v1.5.0 suite green
   against the current sources (14 exclusions, each with a reason; 5 ledger entries).
-- `npx tsx scripts/gate.ts --publish --require-all` at `e26c272` → **15 passed, 0 skipped in
-  424 s** (typecheck:all 24 s, lint 10 s, build 15 s, dist-check, smoke — 21 commands —,
+- `npx tsx scripts/gate.ts --publish --require-all` at `4e6ecae` → **15 passed, 0 skipped in
+  374 s** (typecheck:all 22 s, lint 8 s, build 10 s, dist-check, smoke — 21 commands —,
   bundle-size 381 KiB of the 448 KiB budget, bundle-check — 2 externals —, test:generate
-  57 s — 99 PDFs —, test:coverage 129 s — 1555 tests, 86.9 % stmts —, verify:docs 7 s,
-  verify:samples 9 s, corpus:pdfa 16 s — the 25-file corpus —, validate:pdfx 4 s, validate:pdfa 114 s,
-  compat:previous 38 s).
+  50 s — 99 PDFs —, test:coverage 104 s — 1555 tests, 86.9 % stmts —, verify:docs 7 s,
+  verify:samples 5 s, corpus:pdfa 15 s — the 25-file corpus —, validate:pdfx 4 s, validate:pdfa 110 s
+  — veraPDF 1.30.2, 16 PASS + 4 XFAIL —, compat:previous 38 s — the v1.5.0 suite).
 - Built binary smoke: `--version` 1.6.0; `doctor --format json` (pdfnative 1.9.0, fonts
   36 / 32, 13 conformance-relevant diagnostics listed by `schema`); the quick-start recipes
   of the release note against `dist/cli.cjs`; `govern verify-issue` green on the four
