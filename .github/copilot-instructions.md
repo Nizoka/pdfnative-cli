@@ -15,7 +15,7 @@ are in [AGENTS.md](../AGENTS.md).
 logic lives there. The CLI is a thin, composable dispatch layer over it, and every `pdfnative`
 symbol enters through `src/core-bridge/index.ts`.
 
-**Targets:** Node.js ≥ 22 (`.nvmrc` / `.node-version` pin 22; CI matrix 22 and 24), Bun, Deno
+**Targets:** Node.js ≥ 22 (`.nvmrc` / `.node-version` pin 22; CI runs 22 and 24 on Linux, 22 on Windows and macOS, all required; 26 advisory)
 (via `node dist/cli.cjs`).
 
 ## Working Modes & Token Economy

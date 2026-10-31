@@ -7,7 +7,7 @@ Everything in AGENTS.md applies. This file adds only what is specific to Claude 
 ## Token discipline
 
 - Run tests through `npx tsx scripts/gate.ts --fast` or `npx vitest run <file>` (the dot reporter is configured); never paste a full test run into context.
-- Never Read `dist/`, `coverage/`, `test-output/`, `samples/output/`, `package-lock.json`, `node_modules/`.
+- Never Read `dist/`, `coverage/`, `test-output/`, `samples/output/`, `fuzz/.build/`, `package-lock.json`, `node_modules/`.
   The deny list in `.claude/settings.json` applies to Read and, at best effort, to Grep/Glob — prefer `node dist/cli.cjs <command> --help` and `schema manifest` over reading the bundle.
 - Find a command's flags in `src/commands/completion.ts` (COMMANDS) and its usage text in `src/index.ts` (`<NAME>_USAGE`); find an engine symbol's re-export with Grep in `src/core-bridge/index.ts`.
 - Read README.md, ROADMAP.md and docs/KNOWLEDGE_BASE.md by section: `grep -n "^## "` first, then a line range. CHANGELOG.md: only the top entry.
@@ -20,7 +20,7 @@ Everything in AGENTS.md applies. This file adds only what is specific to Claude 
 
 - `npx tsx scripts/gate.ts --fast` — typecheck:all, lint, test, verify:docs. Run before proposing a commit.
 - `npm run gate` — the CI profile (default).
-- `npx tsx scripts/gate.ts --publish --require-all` — everything, incl. test:generate, verify:samples, corpus:pdfa, validate:pdfx, validate:pdfa. Release branches only.
+- `npx tsx scripts/gate.ts --publish --require-all` — everything, incl. test:generate, verify:samples, corpus:pdfa, validate:pdfx, validate:pdfa, compat:previous (needs the previous tag fetched). Release branches only.
 - `--only <step>` for one step, `--json` for machine output; logs in `test-output/.gate/<step>.log` — open only the failing step's log.
 - When the gate exceeds the Bash timeout, run it in the background; read the result with `--json` and open only the failing step's log.
 

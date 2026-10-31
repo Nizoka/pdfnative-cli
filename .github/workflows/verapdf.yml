@@ -82,9 +82,9 @@ jobs:
       - name: Harden the runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
-          egress-policy: audit
+          egress-policy: audit # 2026-10-31: veraPDF and Adoptium download hosts are not baselined yet
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -99,6 +99,7 @@ jobs:
       # a floating "latest" URL can silently change the rule set between two
       # runs of the same commit. Bump deliberately in the action's default.
       - name: Setup veraPDF
+        id: verapdf
         uses: ./.github/actions/setup-verapdf
 
       - name: Install dependencies
@@ -115,6 +116,8 @@ jobs:
       # surfaces the verdict.
       - name: Validate PDF/A corpus (blocking)
         id: validate
+        env:
+          VERAPDF_HOME: ${{ steps.verapdf.outputs.home }}
         run: |
           set +e
           npm run validate:pdfa --silent -- --verbose 2> >(tee verapdf-stderr.txt >&2) | tee verapdf-report.txt

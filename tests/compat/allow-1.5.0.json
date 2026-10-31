@@ -1,0 +1,77 @@
+{
+  "$comment": "Files of the v1.5.0 test suite that scripts/run-compat.ts does not run against the current sources. Every entry carries a reason; a behaviour change also names the compatibility-ledger entry (release-notes/v1.6.0.md, Compatibility section) that documents and justifies it. A file listed here without a ledger entry tests the repository tree rather than the command surface. Keep this list as short as the ledger: an exclusion that outlives its ledger entry is a hidden breaking change. Exclusions are per file (vitest --exclude); the tests of each file that still hold run in the current suite.",
+  "tag": "v1.5.0",
+  "exclude": [
+    {
+      "pattern": "tests/tools/**",
+      "reason": "Repository-tree tests (workflow pins, the gate table, verify-docs over the tree, the sample plan, the release-prepare fixtures, the vendored gray-profile generator), not command behaviour — the current suite covers today's tree."
+    },
+    {
+      "pattern": "tests/docs/**",
+      "reason": "Repository-tree tests (the English-only prose scan over today's documents), not command behaviour — the current suite covers today's tree."
+    },
+    {
+      "pattern": "tests/regression/**",
+      "reason": "The engine-surface matrix pins the 1.8.0 changelog and the sample baseline the 1.8.0 generators wrote; the current suite holds the 1.9.0 matrix and the re-anchored baseline chain."
+    },
+    {
+      "pattern": "tests/commands/render-pdfx.test.ts",
+      "reason": "Two 1.5.0 tests assert that --pdfx with --tagged is refused (a usage error, and the engine's single coherence message); since pdfnative 1.9.0 PDF/A-2b|2u and PDF/X-4 are claimed together and only pdfa1b/pdfa3b are refused, with level-specific messages the current suite holds.",
+      "ledger": "C1"
+    },
+    {
+      "pattern": "tests/commands/render-dry-run.test.ts",
+      "reason": "One 1.5.0 test expects the dry run to report the joint PDF/A + PDF/X refusal for pdfa2b; the pair is accepted since pdfnative 1.9.0 and the current suite asserts the pdfa1b refusal instead.",
+      "ledger": "C1"
+    },
+    {
+      "pattern": "tests/utils/build-errors.test.ts",
+      "reason": "The 1.5.0 fixture is the 1.8.0 error registry (23 messages, the joint PDF/A + PDF/X refusal among them); the current fixture is the 1.9.0 registry, where that message is replaced by two level-specific ones.",
+      "ledger": "C1"
+    },
+    {
+      "pattern": "tests/fuzz/pdf-bytes.test.ts",
+      "reason": "One 1.5.0 test expects extract-text to answer ok with no text for a content stream past --max-inflate-size; since pdfnative 1.9.0 the engine reports the over-cap stream and the CLI answers E_INPUT (--on-stream-error skip restores the lenience).",
+      "ledger": "C2"
+    },
+    {
+      "pattern": "tests/commands/render-scripts.test.ts",
+      "reason": "The 1.5.0 it.fails markers for untagged Khmer, Myanmar and CJK extraction turn red on purpose: pdfnative 1.9.0 writes /ActualText on reordered runs and the code point actually encoded wins, so the extraction they pinned as broken is right.",
+      "ledger": "C3"
+    },
+    {
+      "pattern": "tests/commands/render-typography-surface.test.ts",
+      "reason": "One 1.5.0 test expects a subs glyph to extract as its own code point from untagged output; since pdfnative 1.9.0 the encoded code point wins and the source character comes back.",
+      "ledger": "C3"
+    },
+    {
+      "pattern": "tests/utils/fonts.test.ts",
+      "reason": "Pins the 1.8.0 inventory (31 modules, 27 script codes); pdfnative 1.9.0 adds five Indic scripts, an inventory change the current suite pins at 36 and 32 — no 1.8.0 code moved or left.",
+      "ledger": "C4"
+    },
+    {
+      "pattern": "tests/commands/doctor-capabilities.test.ts",
+      "reason": "Pins the doctor fonts value to '31 modules / 27 scripts'; 36 / 32 since pdfnative 1.9.0 (additive).",
+      "ledger": "C4"
+    },
+    {
+      "pattern": "tests/commands/render-typography.test.ts",
+      "reason": "One 1.5.0 test counts the allow-list error's 31 names; 36 since pdfnative 1.9.0 (additive).",
+      "ledger": "C4"
+    },
+    {
+      "pattern": "tests/commands/schema-conformance.test.ts",
+      "reason": "Names the nine 1.8.0 diagnostic codes and the 27-script fontEntries description; the 1.9.0 surface adds four codes and five scripts (additive) and the current suite pins the new lists.",
+      "ledger": "C4"
+    },
+    {
+      "pattern": "tests/utils/pdftext.test.ts",
+      "reason": "Imports src/utils/pdftext.ts, the UTF-16 decoder the CLI carried in 1.5.0; the engine's decodePdfTextString() replaces it through the bridge since pdfnative 1.9.0 and the current suite tests that import — inspect and compare behave the same."
+    },
+    {
+      "pattern": "tests/integration/reproducible-build.test.ts",
+      "reason": "Pins the doctor fonts value of the BUILT binary to '31 modules / 27 scripts'; 36 / 32 since pdfnative 1.9.0 (additive).",
+      "ledger": "C4"
+    }
+  ]
+}

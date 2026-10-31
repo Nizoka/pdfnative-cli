@@ -6,6 +6,7 @@ import { basename, join, resolve } from 'node:path';
 import {
     MANIFEST_REL,
     OFFLINE_RULES,
+    ciMatrixMajors,
     isSuppressed,
     lineOf,
     releaseNoteShipped,
@@ -51,6 +52,23 @@ describe('verify-docs — helpers', () => {
         const { jobs, matrixValues } = workflowJobs([ci, 'jobs:\n  sample-regression:\n    steps: []\n']);
         expect([...jobs].sort()).toEqual(['ci', 'other', 'sample-regression']);
         expect([...matrixValues.get('ci')!]).toEqual(['22', '24']);
+    });
+
+    // v1.6.0 — the include form of ci.yml: every entry's name is a status-check
+    // context, `name: ${{ matrix.name }}` on the job delegates to them.
+    it('reads the status-check names and Node majors of an include matrix', () => {
+        const ci = [
+            'jobs:', '  ci:', '    name: ${{ matrix.name }}', '    strategy:', '      matrix:', '        include:',
+            "          - { name: 'ci (22)', os: ubuntu-latest, node-version: 22, slug: linux-node22, audit: true }",
+            "          - { name: 'ci (24)', os: ubuntu-latest, node-version: 24, slug: linux-node24, audit: false }",
+            '          - { name: windows, os: windows-latest, node-version: 22, slug: windows, audit: false }',
+            '    steps: []', '  workflow-lint:', '    name: workflow lint', '    steps: []', '',
+        ].join('\n');
+        const { jobs, matrixValues } = workflowJobs([ci]);
+        expect([...jobs].sort()).toEqual(['ci', 'ci (22)', 'ci (24)', 'windows', 'workflow lint', 'workflow-lint']);
+        expect([...matrixValues.get('ci')!]).toEqual(['22', '24']);
+        expect(ciMatrixMajors(ci)).toEqual([22, 24]);
+        expect(ciMatrixMajors('        node-version: [22, 24]')).toEqual([22, 24]);
     });
 
     // v1.6.0 — a shipped release note leaves the count-checked corpus only when

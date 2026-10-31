@@ -1,7 +1,7 @@
 name: CI
 
-# The job runs `scripts/gate.ts --ci`, the single definition of "green": the
-# step list lives in that file's STEPS table (typecheck:all, lint, build,
+# The `ci` job runs `scripts/gate.ts --ci`, the single definition of "green":
+# the step list lives in that file's STEPS table (typecheck:all, lint, build,
 # dist-check, smoke, bundle-size, bundle-check, test:generate, test:coverage,
 # verify:docs, verify:samples, corpus:pdfa, validate:pdfx) and is not
 # repeated here, so CI and the contributor loop cannot drift apart.
@@ -14,30 +14,19 @@ name: CI
 # The `smoke` step drives the BUILT binary (dist/cli.cjs): tsup flattens
 # src/ into one file, so a path that resolves in source can fail in the
 # bundle (the v1.3.0 version.ts incident) — source tests cannot catch that.
+#
+# No path filter (v1.6.0, after pdfnative 1.9.0). Every job here reports a
+# check the ruleset requires, and GitHub leaves the checks of a path-filtered
+# workflow pending forever, which blocks the pull request: a docs-only change
+# would need the admin bypass, and a bypass used weekly stops being an
+# exception. The gate is fast enough to run on every pull request, and a docs
+# pull request can still break `verify:docs`, which the gate runs.
 
 on:
   push:
     branches: [main, master]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/*.md'
-      - '.github/FUNDING.yml'
-      - 'LICENSE'
-      - '.editorconfig'
-      - '.gitignore'
   pull_request:
     branches: [main, master]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/*.md'
-      - '.github/FUNDING.yml'
-      - 'LICENSE'
-      - '.editorconfig'
-      - '.gitignore'
 
 permissions:
   contents: read
@@ -47,24 +36,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The job id and the matrix are load-bearing: the main ruleset requires the
-  # status checks `ci (22)` and `ci (24)` (.github/rulesets/main.json).
+  # One job, four runs. `name:` is what decides the status-check name, so the
+  # two contexts the ruleset required before 1.6.0 — `ci (22)` and `ci (24)` —
+  # keep exactly the names they had when the matrix was a Node-version list,
+  # and `windows` and `macos` are additive. Renaming a required check is what
+  # leaves every pull request waiting for a context that will never report.
+  #
+  # Windows and macOS are blocking from 1.6.0: "byte-identical on every host"
+  # is a claim the sample baseline can only prove where it runs, and CRLF
+  # checkouts, path separators (the v1.5.0 --font-file basename incident),
+  # case-insensitive file systems and the npm.cmd shim are facts a Linux
+  # runner never exercises. Any "skip on this platform" needs a linked issue.
+  # Both non-Linux legs run the Node version of .nvmrc; the second Node line
+  # is covered on Linux, where the runners are fastest.
   ci:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
 
     strategy:
       fail-fast: false
       matrix:
-        node-version: [22, 24]
+        include:
+          - { name: 'ci (22)', os: ubuntu-latest, node-version: 22, slug: linux-node22, audit: true }
+          - { name: 'ci (24)', os: ubuntu-latest, node-version: 24, slug: linux-node24, audit: false }
+          - { name: windows, os: windows-latest, node-version: 22, slug: windows, audit: false }
+          - { name: macos, os: macos-latest, node-version: 22, slug: macos, audit: false }
 
     steps:
+      # On every runner, macOS included: the vendor README at the pinned SHA
+      # lists GitHub-hosted Windows and macOS runners as supported in audit
+      # mode. One step serves all four legs, so the policy is the one the
+      # Windows and macOS legs allow.
       - name: Harden the runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
-          egress-policy: audit
+          egress-policy: audit # 2026-10-31: audit only on Windows/macOS (vendor matrix), and one step serves every leg
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -79,7 +88,11 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      # Once per commit, not once per platform: the advisory database does not
+      # depend on the runner, and four identical network calls are four
+      # chances to go red for a reason that is not this repository's.
       - name: Audit dependencies
+        if: matrix.audit
         run: npm audit --audit-level=high
 
       - name: Run the quality gate (CI profile)
@@ -89,7 +102,96 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: gate-logs-node${{ matrix.node-version }}
+          name: gate-logs-${{ matrix.slug }}
           path: test-output/.gate/
           retention-days: 7
           if-no-files-found: ignore
+
+  # The zero-breaking-change policy of the process contract, proven rather
+  # than promised (SECURITY.md §Compatibility promise): the previous release's
+  # own test suite, exactly as tagged, runs against the current sources.
+  # tests/compat/allow-<previous>.json lists the files it may skip, each with
+  # a reason and, for a behaviour change, the compatibility-ledger entry of
+  # the release note that justifies it. Blocking: a 1.5.0 test that fails on
+  # 1.6.0 is a breaking change until the ledger says otherwise.
+  compat-previous:
+    name: compat-previous
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # 2026-10-31: first runs of the job; block once the npm and GitHub endpoints are baselined
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The previous tag only — anonymously (the repository is public), so the
+      # checkout above can keep its credentials off the runner.
+      - name: Fetch the previous release tag
+        run: |
+          TAG=$(node -e "console.log(JSON.parse(require('fs').readFileSync(require('fs').readdirSync('tests/compat').filter(f => /^allow-/.test(f)).map(f => 'tests/compat/' + f).sort().pop(), 'utf8')).tag)")
+          git fetch --no-tags --depth=1 origin "+refs/tags/${TAG}:refs/tags/${TAG}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # The archived suite spawns dist/cli.cjs in its integration round-trips.
+      - name: Build
+        run: npm run build
+
+      - name: Run the previous release's test suite against the current sources
+        run: npm run compat:previous
+
+  # The workflows themselves are code that holds tokens. zizmor reads them
+  # for the GitHub Actions weaknesses (cache poisoning, template injection,
+  # excessive permissions, unpinned or impostor actions); actionlint checks
+  # the syntax, the expressions and every `run:` script through shellcheck.
+  # Both pinned: the zizmor image by the digest the action pins for its
+  # version, actionlint by the SHA-256 of its release archive.
+  workflow-lint:
+    name: workflow lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # 2026-10-31: the container registry hosts behind ghcr.io are not baselined yet
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: zizmor
+        uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+        with:
+          version: 1.30.1
+          min-severity: medium
+          advanced-security: false
+          annotations: true
+
+      - name: actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -euo pipefail
+          ARCHIVE="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl --fail --silent --show-error --location --proto '=https' \
+            --output "${RUNNER_TEMP}/${ARCHIVE}" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${ARCHIVE}"
+          echo "${ACTIONLINT_SHA256}  ${RUNNER_TEMP}/${ARCHIVE}" | sha256sum --check --strict
+          tar -xzf "${RUNNER_TEMP}/${ARCHIVE}" -C "${RUNNER_TEMP}" actionlint
+          shellcheck --version | head -2
+          "${RUNNER_TEMP}/actionlint" -color

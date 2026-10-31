@@ -1,0 +1,399 @@
+{
+  "$id": "https://pdfnative.dev/schema/cli/1.5.0/manifest.json",
+  "kind": "capability-manifest",
+  "name": "pdfnative-cli",
+  "version": "1.5.0",
+  "contract": {
+    "stdout": "primary artifact (PDF, JSON report, text, schema, script)",
+    "stderr": "diagnostics and, under --json, the status/error envelope",
+    "exitCodes": {
+      "0": "success",
+      "1": "runtime/check failure",
+      "2": "usage error"
+    }
+  },
+  "globalFlags": [
+    "--help",
+    "--version",
+    "--no-color",
+    "--quiet",
+    "--json",
+    "--dry-run",
+    "--config",
+    "--no-config",
+    "--max-inflate-size",
+    "--creation-date"
+  ],
+  "errorCodes": [
+    "E_USAGE",
+    "E_INPUT",
+    "E_PARSE",
+    "E_IO",
+    "E_SIGN",
+    "E_VERIFY_FAILED",
+    "E_CHECK_FAILED",
+    "E_POLICY",
+    "E_UNSUPPORTED",
+    "E_PASSWORD",
+    "E_NETWORK",
+    "E_RUNTIME"
+  ],
+  "commands": [
+    {
+      "name": "render",
+      "summary": "Render a JSON document definition to PDF",
+      "flags": [
+        "--input",
+        "--output",
+        "--stream",
+        "--stream-page-by-page",
+        "--stream-true",
+        "--max-blocks",
+        "--watch",
+        "--template",
+        "--variant",
+        "--table-wrap",
+        "--repeat-header",
+        "--zebra",
+        "--min-row-height",
+        "--cell-padding",
+        "--layout",
+        "--page-size",
+        "--margin",
+        "--tagged",
+        "--compress",
+        "--pdfx",
+        "--output-intent-icc",
+        "--output-intent-id",
+        "--trapped",
+        "--split-paragraphs",
+        "--keep-headings-with-next",
+        "--kerning",
+        "--font-features",
+        "--lang",
+        "--font",
+        "--font-file",
+        "--outline",
+        "--debug-layout",
+        "--inspect-layout",
+        "--header-left",
+        "--header-center",
+        "--header-right",
+        "--footer-left",
+        "--footer-center",
+        "--footer-right",
+        "--watermark-text",
+        "--watermark-image",
+        "--watermark-opacity",
+        "--watermark-angle",
+        "--watermark-color",
+        "--watermark-font-size",
+        "--watermark-position",
+        "--encrypt",
+        "--owner-password",
+        "--user-password",
+        "--permissions",
+        "--encrypt-algorithm",
+        "--encrypt-owner-pass",
+        "--encrypt-user-pass",
+        "--encrypt-permissions",
+        "--attachment",
+        "--strict",
+        "--chunk-size"
+      ]
+    },
+    {
+      "name": "sign",
+      "summary": "Apply a digital signature to a PDF",
+      "flags": [
+        "--input",
+        "--output",
+        "--key",
+        "--cert",
+        "--cert-chain",
+        "--algorithm",
+        "--reason",
+        "--name",
+        "--location",
+        "--contact",
+        "--signing-time",
+        "--timestamp",
+        "--timestamp-digest",
+        "--timestamp-nonce",
+        "--timestamp-timeout",
+        "--allow-multiple",
+        "--field-name",
+        "--profile",
+        "--digest",
+        "--signature-rect",
+        "--signature-page",
+        "--placeholder-bytes",
+        "--pure-crypto"
+      ]
+    },
+    {
+      "name": "verify",
+      "summary": "Verify embedded PDF signatures",
+      "flags": [
+        "--input",
+        "--trust",
+        "--strict",
+        "--revocation",
+        "--revocation-policy",
+        "--format",
+        "--summary",
+        "--fields",
+        "--pretty"
+      ]
+    },
+    {
+      "name": "ltv",
+      "summary": "PAdES B-LT: collect/embed OCSP+CRL validation data (/DSS)",
+      "flags": [
+        "--input",
+        "--output",
+        "--online",
+        "--prefer",
+        "--extra-cert",
+        "--data",
+        "--timeout"
+      ]
+    },
+    {
+      "name": "doc-timestamp",
+      "summary": "PAdES B-LTA: append an RFC 3161 document timestamp",
+      "flags": [
+        "--input",
+        "--output",
+        "--url",
+        "--digest",
+        "--field-name",
+        "--placeholder-bytes",
+        "--nonce",
+        "--timeout"
+      ]
+    },
+    {
+      "name": "inspect",
+      "summary": "Analyse a PDF and output metadata",
+      "flags": [
+        "--input",
+        "--format",
+        "--verbose",
+        "--pages",
+        "--pdfua",
+        "--pdfx",
+        "--iso-dates",
+        "--annotations",
+        "--form-fields",
+        "--encryption",
+        "--signatures",
+        "--password",
+        "--check",
+        "--summary",
+        "--fields",
+        "--pretty"
+      ]
+    },
+    {
+      "name": "merge",
+      "summary": "Concatenate multiple PDFs into one",
+      "flags": [
+        "--input",
+        "--output",
+        "--drop-annotations",
+        "--max-output-size",
+        "--password",
+        "--encrypt",
+        "--owner-password",
+        "--user-password",
+        "--permissions",
+        "--stream",
+        "--chunk-size"
+      ]
+    },
+    {
+      "name": "split",
+      "summary": "Split a PDF into multiple PDFs",
+      "flags": [
+        "--input",
+        "--output-dir",
+        "--pages",
+        "--prefix",
+        "--drop-annotations",
+        "--max-output-size",
+        "--password",
+        "--encrypt",
+        "--owner-password",
+        "--user-password",
+        "--permissions",
+        "--stream",
+        "--chunk-size"
+      ]
+    },
+    {
+      "name": "extract",
+      "summary": "Extract selected pages into a new PDF",
+      "flags": [
+        "--input",
+        "--output",
+        "--pages",
+        "--drop-annotations",
+        "--max-output-size",
+        "--password",
+        "--encrypt",
+        "--owner-password",
+        "--user-password",
+        "--permissions",
+        "--stream",
+        "--chunk-size"
+      ]
+    },
+    {
+      "name": "extract-text",
+      "summary": "Extract reading-order text (text|json|ndjson)",
+      "flags": [
+        "--input",
+        "--format",
+        "--pages",
+        "--runs",
+        "--password",
+        "--max-length",
+        "--summary",
+        "--fields",
+        "--pretty"
+      ]
+    },
+    {
+      "name": "fill",
+      "summary": "Fill and/or flatten an AcroForm PDF",
+      "flags": [
+        "--input",
+        "--output",
+        "--data",
+        "--flatten",
+        "--export",
+        "--force",
+        "--on-unknown",
+        "--need-appearances",
+        "--password"
+      ]
+    },
+    {
+      "name": "encrypt",
+      "summary": "Re-secure a PDF with AES-128/256 encryption",
+      "flags": [
+        "--input",
+        "--output",
+        "--owner-password",
+        "--user-password",
+        "--algorithm",
+        "--permissions",
+        "--password",
+        "--drop-annotations",
+        "--max-output-size",
+        "--stream",
+        "--chunk-size"
+      ]
+    },
+    {
+      "name": "decrypt",
+      "summary": "Remove encryption from a PDF",
+      "flags": [
+        "--input",
+        "--output",
+        "--password",
+        "--drop-annotations",
+        "--max-output-size",
+        "--stream",
+        "--chunk-size"
+      ]
+    },
+    {
+      "name": "annotate",
+      "summary": "Attach markup annotations to a PDF",
+      "flags": [
+        "--input",
+        "--output",
+        "--annotations",
+        "--password"
+      ]
+    },
+    {
+      "name": "metadata",
+      "summary": "Update PDF /Info + XMP metadata (incremental — keeps signatures)",
+      "flags": [
+        "--input",
+        "--output",
+        "--title",
+        "--author",
+        "--subject",
+        "--keywords",
+        "--mod-date",
+        "--from-json",
+        "--password"
+      ]
+    },
+    {
+      "name": "compare",
+      "summary": "Diff two PDFs by text and structure",
+      "flags": [
+        "--mode",
+        "--format",
+        "--tolerance",
+        "--ignore-whitespace",
+        "--pages",
+        "--password-a",
+        "--password-b",
+        "--pretty"
+      ]
+    },
+    {
+      "name": "batch",
+      "summary": "Render a directory or run a multi-command manifest pipeline",
+      "flags": [
+        "--input-dir",
+        "--output-dir",
+        "--concurrency",
+        "--fail-fast",
+        "--manifest",
+        "--allow-network",
+        "--continue-on-error",
+        "--format",
+        "--layout",
+        "--variant",
+        "--summary",
+        "--fields",
+        "--pretty"
+      ]
+    },
+    {
+      "name": "govern",
+      "summary": "AI-governance / HITL contract",
+      "flags": [
+        "--input",
+        "--format",
+        "--pretty"
+      ]
+    },
+    {
+      "name": "schema",
+      "summary": "Print a JSON Schema for a CLI input/output shape",
+      "flags": []
+    },
+    {
+      "name": "completion",
+      "summary": "Emit a shell completion script",
+      "flags": []
+    },
+    {
+      "name": "doctor",
+      "summary": "Environment / capability preflight",
+      "flags": [
+        "--format",
+        "--json",
+        "--pretty"
+      ]
+    }
+  ]
+}

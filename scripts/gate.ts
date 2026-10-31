@@ -92,6 +92,22 @@ function veraPdfInstalled(): boolean {
 
 // ── Notes (figures shown next to PASS) ──────────────────────────────
 
+/**
+ * Whether the previous release's tag (the one tests/compat/allow-<version>.json
+ * names) is present in this clone — the skip condition of compat:previous.
+ * CI's shallow checkout has no tags; ci.yml and publish.yml fetch exactly
+ * this one.
+ */
+function previousTagAvailable(): boolean {
+    const dir = join(REPO_ROOT, 'tests', 'compat');
+    if (!existsSync(dir)) return false;
+    const allow = readdirSync(dir).filter((f) => /^allow-\d+\.\d+\.\d+\.json$/.test(f)).sort().pop();
+    if (!allow) return false;
+    const { tag } = JSON.parse(readFileSync(join(dir, allow), 'utf8')) as { tag: string };
+    const probe = spawnSync('git', ['rev-parse', '--verify', '--quiet', `${tag}^{commit}`], { cwd: REPO_ROOT, windowsHide: true });
+    return probe.status === 0;
+}
+
 function testCount(): string | null {
     if (!existsSync(VITEST_JSON)) return null;
     // The whole suite, skipped tests included — the figure `declared.tests`
@@ -258,6 +274,13 @@ export const STEPS: readonly Step[] = [
     {
         id: 'validate:pdfa', npmScript: 'validate:pdfa', profiles: ['publish'],
         skipWhen: () => (veraPdfInstalled() ? null : 'veraPDF not installed'),
+    },
+    // v1.6.0 — the previous release's suite against the current sources
+    // (SECURITY.md §Compatibility promise). Publish profile: it needs the
+    // previous tag, which ci.yml's compat-previous job and publish.yml fetch.
+    {
+        id: 'compat:previous', npmScript: 'compat:previous', profiles: ['publish'],
+        skipWhen: () => (previousTagAvailable() ? null : 'previous release tag not fetched (see tests/compat/allow-*.json)'),
     },
 ];
 

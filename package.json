@@ -9,6 +9,9 @@
   "main": "./dist/cli.cjs",
   "module": "./dist/cli.js",
   "types": "./dist/cli.d.ts",
+  "imports": {
+    "#fuzz-surface": "./fuzz/.build/fuzz-surface.js"
+  },
   "files": [
     "dist",
     "LICENSE",
@@ -35,6 +38,7 @@
     "corpus:pdfa": "npx tsx scripts/generate-pdfa-corpus.ts",
     "validate:pdfa": "npx tsx scripts/validate-pdfa.ts",
     "validate:pdfx": "npx tsx scripts/validate-pdfx.ts",
+    "compat:previous": "npx tsx scripts/run-compat.ts",
     "release:prepare": "npx tsx scripts/release-prepare.ts",
     "agents:rules": "npx tsx scripts/build-claude-rules.ts",
     "hooks:install": "node scripts/install-git-hooks.mjs",

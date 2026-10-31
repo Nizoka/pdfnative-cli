@@ -7,6 +7,11 @@ description: >-
   CI tool. Shared by verapdf.yml and publish.yml so the URL/SHA-256 bump
   happens in one place (it used to be duplicated in both workflows).
 
+outputs:
+  home:
+    description: The veraPDF install directory (`verapdf` is `<home>/verapdf`); pass it as VERAPDF_HOME on the step that validates.
+    value: ${{ steps.install.outputs.home }}
+
 inputs:
   version:
     description: >-
@@ -52,6 +57,7 @@ runs:
         unzip -q "${ARCHIVE}" -d "$HOME/verapdf-installer"
 
     - name: Install veraPDF CLI
+      id: install
       shell: bash
       run: |
         set -euo pipefail
@@ -72,8 +78,10 @@ runs:
         </AutomatedInstallation>
         XML
         java -jar "${INSTALLER_JAR}" "$HOME/verapdf/auto-install.xml"
-        echo "VERAPDF_HOME=$HOME/verapdf" >> "$GITHUB_ENV"
-        echo "$HOME/verapdf" >> "$GITHUB_PATH"
+        # An output, not GITHUB_ENV/GITHUB_PATH (zizmor github-env): the
+        # consuming step scopes VERAPDF_HOME with `env:`, so the trust
+        # boundary is written down where the value is used.
+        echo "home=$HOME/verapdf" >> "$GITHUB_OUTPUT"
 
     - name: Verify veraPDF
       shell: bash

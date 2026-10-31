@@ -216,14 +216,37 @@ export function workflowJobs(workflowTexts: readonly string[]): { jobs: Set<stri
             }
             if (!current) continue;
             const jobName = /^ {4}name:\s*(.+?)\s*$/.exec(line);
-            if (jobName) jobs.add(jobName[1].replace(/^["']|["']$/g, ''));
+            // A literal job name is a status-check context; `name: ${{ matrix.name }}`
+            // delegates it to the matrix include entries below.
+            if (jobName && !jobName[1].includes('${{')) jobs.add(jobName[1].replace(/^["']|["']$/g, ''));
             const list = /^ {8}[A-Za-z0-9_-]+:\s*\[([^\]]*)\]\s*$/.exec(line);
             if (list) {
                 for (const v of list[1].split(',')) matrixValues.get(current)!.add(v.trim().replace(/['"]/g, ''));
             }
+            // v1.6.0 — the include form: `- { name: 'ci (22)', os: …, node-version: 22, … }`.
+            // Each entry's name is the context GitHub reports; its node-version a tested major.
+            const include = /^ {10}- \{\s*(.+?)\s*\}\s*$/.exec(line);
+            if (include) {
+                const name = /(?:^|,\s*)name:\s*('([^']*)'|"([^"]*)"|([^,}]+))/.exec(include[1]);
+                if (name) jobs.add((name[2] ?? name[3] ?? name[4] ?? '').trim());
+                const node = /(?:^|,\s*)node-version:\s*([^,}]+)/.exec(include[1]);
+                if (node) matrixValues.get(current)!.add(node[1].trim().replace(/['"]/g, ''));
+            }
         }
     }
     return { jobs, matrixValues };
+}
+
+/**
+ * The Node majors ci.yml tests: a `node-version: [22, 24]` list, or (v1.6.0)
+ * the `node-version:` values of its `matrix.include` entries.
+ */
+export function ciMatrixMajors(ciText: string): number[] {
+    const list = /node-version:\s*\[([^\]]*)\]/.exec(ciText);
+    const raw = list
+        ? list[1].split(',')
+        : [...ciText.matchAll(/^ {10}- \{[^}]*?node-version:\s*([^,}]+)/gm)].map((m) => m[1]);
+    return [...new Set(raw.map((s) => Number(s.trim().replace(/['"]/g, ''))).filter((n) => Number.isFinite(n)))];
 }
 
 /**
@@ -825,20 +848,28 @@ export async function verifyDocs(root: string, options: VerifyOptions = {}): Pro
                 if (uses.length === 0) continue;
                 const withFile = [...text.matchAll(/node-version-file:\s*\.nvmrc\b/g)].length;
                 if (withFile >= uses.length) continue;
-                const matrix = /node-version:\s*\$\{\{\s*matrix\.node-version\s*\}\}/.test(text) && /node-version:\s*\[([^\]]*)\]/.exec(text);
-                if (name === 'ci.yml' && matrix) {
-                    const majors = matrix[1].split(',').map((s) => Number(s.trim().replace(/['"]/g, '')));
+                const spansMatrix = /node-version:\s*\$\{\{\s*matrix\.node-version\s*\}\}/.test(text);
+                const majors = ciMatrixMajors(text);
+                if (name === 'ci.yml' && spansMatrix && majors.length > 0) {
                     if (pinnedMajor !== null && !majors.includes(pinnedMajor)) {
-                        fail(relPath, lineOf(text, matrix.index), 'node-pin-parity', `matrix [${matrix[1].trim()}] does not include the .nvmrc major ${pinnedMajor}`);
+                        fail(relPath, lineOf(text, text.search(/node-version/)), 'node-pin-parity', `matrix [${majors.join(', ')}] does not include the .nvmrc major ${pinnedMajor}`);
                     }
                     continue;
                 }
-                fail(relPath, lineOf(text, uses[0].index), 'node-pin-parity', 'actions/setup-node must read `node-version-file: .nvmrc` (only ci.yml may span a matrix)');
+                // v1.6.0 — the advisory workflow tests the newest line explicitly
+                // (SECURITY.md §Supported runtimes): a major above the pin, never below.
+                const advisory = name === 'node-current.yml' && /node-version:\s*(\d+)\s*$/m.exec(text);
+                if (advisory) {
+                    if (pinnedMajor !== null && Number(advisory[1]) <= pinnedMajor) {
+                        fail(relPath, lineOf(text, advisory.index), 'node-pin-parity', `node-current tests Node ${advisory[1]}, which is not newer than the .nvmrc major ${pinnedMajor}`);
+                    }
+                    continue;
+                }
+                fail(relPath, lineOf(text, uses[0].index), 'node-pin-parity', 'actions/setup-node must read `node-version-file: .nvmrc` (only ci.yml may span a matrix, only node-current.yml a newer major)');
             }
         }
         const engines = pkgJsonText === null ? null : ((JSON.parse(pkgJsonText) as { engines?: { node?: string } }).engines?.node ?? null);
-        const ciMatrix = /node-version:\s*\[([^\]]*)\]/.exec(readOr('.github/workflows/ci.yml') ?? '')?.[1]
-            .split(',').map((s) => Number(s.trim().replace(/['"]/g, ''))).filter((n) => Number.isFinite(n)) ?? [];
+        const ciMatrix = ciMatrixMajors(readOr('.github/workflows/ci.yml') ?? '');
         report(checkNodeVersionPin({ nodeVersion: readOr('.node-version'), enginesNode: engines, ciMatrix }), 'node-pin-parity');
     }
 

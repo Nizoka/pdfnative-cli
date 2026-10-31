@@ -23,7 +23,7 @@
     }
   },
   "declared": {
-    "tests": 1480,
+    "tests": 1539,
     "coverageStatements": 82,
     "coverageMeasured": 86.06,
     "bundleBudgetBytes": 458752,
@@ -49,7 +49,7 @@
     "manifestCommands": 14,
     "pdfaCorpus": 26,
     "fontAliases": 4,
-    "testFiles": 100,
+    "testFiles": 102,
     "renderSamples": 82,
     "sampleScripts": 89,
     "samplePdfs": 99
