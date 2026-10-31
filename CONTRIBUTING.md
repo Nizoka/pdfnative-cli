@@ -41,9 +41,11 @@ verifiable; the rulesets do not require signatures yet, so an unsigned contribut
 welcome.
 
 Every file the project writes uses LF line endings (`.gitattributes` says
-`* text=auto eol=lf`); on Windows, Git converts on checkout and the pre-commit hook refuses a
-staged CRLF file. Do not run `git add --renormalize` in a feature branch — the maintainer does
-that in one dedicated commit.
+`* text=auto eol=lf`); every tracked text blob is LF since the v1.6.0 normalisation commit
+listed in `.git-blame-ignore-revs` (run `git config blame.ignoreRevsFile .git-blame-ignore-revs`
+once so `git blame` skips it). On Windows, Git converts on checkout, the pre-commit hook
+refuses a staged CRLF file and `verify:docs` (rule `eol-lf`) fails on a CRLF blob. Do not run
+`git add --renormalize` in a feature branch: rewrite the offending file with LF and stage it.
 
 Windows notes: run the `.sh` samples and shell one-liners under Git Bash
 (`C:\Program Files\Git\bin\bash.exe`); PowerShell swallows a bare `--` after `npm run`, so

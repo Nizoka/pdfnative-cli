@@ -87,7 +87,7 @@ every CONFIRMED / DOWNGRADED finding with its fix commit, every waiver with its 
 
 ## Human-in-the-loop — steps for the maintainer
 
-1. <`git add --renormalize .` commit, if pending.>
+1. <Merge with a merge commit, not a squash, when the branch carries a commit listed in `.git-blame-ignore-revs`.>
 2. Import or update the rulesets (CONTRIBUTING §Branch protection).
 3. Merge (squash, title `release: vX.Y.Z — <headline>`), tag `vX.Y.Z`, publish the GitHub
    Release (body = `release-notes/vX.Y.Z.md`); `publish.yml` takes it from there.
