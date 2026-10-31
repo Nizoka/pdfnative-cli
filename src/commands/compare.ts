@@ -308,7 +308,7 @@ function extractPageTexts(doc: LoadedDoc, pages: readonly number[], onStreamErro
     try {
         return new Map(extractText(doc.bytes, opts).map((p) => [p.pageIndex, p.text]));
     } catch (e) {
-        throw mapPdfError(e, `Failed to extract text from PDF ${doc.label}`);
+        throw mapPdfError(e, `Failed to extract text from PDF ${doc.label}`, { streamErrorFlag: true });
     }
 }
 

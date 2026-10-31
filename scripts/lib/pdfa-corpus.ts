@@ -312,12 +312,10 @@ export const CORPUS: readonly CorpusEntry[] = [
         command: 'render samples/render/images/01-jpeg2000.json --tagged pdfa2b --strict --font latin --lang latin',
         args: (out) => ['render', '--input', imageSample('01-jpeg2000.json'), '--output', out('jpx-pdfa2b.pdf'), '--tagged', 'pdfa2b', ...STRICT_FONTS, ...PINNED],
     },
-    {
-        // NEGATIVE canary: the same image under PDF/A-1b — /JPXDecode is not a PDF 1.4 filter (PDFA1_JPX_IMAGE); veraPDF must reject.
-        file: 'jpx-pdfa1b.pdf', claims: 'pdfa', expectCompliant: false,
-        command: 'render samples/render/images/01-jpeg2000.json --tagged pdfa1b --font latin --lang latin',
-        args: (out) => ['render', '--input', imageSample('01-jpeg2000.json'), '--output', out('jpx-pdfa1b.pdf'), '--tagged', 'pdfa1b', '--font', 'latin', '--lang', 'latin', ...PINNED],
-    },
+    // No negative canary for a JPX under PDF/A-1b: veraPDF 1.30.2 accepts the
+    // file (its PDF/A-1 profile carries no rule against a PDF 1.5 filter), so
+    // "the validator must reject" would be a false expectation; the engine's
+    // PDFA1_JPX_IMAGE diagnostic is held by tests/helpers/diagnostic-triggers.ts.
 ];
 
 /** Number of entries claiming a given standard — the coverage canaries' expectation. */

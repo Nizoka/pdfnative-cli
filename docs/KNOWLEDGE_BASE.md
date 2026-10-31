@@ -1275,7 +1275,7 @@ npm run verify:samples         # compare; `npx tsx scripts/verify-samples.ts --u
 # Engine surface — tests/regression/engine-surface.json maps every pdfnative changelog bullet to tests + samples
 npx vitest run tests/regression/engine-surface.test.ts
 
-# Conformance corpus — 26 corpus files (PDF/A via veraPDF, an external tool; PDF/X in-process)
+# Conformance corpus — 25 corpus files (PDF/A via veraPDF, an external tool; PDF/X in-process)
 npm run corpus:pdfa            # generate test-output/pdfa/ (needs a prior npm run build)
 npm run validate:pdfx          # PDF/X-4 entries — never skipped
 npm run validate:pdfa          # PDF/A entries — SKIPs with exit 0 without veraPDF (see CONTRIBUTING.md)

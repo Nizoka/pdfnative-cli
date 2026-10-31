@@ -92,8 +92,9 @@ export function loadConfig(
     let raw: Buffer;
     try {
         raw = readFileSync(path);
-    } catch {
-        throw new CliError(`Failed to parse config file ${path}: invalid JSON.`, 2);
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new CliError(`Failed to read config file ${path}: ${msg}`, 2);
     }
     if (raw.length > CONFIG_SIZE_LIMIT) {
         throw new CliError(`Config file exceeds the 1 MB limit: ${path}`, 2);

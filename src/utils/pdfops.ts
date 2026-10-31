@@ -191,9 +191,12 @@ export function buildEncryptOptions(args: ParsedArgs, algoRaw: string | undefine
 /**
  * Map a value thrown by a pdfnative parse/crypto call to a {@link CliError}
  * with the correct stable error code, without leaking secrets. `context` is a
- * short human prefix (e.g. "Failed to read PDF").
+ * short human prefix (e.g. "Failed to read PDF"); `streamErrorFlag` is set by
+ * the two commands that accept `--on-stream-error` (extract-text, compare),
+ * so the remedy named for a stream over the inflate cap is one the command
+ * actually has.
  */
-export function mapPdfError(e: unknown, context: string): CliError {
+export function mapPdfError(e: unknown, context: string, options: { readonly streamErrorFlag?: boolean } = {}): CliError {
     if (e instanceof PdfPasswordError) {
         return new CliError(`${context}: ${e.message}`, 1, ErrorCode.PASSWORD);
     }
@@ -204,7 +207,10 @@ export function mapPdfError(e: unknown, context: string): CliError {
     // PDF_STREAM_LIMIT). The document is well-formed — the CLI's own read caps
     // are E_INPUT too — and the remedy is a flag, which the message names.
     if (e instanceof PdfStreamLimitError) {
-        return new CliError(`${context}: ${e.message} (raise --max-inflate-size, or pass --on-stream-error skip to read the other streams)`, 1, ErrorCode.INPUT);
+        const remedy = options.streamErrorFlag === true
+            ? 'raise --max-inflate-size, or pass --on-stream-error skip to read the other streams'
+            : 'raise --max-inflate-size';
+        return new CliError(`${context}: ${e.message} (${remedy})`, 1, ErrorCode.INPUT);
     }
     const message = e instanceof Error ? e.message : String(e);
     return new CliError(`${context}: ${message}`, 1, ErrorCode.PARSE);

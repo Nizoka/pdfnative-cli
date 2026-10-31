@@ -478,7 +478,9 @@ async function loadTemplate(templatePath: string): Promise<unknown> {
 function conformanceFields(layout: Partial<PdfLayoutOptions>): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     if (layout.pdfx !== undefined) out.pdfx = layout.pdfx;
-    if (layout.tagged !== undefined && layout.tagged !== false) out.tagged = layout.tagged;
+    // `schema status` types `tagged` as a PDF/A level; the engine's `tagged: true`
+    // (a structure tree with no claim) reaches here through --layout and is not one.
+    if (typeof layout.tagged === 'string') out.tagged = layout.tagged;
     if (layout.direction !== undefined) out.direction = layout.direction;
     if (layout.actualText === false) out.actualText = false;
     const pinned = layout.creationDate ?? getDefaultCreationDate() ?? null;

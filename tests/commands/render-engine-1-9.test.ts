@@ -154,4 +154,13 @@ describe('render: the table variant and chart series (pdfnative 1.9.0)', { timeo
         const b = await renderTo(tmp, MINIMAL_DOC, [...LATIN, '--actual-text', 'true'], 'b.pdf');
         expect(Buffer.compare(a.bytes, b.bytes)).toBe(0);
     });
+
+    it('a --layout "tagged": true (the engine\'s structure tree without a claim) never reaches the envelope, whose tagged is a PDF/A level', async () => {
+        const layout = await tmp.json('tagged-true.json', { tagged: true });
+        const { envelope } = await renderJson(tmp, docOf([para('Structure, no claim.')]), [...LATIN, '--layout', layout]);
+        expect(envelope).toMatchObject({ ok: true });
+        expect(envelope).not.toHaveProperty('tagged');
+        const claimed = await renderJson(tmp, docOf([para('A claim.')]), [...LATIN, '--tagged', 'pdfa2b']);
+        expect(claimed.envelope).toMatchObject({ tagged: 'pdfa2b' });
+    });
 });

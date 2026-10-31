@@ -72,6 +72,12 @@ export interface CompatAllowList {
     readonly exclude: readonly CompatExclusion[];
 }
 
+/** The allow-list of one tag (`--tag vX.Y.Z` → `tests/compat/allow-X.Y.Z.json`), or null when it does not exist. */
+export function allowListForTag(root: string, tag: string): string | null {
+    const file = join(root, 'tests', 'compat', `allow-${tag.replace(/^v/, '')}.json`);
+    return existsSync(file) ? file : null;
+}
+
 /** The newest `tests/compat/allow-<version>.json` — the previous release's. */
 export function findAllowList(root: string): string | null {
     const dir = join(root, 'tests', 'compat');
@@ -107,17 +113,28 @@ function main(): number {
     const tagArg = args.indexOf('--tag');
     const listOnly = args.includes('--list');
 
-    const allowPath = findAllowList(ROOT);
+    // --tag runs another release's suite under THAT release's allow-list: the
+    // exclusions and ledger entries of one release say nothing about another.
+    const explicitTag = tagArg >= 0 ? (args[tagArg + 1] ?? '') : null;
+    if (explicitTag !== null && !/^v\d+\.\d+\.\d+$/.test(explicitTag)) {
+        process.stderr.write(`run-compat: tag "${explicitTag}" is not of the form vX.Y.Z\n`);
+        return 2;
+    }
+    const allowPath = explicitTag === null ? findAllowList(ROOT) : allowListForTag(ROOT, explicitTag);
     if (allowPath === null) {
-        process.stderr.write('run-compat: no tests/compat/allow-<version>.json — nothing to check against\n');
+        process.stderr.write(explicitTag === null
+            ? 'run-compat: no tests/compat/allow-<version>.json — nothing to check against\n'
+            : `run-compat: no tests/compat/allow-${explicitTag.slice(1)}.json for --tag ${explicitTag} — write its allow-list first\n`);
         return 2;
     }
-    const allow = parseAllowList(readFileSync(allowPath, 'utf8'));
-    const tag = tagArg >= 0 ? (args[tagArg + 1] ?? '') : allow.tag;
-    if (!/^v\d+\.\d+\.\d+$/.test(tag)) {
-        process.stderr.write(`run-compat: tag "${tag}" is not of the form vX.Y.Z\n`);
+    let allow: CompatAllowList;
+    try {
+        allow = parseAllowList(readFileSync(allowPath, 'utf8'));
+    } catch (e) {
+        process.stderr.write(`run-compat: ${allowPath}: ${e instanceof Error ? e.message : String(e)}\n`);
         return 2;
     }
+    const tag = allow.tag;
     if (listOnly) {
         process.stdout.write(`compat-previous: ${tag} suite against the current sources; exclusions from ${allowPath}:\n`);
         for (const e of allow.exclude) process.stdout.write(`  ${e.pattern.padEnd(48)} ${e.ledger ? `[${e.ledger}] ` : ''}${e.reason}\n`);

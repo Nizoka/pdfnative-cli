@@ -65,7 +65,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) engine �
 - **CMYK & PDF/X-4 (v1.5.0)** — every colour accepts CMYK (`"c m y k"` or `[c,m,y,k]`),
   printer's marks gain **colour bars**, and `render --pdfx pdfx4 --output-intent-icc <cmyk.icc>
   --trapped false` writes a PDF/X-4 file whose claim `inspect --check pdfx` re-validates with
-  pdfnative's structural validator (`PDFX_*` diagnostics, `--strict` gating). A 26-file
+  pdfnative's structural validator (`PDFX_*` diagnostics, `--strict` gating). A 25-file
   conformance corpus (PDF/A via veraPDF, PDF/X via the validator) guards every release.
 - **Reproducible output (v1.5.0)** — the global `--creation-date <iso8601>` (or
   `SOURCE_DATE_EPOCH`) pins `/CreationDate`, `xmp:CreateDate`, the `{date}` placeholder and
@@ -149,14 +149,14 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) engine �
 - **Engineered like the engine (v1.5.0, aligned with 1.9.0 in v1.6.0)** — one quality gate
   (`npm run gate`) with fast / CI / publish profiles, run as required checks on **Ubuntu (Node
   22 and 24), Windows and macOS**; a byte-exact sample baseline (`test-output/samples/` vs
-  `tests/regression/baselines/samples.sha256.json`), a 26-file PDF/A + PDF/X conformance
+  `tests/regression/baselines/samples.sha256.json`), a 25-file PDF/A + PDF/X conformance
   corpus, a **compatibility promise proved on every pull request** (the previous release's test
   suite and `schema` captures replayed against the current sources — [SECURITY.md
   §Compatibility promise](SECURITY.md#compatibility-promise)), ClusterFuzzLite over the CLI's own
   parsers, hardened and linted workflows (SHA-pinned actions, zizmor + actionlint, CodeQL),
   a guard → build → publish → attest release pipeline (Trusted Publishing, SBOMs, SLSA Build L2
   attestations), a documentation verifier (`npm run verify:docs`) and a committed Claude Code
-  layer with a human-in-the-loop guard hook — 1539 tests.
+  layer with a human-in-the-loop guard hook — 1554 tests.
 - **AI-governance / HITL** — the **`govern`** command surfaces pdfnative's Human-in-the-Loop
   contract to agents: they act as *draftsmen*, never autonomous submitters. `govern
   verify-issue` gates a local draft; a human always reviews and submits.
@@ -347,12 +347,11 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) engine �
 
 The CLI's PDF/A outputs are **validated against the [veraPDF](https://verapdf.org)
 reference validator in CI (blocking)**, and its PDF/X-4 outputs against pdfnative's
-structural PDF/X validator: a corpus of 26 files produced by the CLI itself — 21 claiming
+structural PDF/X validator: a corpus of 25 files produced by the CLI itself — 20 claiming
 PDF/A (renders across all four levels plus attachments, headers/footers, outline, watermark,
 a table-variant render with embedded fonts, an AcroForm, Gray and CMYK output intents, an
-incremental PAdES signature, a `metadata` update, a JPEG 2000 image under PDF/A-2b and five
-negative canaries — unembedded fonts, an ICC v4 profile under PDF/A-1, a JPX image under
-PDF/A-1) and 6 claiming PDF/X-4 (a CMYK and a Gray print render, a signed print render, a
+incremental PAdES signature, a `metadata` update, a JPEG 2000 image under PDF/A-2b and four
+negative canaries — unembedded fonts, an ICC v4 profile under PDF/A-1) and 6 claiming PDF/X-4 (a CMYK and a Gray print render, a signed print render, a
 spot-colour render, a negative canary broken by an annotation outside the page boxes, and the
 PDF/A-2b + PDF/X-4 dual claim, counted in both groups) — is checked against the profile each
 file claims in XMP. It includes **negative canaries** that the validators must reject — so a

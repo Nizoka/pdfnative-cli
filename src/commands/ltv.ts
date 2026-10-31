@@ -33,6 +33,7 @@ import { CliError, ErrorCode } from '../utils/error.js';
 import { emitStatus, isDryRun } from '../utils/agent.js';
 import { splitPemBlocks, pemToDer } from '../utils/keys.js';
 import { createRevocationProvider } from '../utils/ltv-provider.js';
+import { mapPdfError } from '../utils/pdfops.js';
 
 const SUBCOMMANDS = ['collect', 'embed', 'add'] as const;
 type LtvMode = (typeof SUBCOMMANDS)[number];
@@ -106,8 +107,10 @@ function parseMatch(raw: string | undefined): ComposeLtvOptions['match'] {
  */
 async function readCertificateFile(flag: string, filePath: string): Promise<readonly Uint8Array[]> {
     const bytes = await readBinaryFileCapped(filePath, MAX_MATERIAL_BYTES, `${flag} file`);
-    const head = Buffer.from(bytes.subarray(0, 64)).toString('latin1');
-    if (!head.includes('-----BEGIN')) return [bytes];
+    // PEM anywhere in the file: `openssl x509 -text` and PKCS#12 exports put
+    // a textual preamble (Certificate:, Bag Attributes) before the first block.
+    const text = Buffer.from(bytes).toString('latin1');
+    if (!text.includes('-----BEGIN ')) return [bytes];
     const blocks = splitPemBlocks(Buffer.from(bytes).toString('utf8'));
     if (blocks.length === 0) {
         throw new CliError(`${flag} file "${filePath}" contains no PEM certificate block.`, 1, ErrorCode.INPUT);
@@ -141,7 +144,10 @@ async function loadMaterial(flags: ParsedArgs['flags']): Promise<LtvMaterial | n
 /**
  * Compose the /DSS data from material on disk (pdfnative 1.9.0). The engine's
  * own refusals (`composeLtvData: …` — no material, no signed signature) are
- * the user's input (E_INPUT); anything else is reported with a fixed string.
+ * the user's input (E_INPUT); a parse failure of a material file (a truncated
+ * OCSP response, a CRL that is not DER) goes through `mapPdfError` like every
+ * other engine parse error, so the message names what could not be read.
+ * The material holds no secret.
  */
 function composeMaterial(pdfBytes: Uint8Array, material: LtvMaterial, match: ComposeLtvOptions['match']): LtvData {
     try {
@@ -151,8 +157,21 @@ function composeMaterial(pdfBytes: Uint8Array, material: LtvMaterial, match: Com
         if (message.startsWith('composeLtvData:')) {
             throw new CliError(`ltv embed: ${message.slice('composeLtvData:'.length).trim()}`, 1, ErrorCode.INPUT);
         }
-        throw new CliError('Failed to compose validation information.', 1);
+        throw mapPdfError(e, 'Failed to compose validation information');
     }
+}
+
+/** The flags of `ltv embed`'s offline material, which collect/add never read: refuse them instead of ignoring them. */
+const MATERIAL_FLAGS = ['cert', 'ocsp', 'crl', 'match'] as const;
+
+function refuseMaterialFlags(sub: 'collect' | 'add', flags: ParsedArgs['flags']): void {
+    const given = MATERIAL_FLAGS.filter((f) => hasFlag(flags, f)).map((f) => `--${f}`);
+    if (given.length === 0) return;
+    throw new CliError(
+        `${given.join(', ')} belong to \`ltv embed\` (offline material); \`ltv ${sub}\` fetches its material with --online — `
+        + 'use --extra-cert for chain certificates.',
+        2,
+    );
 }
 
 // ── ltv-data (de)serialization ───────────────────────────────────────
@@ -273,6 +292,7 @@ function buildCollectOptions(flags: OnlineFlags): CollectLtvOptions {
 // ── Sub-modes ────────────────────────────────────────────────────────
 
 async function ltvCollect(args: ParsedArgs, dryRun: boolean): Promise<void> {
+    refuseMaterialFlags('collect', args.flags);
     requireOnline('collect', args.flags);
     const inputPath = getStringFlag(args.flags, 'input', 'i');
     const outputPath = getStringFlag(args.flags, 'output', 'o');
@@ -379,6 +399,7 @@ async function ltvEmbed(args: ParsedArgs, dryRun: boolean): Promise<void> {
 }
 
 async function ltvAdd(args: ParsedArgs, dryRun: boolean): Promise<void> {
+    refuseMaterialFlags('add', args.flags);
     requireOnline('add', args.flags);
     const inputPath = getStringFlag(args.flags, 'input', 'i');
     const outputPath = getStringFlag(args.flags, 'output', 'o');

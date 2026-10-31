@@ -23,11 +23,11 @@
     }
   },
   "declared": {
-    "tests": 1539,
+    "tests": 1554,
     "coverageStatements": 82,
     "coverageMeasured": 86.06,
     "bundleBudgetBytes": 458752,
-    "pdfaSamples": 21,
+    "pdfaSamples": 20,
     "pdfxSamples": 6,
     "unicodeScripts": 32,
     "bundledFontModules": 36,
@@ -47,9 +47,9 @@
     "errorCodes": 12,
     "globalFlags": 10,
     "manifestCommands": 14,
-    "pdfaCorpus": 26,
+    "pdfaCorpus": 25,
     "fontAliases": 4,
-    "testFiles": 102,
+    "testFiles": 103,
     "renderSamples": 82,
     "sampleScripts": 89,
     "samplePdfs": 99

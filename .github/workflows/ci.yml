@@ -133,7 +133,7 @@ jobs:
       # checkout above can keep its credentials off the runner.
       - name: Fetch the previous release tag
         run: |
-          TAG=$(node -e "console.log(JSON.parse(require('fs').readFileSync(require('fs').readdirSync('tests/compat').filter(f => /^allow-/.test(f)).map(f => 'tests/compat/' + f).sort().pop(), 'utf8')).tag)")
+          TAG=$(node -e "console.log(JSON.parse(require('fs').readFileSync(require('fs').readdirSync('tests/compat').filter(f => /^allow-/.test(f)).map(f => 'tests/compat/' + f).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).pop(), 'utf8')).tag)")
           git fetch --no-tags --depth=1 origin "+refs/tags/${TAG}:refs/tags/${TAG}"
 
       - name: Setup Node.js

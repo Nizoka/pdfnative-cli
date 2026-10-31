@@ -323,6 +323,40 @@ describe('ltv embed — offline material', () => {
         expect(envelope).toMatchObject({ ok: true, dryRun: true, match: 'all', ocspResponses: 1 });
         expect(await fileExists(outPdf)).toBe(false);
     });
+
+    it('a PEM bundle with a textual preamble (openssl x509 -text, a PKCS#12 export) is read as PEM, not handed to the engine as DER', async () => {
+        const { ocspDer } = await materialFiles();
+        setRevocationProvider(null);
+        const pem = await fs.readFile(signerCertPem, 'utf8');
+        const preamble = 'Certificate:\n    Data:\n        Version: 3 (0x2)\n        Serial Number: 4660 (0x1234)\n        Signature Algorithm: sha256WithRSAEncryption\n        Issuer: CN = Mock Root\n';
+        expect(preamble.length).toBeGreaterThan(64);
+        const withPreamble = out('signer-text.pem');
+        await fs.writeFile(withPreamble, preamble + pem, 'utf8');
+        const outPdf = out('offline-preamble.pdf');
+        const { envelope } = await withJsonEnvelope(() => ltv(parseArgs([
+            'embed', '--input', signedPdf, '--cert', withPreamble, '--cert', rootCertPem, '--ocsp', ocspDer, '--match', 'chain', '--output', outPdf,
+        ])));
+        expect(envelope).toMatchObject({ ok: true, match: 'chain', ocspResponses: 1, vri: 1 });
+    });
+
+    it('a material file the engine cannot parse is E_PARSE with the engine\'s message, never a bare E_RUNTIME', async () => {
+        // The engine keeps unparseable material as opaque blobs; what it cannot
+        // read at all is the document itself — the parse error reaches the user
+        // with its message and the stable E_PARSE code, like every other command.
+        const notAPdf = out('not-a-pdf.bin');
+        await fs.writeFile(notAPdf, Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\ntrailer\n'));
+        await expect(ltv(parseArgs(['embed', '--input', notAPdf, '--cert', signerCertPem, '--output', out('x.pdf')])))
+            .rejects.toMatchObject({ code: ErrorCode.PARSE, message: expect.stringContaining('Failed to compose validation information: ') });
+    });
+
+    it('ltv collect and ltv add refuse the embed-only material flags instead of ignoring them', async () => {
+        for (const sub of ['collect', 'add']) {
+            for (const material of [['--cert', signerCertPem], ['--crl', out('any.crl')], ['--match', 'chain']]) {
+                await expect(ltv(parseArgs([sub, '--input', signedPdf, '--online', ...material, '--output', out('x.pdf')])))
+                    .rejects.toMatchObject({ exitCode: 2, message: expect.stringContaining('belong to `ltv embed`') });
+            }
+        }
+    });
 });
 
 // ── ltv add ──────────────────────────────────────────────────────────

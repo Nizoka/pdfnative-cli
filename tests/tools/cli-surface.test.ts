@@ -139,7 +139,7 @@ describe('cli-surface — the real tree', () => {
             errorCodes: 12,
             globalFlags: 10,
             manifestCommands: 14,
-            pdfaCorpus: 26,
+            pdfaCorpus: 25,
             bundledFontModules: 36,
             unicodeScripts: 32,
             fontAliases: 4,

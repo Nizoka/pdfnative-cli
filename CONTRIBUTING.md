@@ -150,12 +150,13 @@ encrypted and signed output through a canonical projection (`ENCRYPTED_SAMPLES` 
 The CLI's PDF/A claims are checked against the official reference validator,
 [veraPDF](https://verapdf.org). `npm run corpus:pdfa` drives the **built** CLI
 (`scripts/generate-pdfa-corpus.ts`, corpus table in `scripts/lib/pdfa-corpus.ts`) to write
-22 files to `test-output/pdfa/` — 18 claiming PDF/A (renders at all four levels 1b / 2b /
+25 files to `test-output/pdfa/` — 20 claiming PDF/A (renders at all four levels 1b / 2b /
 2u / 3b, a PDF/A-3b XML attachment, header/footer templates, `--outline auto`, an opaque
 watermark, a `--variant table` render with embedded fonts, an AcroForm, a Gray and a CMYK
-output intent, an incremental PAdES signature over a claiming file and an incremental
-`metadata` update) and 4 claiming PDF/X-4 (a CMYK and a Gray print render, a signed print
-render and a negative canary broken by `annotate`). The corpus is
+output intent, an incremental PAdES signature over a claiming file, an incremental
+`metadata` update, a JPEG 2000 image under PDF/A-2b and the PDF/A-2b + PDF/X-4 dual claim)
+and 6 claiming PDF/X-4 (a CMYK and a Gray print render, a signed print render, a spot-colour
+render, the dual claim and a negative canary broken by `annotate`). The corpus is
 reproducible: pinned dates, the committed test key pair, a per-file SHA-256 in `manifest.json`.
 
 `npm run validate:pdfa` (`scripts/validate-pdfa.ts`, pure core in `scripts/lib/verapdf.ts`)

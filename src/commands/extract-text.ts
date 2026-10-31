@@ -79,7 +79,7 @@ export async function extractTextCmd(args: ParsedArgs): Promise<void> {
     try {
         pages = extractText(pdfBytes, opts);
     } catch (e) {
-        throw mapPdfError(e, 'Failed to extract text');
+        throw mapPdfError(e, 'Failed to extract text', { streamErrorFlag: true });
     }
 
     if (format === 'text') {

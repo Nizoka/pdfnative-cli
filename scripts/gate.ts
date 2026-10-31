@@ -52,6 +52,7 @@
 
 import { spawnSync, type SpawnSyncOptions } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeSync } from 'node:fs';
+import { findAllowList, parseAllowList, tagAvailable } from './run-compat.js';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -99,13 +100,16 @@ function veraPdfInstalled(): boolean {
  * this one.
  */
 function previousTagAvailable(): boolean {
-    const dir = join(REPO_ROOT, 'tests', 'compat');
-    if (!existsSync(dir)) return false;
-    const allow = readdirSync(dir).filter((f) => /^allow-\d+\.\d+\.\d+\.json$/.test(f)).sort().pop();
-    if (!allow) return false;
-    const { tag } = JSON.parse(readFileSync(join(dir, allow), 'utf8')) as { tag: string };
-    const probe = spawnSync('git', ['rev-parse', '--verify', '--quiet', `${tag}^{commit}`], { cwd: REPO_ROOT, windowsHide: true });
-    return probe.status === 0;
+    // The same discovery run-compat.ts uses (numeric order: allow-1.10.0 after
+    // allow-1.9.0). A malformed allow-list is not a skip: the step runs and
+    // run-compat.ts names the file and the error (exit 2 → FAIL).
+    const allowPath = findAllowList(REPO_ROOT);
+    if (allowPath === null) return false;
+    try {
+        return tagAvailable(REPO_ROOT, parseAllowList(readFileSync(allowPath, 'utf8')).tag);
+    } catch {
+        return true;
+    }
 }
 
 function testCount(): string | null {
