@@ -247,6 +247,52 @@ This document outlines the planned development direction for pdfnative-cli. Prio
   the Claude Code layer (`CLAUDE.md` = `@AGENTS.md`, settings, guard hook, generated rules,
   `release-audit` skill), `docs/AGENT_CONTRACT.md` split out of AGENTS.md, CHANGELOG compare links.
 
+### v1.6.0 — right-to-left, 32 scripts, spot colours & the dual PDF/A + PDF/X claim _(released 2026-10-31)_
+
+- [x] **`pdfnative` bumped** to `^1.9.0` (was `^1.8.0`) — every 1.9.0 feature exposed, traced in
+  `tests/regression/engine-surface.json` (72 items: tests and samples, or a motivated waiver).
+- [x] **Right-to-left** — `render --direction auto|ltr|rtl` (full UAX #9; per-paragraph
+  `direction`), `--actual-text [true|false]` (untagged shaped and RTL runs carry `/Span
+  /ActualText`, so `extract-text` returns logical order — the Khmer, Myanmar and CJK `it.fails`
+  markers of v1.5.0 are gone); envelope `direction`, `actualText`.
+- [x] **Five Indic scripts** — `gu pa kn ml or` (32 Unicode scripts, 36 modules), shaping probes
+  per script in `tests/helpers/script-text.ts`, `doctor` probes the modules.
+- [x] **Spot colours** — `layout.print.spotColours`, `{ spot }` / `{ spot, tint }` / `{ inks }`
+  values (`/Separation`, `/DeviceN`), chart `colors` per value and an optional series `label`;
+  the engine's refusals classified `E_INPUT`.
+- [x] **PDF/A-2 + PDF/X-4 in one file** — the CLI pre-check is gone; `--tagged pdfa2b|pdfa2u --pdfx
+  pdfx4` writes the dual claim, `inspect --check pdfa,pdfx` verifies it, the corpus carries it
+  (veraPDF and `validatePdfX` both accept); `pdfa1b` / `pdfa3b` refused by the engine; envelope `tagged`.
+- [x] **JPEG 2000** — `.jp2` / `.j2k` image blocks and watermarks as `/JPXDecode`;
+  `PDFA1_JPX_IMAGE`, `PDFA_JPX_IMAGE`, `PDFA_GLYPH_WITHOUT_UNICODE`, `TEXT_GLYPH_NOT_COVERED`
+  (13 diagnostics, each with a trigger).
+- [x] **`extract-text` / `compare --on-stream-error limit|throw|skip`** — the engine's
+  `PdfStreamLimitError` is `E_INPUT` by instance; `compare` never calls an unreadable page equal.
+- [x] **`ltv embed` from material on disk** — `--cert` / `--ocsp` / `--crl` (repeatable),
+  `--match all|chain`, through `composeLtvData`; the PAdES ladder has an offline B-LT rung.
+- [x] **Engine primitives replace CLI copies** — `annotate link` through `buildAnnotationBody`,
+  `/Info` strings through `decodePdfTextString` (`utils/pdftext.ts` deleted), the synthetic Gray
+  and CMYK profiles from `pdfnative/tools` (`scripts/lib/synthetic-gray-profile.ts` deleted).
+- [x] **A long table of contents paginates**, **a chart series without `label`** renders — both
+  fixed upstream (1.9.0) and pinned by tests and samples; `--variant table` refuses a malformed
+  `PdfParams` (`infoItems` as `{ label, value }`) with `E_INPUT` instead of an engine `TypeError`.
+- [x] **Compatibility promise** — `tests/compat/`: the v1.5.0 `schema manifest` / `status` /
+  `list` captures held by `manifest-compat.test.ts` (a minor only adds), the v1.5.0 test suite
+  replayed against the current sources (`npm run compat:previous`, `scripts/run-compat.ts`,
+  allow-list with a ledger entry per behaviour change), required check `compat-previous` and a
+  publish-gate step; SECURITY.md §Compatibility promise and §Supported runtimes.
+- [x] **CI/CD aligned with the 1.9.0 engine** — the gate required on Ubuntu (Node 22, 24),
+  Windows and macOS; `workflow lint` (zizmor + actionlint); CodeQL `security-extended` with
+  the `actions` language and job-level permissions; `publish.yml` as guard → build → publish →
+  attest (tarball digests, an npm client pinned by SHA-512, the registry bytes attested, SLSA
+  Build L2); `node-current` (Node 26, advisory); ClusterFuzzLite over nine parser targets
+  (`fuzz/`, Jazzer.js pinned by lockfile inside the build image, `tests/fuzz/targets.test.ts`
+  proving every target locally); Dependabot with a seven-day cooldown on four ecosystems;
+  `.github/rulesets/main.json` with seven required contexts and merge commits allowed; the
+  repository normalised to LF (`.git-blame-ignore-revs`); every Dependabot alert of the dev
+  toolchain closed by the bumps, the CodeQL `js/insecure-randomness` findings fixed at the
+  source (`tmpName` on `randomUUID`).
+
 ## Future Considerations
 
 Feasibility is called out honestly: some ideas need pdfnative to expose a primitive first
@@ -280,31 +326,38 @@ Feasibility is called out honestly: some ideas need pdfnative to expose a primit
   signed PDF is never byte-identical across runs even with `--creation-date` and
   `--signing-time` pinned. The sample baseline fingerprints signed samples semantically.
   **Blocked upstream** — needs the signing path to honour the pinned creation instant.
-- **PDF/X-1a / PDF/X-3 / PDF/X-4p, spot colours** — pdfnative 1.9.0 validates and emits
-  PDF/X-4 only (`PDF_X_CONFORMANCE_TARGETS`); the older targets need DeviceN / Separation
-  colour spaces and externally referenced profiles the engine does not expose. **Blocked upstream**.
-- **PDF/A and PDF/X in one file** — ISO 19005 and ISO 15930 can be claimed together
-  (PDF/A-2 + PDF/X-4), but the engine refuses `layout.pdfx` with `tagged` and the CLI mirrors
-  that pre-check. **Blocked upstream**.
+- **PDF/X-1a / PDF/X-3 / PDF/X-4p** — spot colours (`/Separation`, `/DeviceN`) **shipped in
+  v1.6.0** with pdfnative 1.9.0, which validates and emits PDF/X-4 only
+  (`PDF_X_CONFORMANCE_TARGETS`); the older targets (PDF/X-1a's CMYK-only content, PDF/X-3's
+  colour-managed RGB, PDF/X-4p's externally referenced profile) need conformance rules the
+  engine does not expose. **Blocked upstream** (issue draft under `.github/drafts/`).
 - **`formField.fieldType` validated by the engine** — pdfnative 1.9.0 does not check the value:
   anything outside `text` / `multilineText` / `checkbox` / `radio` / `dropdown` / `listbox` falls
   through its geometry table and writes `NaN` rectangles. `render` refuses the value up front
   (`E_INPUT`, v1.5.0); the guard can go once the builder throws. Same family: with
   `layout.typography.kerning` on an untagged document, `extract-text` can read a stray space
   inside a kerned word. **Upstream issues to file** (maintainer, HITL).
-- **Untagged text extraction of shaped scripts** — from UNTAGGED output the 1.8.0 engine returned
-  stacked Khmer and Myanmar clusters as U+FFFD, CJK ideographs that share a glyph with a Kangxi
-  radical as the radical (U+2F49 for U+6708), and reordered glyphs (reph, Tamil and Thai pre-base
-  signs) in visual order; glyphs of `subs` / `sups` extract as their own code points. Tagged output
-  (`--tagged`) carries `/ActualText` and returns the source text exactly.
-  `tests/commands/render-scripts.test.ts` pins the first two with `it.fails`.
-  **Upstream issues to file** (maintainer, HITL).
-- **A long table of contents does not paginate** — 160 entries are laid out on one page and run
-  past its foot; `--inspect-layout` agrees with the render, so the report is faithful. **Upstream.**
-- **Malformed block shapes reach the engine** — a chart series without `label` next to another
-  series raises a `TypeError` inside the engine (`E_RUNTIME`, not `E_INPUT`). The CLI validates
-  paths, sizes and `formField.fieldType`, not every block shape; a JSON-Schema pre-check of
-  `render` input is a candidate for a later release.
+- **Untagged text extraction of a Thai above-vowel + tone-mark pair** — pdfnative 1.9.0 returns
+  untagged shaped and right-to-left text in logical order through `/Span /ActualText` (the Khmer,
+  Myanmar, CJK and reordering limits of 1.8.0 are gone, **delivered in v1.6.0**); the one pair
+  that still extracts in geometric order is a Thai vowel sign above the base followed by a tone
+  mark (`ตั้ง`), pinned with `it.fails` (`thToneBelow`) in `tests/commands/render-scripts.test.ts`.
+  Tagged output returns it exactly. **Upstream issue to file** (maintainer, HITL; draft under
+  `.github/drafts/`).
+- **Malformed block shapes reach the engine** — the chart series without `label` and the 160-entry
+  table of contents were fixed upstream in 1.9.0 (**delivered in v1.6.0**); a table-variant
+  `infoItems` of plain strings is now refused by the CLI (`E_INPUT`). The CLI validates paths,
+  sizes, `formField.fieldType` and the table-variant shape, not every block shape; a JSON-Schema
+  pre-check of `render` input against `schema render` is a candidate for a later release.
+- **Compatibility snapshots** — v1.6.0 replays the previous release's suite and holds its
+  `schema manifest` / `status` / `list` captures (`tests/compat/`); the allow-list is reviewed at
+  every release (an exclusion without a ledger entry is a breaking change by policy). A committed
+  `manifest.json` per release and a JSON-LD / `llms-full.txt` variant are deferred: both derive
+  from `schema manifest`, whose `$id` already carries the version.
+- **Synthetic ICC profiles with a chosen version** — the PDF/A-1 canary needs an ICC v4 variant of
+  the engine's synthetic Gray profile; `scripts/lib/icc-canary.ts` patches the header byte
+  because `buildSyntheticGrayProfile()` takes no `version` option. **Upstream issue to file**
+  (maintainer, HITL; draft under `.github/drafts/`).
 - **Hyphenation dictionaries from the CLI** — the engine breaks lines at
   existing U+00AD soft hyphens; a language dictionary or a hyphenation provider (a function in
   the engine's API) would need the CLI to load code or data from a user path. Deferred by

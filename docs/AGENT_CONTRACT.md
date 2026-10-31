@@ -90,6 +90,10 @@ command that emits it) and the additive fields below:
 | `pdfx: "pdfx4"` | `render --pdfx` | The PDF/X conformance level the output claims (v1.5.0) |
 | `creationDate: "<ISO 8601>"` | `render` (also on the `render` envelopes inside a `batch` run) | The pinned creation instant when `--creation-date` or `SOURCE_DATE_EPOCH` is active (v1.5.0) |
 | `timestamp: { url, digest, timeoutMs? }` | `sign --timestamp` | The RFC 3161 TSA used, the digest algorithm and, when set, `--timestamp-timeout` (v1.5.0) |
+| `tagged: "pdfa2b"` | `render --tagged` | The PDF/A level the output claims (v1.6.0; next to `pdfx` on a dual claim) |
+| `direction: "auto" \| "ltr" \| "rtl"` | `render --direction` | The base text direction requested (v1.6.0) |
+| `actualText: false` | `render --actual-text false` | Only when the `/ActualText` runs were switched off — the default emits nothing (v1.6.0) |
+| `match: "all" \| "chain"` | `ltv embed` with `--cert` / `--ocsp` / `--crl` | How the offline material was referenced from the `/VRI` dictionaries (v1.6.0) |
 
 `inspect`, `verify`, and `batch` put their result document on **stdout** as JSON;
 `--json` only adds the failure envelope on stderr and (for `batch`) forces the
@@ -185,7 +189,7 @@ version so you can detect drift.
 
 ```bash
 pdfnative schema list             # → { "subjects": [ …all subjects… ] }
-pdfnative schema render           # input accepted by `render` (incl. layout.typography, layout.pdfx, CMYK colours)
+pdfnative schema render           # input accepted by `render` (incl. layout.typography, layout.pdfx, layout.direction, spot colours, CMYK)
 pdfnative schema inspect          # output of `inspect --format json`
 pdfnative schema verify-summary   # output of `verify --summary`
 pdfnative schema annotate         # annotation-spec accepted by `annotate --annotations` (incl. `link`)
@@ -210,7 +214,15 @@ as a tool set at runtime. A prose/LLM-facing version lives in `llms.txt` at the 
 (`{ pageIndex, text, runs? }`), which streams cleanly into a retrieval pipeline; add `--runs`
 for positioned runs, `--password` for encrypted PDFs. No OCR — image-only pages yield empty text.
 Tagged output (`--tagged`) carries `/ActualText`, so extracted text is the source text even
-where the typography engine inserted narrow no-break spaces or soft hyphens.
+where the typography engine inserted narrow no-break spaces or soft hyphens; since v1.6.0
+(pdfnative ≥ 1.9.0) untagged shaped and right-to-left runs carry it too, so Arabic, Hebrew,
+Khmer, Myanmar or Indic text comes back in logical order, as typed, unless the file was
+rendered with `--actual-text false`. A content or font stream over the global
+`--max-inflate-size` is a refusal, not a silently empty page: `--on-stream-error limit`
+(default) fails with `E_INPUT` naming both remedies, `throw` fails on any undecodable stream,
+`skip` reads the page as empty text — branch on the code, and prefer `limit` for untrusted
+input. `compare` takes the same flag and never calls two documents equal because a page could
+not be read.
 
 ---
 
@@ -329,7 +341,12 @@ pdfnative verify --input final.pdf --strict                  # offline gate
 ```
 
 Air-gapped variant: `ltv collect --online` on a connected machine emits a replayable
-JSON (`schema ltv-data`); `ltv embed --data ltv.json` applies it fully offline.
+JSON (`schema ltv-data`); `ltv embed --data ltv.json` applies it fully offline. Material you
+already hold (v1.6.0): `ltv embed --cert chain.pem --ocsp signer.ocsp.der --crl ca.crl
+--match chain` composes the `/DSS` + `/VRI` from certificates (PEM bundles or DER), DER OCSP
+responses and DER CRLs obtained by any means — no `collect` step, no network, `--dry-run`
+composes without writing, and the envelope carries `match`. `--data` and the material flags
+are exclusive (exit 2); material that matches no signature is `E_INPUT`.
 `verify` reports the timestamp's `messageImprint` digest (`timestampDigest`) and notes a
 SHA-1 imprint as a weak digest; under `--strict` that timestamp is refused (`E_VERIFY_FAILED`).
 
@@ -337,6 +354,13 @@ SHA-1 imprint as a weak digest; under `--strict` that timestamp is refused (`E_V
 
 ## 8. Safety notes for unattended use
 
+- **Stable across 1.x.** No command, flag, global flag, `E_*` code, exit code, `schema`
+  subject or envelope field of a 1.x release is removed or renamed; a minor only adds, and
+  every pull request replays the previous release's test suite and `schema` captures against
+  the current sources (`compat-previous`; policy in
+  [SECURITY.md §Compatibility promise](../SECURITY.md#compatibility-promise)). Pin a minor if
+  you want byte-identical output across upgrades: engine-inherited byte changes are declared
+  in each release note's compatibility ledger.
 - **Offline by default.** The ONLY network opt-ins are `verify --revocation online`,
   `sign --timestamp <url>`, `ltv collect|add --online`, `doc-timestamp --url <url>`, and
   `batch --allow-network` (which gates network flags inside a manifest). Every request
