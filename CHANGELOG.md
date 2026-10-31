@@ -64,6 +64,7 @@ note's compatibility ledger.
   'link', rect, url })` (pdfnative 1.9.0); the CLI's own dictionary builder is gone.
 - **Engine text-string decoding** — `inspect` and `compare` decode `/Info` strings through
   `decodePdfTextString` (PDFDocEncoding and UTF-16); `src/utils/pdftext.ts` is deleted.
+- **`inspect --check` takes a comma list** (`--check pdfa,pdfx`) as well as the repeated form.
 
 #### Compatibility, CI/CD and tooling
 

@@ -156,7 +156,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) engine �
   parsers, hardened and linted workflows (SHA-pinned actions, zizmor + actionlint, CodeQL),
   a guard → build → publish → attest release pipeline (Trusted Publishing, SBOMs, SLSA Build L2
   attestations), a documentation verifier (`npm run verify:docs`) and a committed Claude Code
-  layer with a human-in-the-loop guard hook — 1554 tests.
+  layer with a human-in-the-loop guard hook — 1555 tests.
 - **AI-governance / HITL** — the **`govern`** command surfaces pdfnative's Human-in-the-Loop
   contract to agents: they act as *draftsmen*, never autonomous submitters. `govern
   verify-issue` gates a local draft; a human always reviews and submits.
@@ -874,7 +874,7 @@ signature adds `timestamp: { url, digest, timeoutMs? }` to the success envelope.
 | `--pdfua` | false | Add a PDF/UA (ISO 14289-1) structural validation report (`valid` + `errors` + `warnings`) |
 | `--pdfx` | false | (v1.5.0) Add a PDF/X-4 validation report (`pdfx: { valid, target, errors, warnings }`, pdfnative's `validatePdfX`); `pdfxConformance` (XMP `GTS_PDFXVersion`) is always reported |
 | `--iso-dates` | false | (v1.5.0) Normalise `metadata.creationDate` / `modDate` from `D:YYYYMMDD…` to ISO 8601 (unparsable strings are left as is) |
-| `--check pdfa\|signed\|encrypted\|pdfua\|pdfx\|"signatures>=N"` _(repeatable)_ | — | CI-friendly assertion; AND semantics; sets exit code (0 = pass, 1 = fail). `signatures>=N` counts real signatures (placeholders and `/DocTimeStamp` fields excluded); `pdfx` requires a PDF/X-4 claim that validates |
+| `--check pdfa\|signed\|encrypted\|pdfua\|pdfx\|"signatures>=N"` _(repeatable, or a comma list — v1.6.0)_ | — | CI-friendly assertion; AND semantics; sets exit code (0 = pass, 1 = fail). `signatures>=N` counts real signatures (placeholders and `/DocTimeStamp` fields excluded); `pdfx` requires a PDF/X-4 claim that validates |
 
 v1.4.0 also fixes the top-level `signatures` and `formFields` counters, which previously
 always reported `0`, and reports `metadata.trapped` when present. `--summary` returns

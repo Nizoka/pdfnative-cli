@@ -23,7 +23,7 @@
     }
   },
   "declared": {
-    "tests": 1554,
+    "tests": 1555,
     "coverageStatements": 82,
     "coverageMeasured": 86.86,
     "bundleBudgetBytes": 458752,

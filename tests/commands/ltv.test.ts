@@ -353,7 +353,7 @@ describe('ltv embed — offline material', () => {
         for (const sub of ['collect', 'add']) {
             for (const material of [['--cert', signerCertPem], ['--crl', out('any.crl')], ['--match', 'chain']]) {
                 await expect(ltv(parseArgs([sub, '--input', signedPdf, '--online', ...material, '--output', out('x.pdf')])))
-                    .rejects.toMatchObject({ exitCode: 2, message: expect.stringContaining('belong to `ltv embed`') });
+                    .rejects.toMatchObject({ exitCode: 2, message: expect.stringMatching(/belongs? to `ltv embed`/) });
             }
         }
     });

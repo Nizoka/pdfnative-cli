@@ -469,7 +469,9 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     const includeEncryption = hasFlag(args.flags, 'encryption');
     const includeSignatures = hasFlag(args.flags, 'signatures');
     const password = resolveSourcePassword(args.flags);
-    const checks = getStringFlagAll(args.flags, 'check');
+    // Repeatable, and (v1.6.0) a comma list: `--check pdfa,pdfx` is the documented
+    // form of the dual claim. An empty piece ("pdfa,") stays and is refused below.
+    const checks = getStringFlagAll(args.flags, 'check').flatMap((c) => c.split(',')).map((c) => c.trim());
     const includePdfua = hasFlag(args.flags, 'pdfua') || checks.includes('pdfua');
     const includePdfx = hasFlag(args.flags, 'pdfx') || checks.includes('pdfx');
     // v1.5.0: normalise /Info dates (D:YYYYMMDDHHmmSS+HH'mm') to ISO 8601.

@@ -168,7 +168,7 @@ function refuseMaterialFlags(sub: 'collect' | 'add', flags: ParsedArgs['flags'])
     const given = MATERIAL_FLAGS.filter((f) => hasFlag(flags, f)).map((f) => `--${f}`);
     if (given.length === 0) return;
     throw new CliError(
-        `${given.join(', ')} belong to \`ltv embed\` (offline material); \`ltv ${sub}\` fetches its material with --online — `
+        `${given.join(', ')} ${given.length === 1 ? 'belongs' : 'belong'} to \`ltv embed\` (offline material); \`ltv ${sub}\` fetches its material with --online — `
         + 'use --extra-cert for chain certificates.',
         2,
     );

@@ -202,6 +202,29 @@ describe('inspect', () => {
         }
     });
 
+    it('--check accepts a comma list — the documented form of the dual claim — with the same AND semantics as the repeated form', async () => {
+        const pdfPath = await generateTestPdf();
+        const errStream: string[] = [];
+        const origStdout = process.stdout.write.bind(process.stdout);
+        const origStderr = process.stderr.write.bind(process.stderr);
+        process.stdout.write = () => true;
+        process.stderr.write = (c: unknown) => { errStream.push(String(c)); return true; };
+        try {
+            const err = await inspect(parseArgs(['--input', pdfPath, '--check', 'pdfa,signed'])).catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(1);
+            expect(errStream.join('')).toContain('pdfa=fail');
+            expect(errStream.join('')).toContain('signed=fail');
+        } finally {
+            process.stdout.write = origStdout;
+            process.stderr.write = origStderr;
+        }
+        // A trailing comma is an empty value, refused like any unknown one.
+        const empty = await inspect(parseArgs(['--input', pdfPath, '--check', 'pdfa,'])).catch((e: unknown) => e);
+        expect(empty).toBeInstanceOf(CliError);
+        expect((empty as CliError).exitCode).toBe(2);
+    });
+
     it('rejects invalid --check value', async () => {
         const pdfPath = await generateTestPdf();
         const err = await inspect(parseArgs(['--input', pdfPath, '--check', 'unknown']))

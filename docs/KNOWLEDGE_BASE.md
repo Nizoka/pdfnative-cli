@@ -593,7 +593,7 @@ pdfnative inspect [--input <file.pdf>] [--format json|text]
 | `--signatures` | boolean | false | (v1.4.0) List signature fields via `listSignatures` — `fieldName`, `subFilter`, `byteRange`, `isDocTimestamp`, `isPlaceholder`, `sigObjNum`, `contentsLength` (never the signature bytes) |
 | `--pdfx` | boolean | false | (v1.5.0) Add a PDF/X-4 validation report `pdfx: { valid, target, errors, warnings }` (`validatePdfX`); `pdfxConformance` (XMP `pdfxid:GTS_PDFXVersion`) is always present |
 | `--iso-dates` | boolean | false | (v1.5.0) Normalise `metadata.creationDate` / `modDate` from `D:YYYYMMDDHHmmSS+HH'mm'` to ISO 8601 (`src/utils/pdfdate.ts`; unparsable strings unchanged) |
-| `--check` | `pdfa`\|`signed`\|`encrypted`\|`pdfua`\|`pdfx`\|`"signatures>=N"` (repeatable, AND) | — | CI assertion; sets exit code (0 = pass, 1 = fail). `"signatures>=N"` is new in v1.4.0, `pdfx` in v1.5.0 |
+| `--check` | `pdfa`\|`signed`\|`encrypted`\|`pdfua`\|`pdfx`\|`"signatures>=N"` (repeatable or a comma list, AND) | — | CI assertion; sets exit code (0 = pass, 1 = fail). `"signatures>=N"` is new in v1.4.0, `pdfx` in v1.5.0 |
 
 **v1.4.0:** `metadata.trapped` (`/Trapped`) is reported, and a bug where the per-page `signatures` / `formFields` counters always reported `0` is fixed. **v1.5.0:** `--summary` returns `{ pages, encrypted, signatures, pdfa, pdfx }`; the text report prints `PDF/X:` and `PDF/X check:` lines.
 

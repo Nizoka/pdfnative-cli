@@ -532,9 +532,9 @@ Options:
                   PDF date string (D:YYYYMMDDHHmmSS+HH'mm') to ISO 8601
   --signatures    List signature fields (fieldName, subFilter, byteRange,
                   isDocTimestamp, isPlaceholder — never the signature bytes)
-  --check         Assert a property; repeatable; AND semantics; exits 1 on
-                  failure. Values: pdfa | signed | encrypted | pdfua | pdfx |
-                  "signatures>=N"
+  --check         Assert a property; repeatable or a comma list (--check
+                  pdfa,pdfx); AND semantics; exits 1 on failure. Values:
+                  pdfa | signed | encrypted | pdfua | pdfx | "signatures>=N"
   --summary       Emit only the minimal verdict { pages, encrypted, signatures, pdfa, pdfx }
   --fields        Comma-separated dot-paths to keep (e.g. pageCount,metadata.title)
   --pretty        Force indented JSON even under --json (agent mode is compact)
