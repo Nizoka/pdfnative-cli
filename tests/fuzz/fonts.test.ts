@@ -7,7 +7,8 @@ import { describe, it, expect, afterAll, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { sniffFontFormat, parseFontFileSpec, loadCustomFonts, BUNDLED_FONT_MODULES, FONT_ALIASES } from '../../src/utils/fonts.js';
+import { pathToFileURL } from 'node:url';
+import { sniffFontFormat, parseFontFileSpec, loadCustomFonts, resolveFontsDir, BUNDLED_FONT_MODULES, FONT_ALIASES } from '../../src/utils/fonts.js';
 import { ErrorCode } from '../../src/utils/error.js';
 import { forEachCase, forEachCaseAsync, onlyCliError, onlyCliErrorAsync, randomToken, assertPrototypeClean, concatBytes, mulberry32 } from '../helpers/fuzz.js';
 
@@ -56,6 +57,24 @@ describe('fuzz: fonts', () => {
             writeFileSync(p, concatBytes([magic, randomBytes(rng, 16 + rng.int(4096))]));
             const r = await onlyCliErrorAsync(() => loadCustomFonts([`${p}:fuzz${i}`], true), [ErrorCode.INPUT]);
             expect(r.outcome).toBe('error');
+        });
+    });
+
+    // pdfnative 1.9.0 (CWE-125): parseFontData() read past the end of a malformed
+    // font (a RangeError, not a refusal). A real face cut at random offsets is the
+    // probe: every cut is refused with E_INPUT, or — when the cut spares every
+    // table the parser needs — accepted, and never crashes the sniffer or parser.
+    it('a bundled TrueType truncated at 20 random offsets is refused with E_INPUT or accepted, never a RangeError (CWE-125)', async () => {
+        const mod = await import(pathToFileURL(join(resolveFontsDir(), 'noto-hebrew-data.js')).href) as { default?: { ttfBase64: string }; ttfBase64?: string };
+        const b64 = (mod.default ?? mod).ttfBase64;
+        expect(typeof b64).toBe('string');
+        const ttf = Buffer.from(b64 as string, 'base64');
+        await forEachCaseAsync('truncated-font', 20, async (rng, i) => {
+            const cut = 12 + rng.int(ttf.length - 12);
+            const p = join(dir, `cut${i}.ttf`);
+            writeFileSync(p, ttf.subarray(0, cut));
+            const r = await onlyCliErrorAsync(() => loadCustomFonts([`${p}:cut${i}`], true), [ErrorCode.INPUT]);
+            expect(['ok', 'error']).toContain(r.outcome);
         });
     });
 

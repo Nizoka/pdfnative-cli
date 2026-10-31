@@ -10,9 +10,9 @@
       "binary": "pdfnative"
     },
     "pdfnative": {
-      "version": "1.8.0",
+      "version": "1.9.0",
       "pinField": "dependencies",
-      "pin": "^1.8.0",
+      "pin": "^1.9.0",
       "repo": "https://github.com/Nizoka/pdfnative"
     },
     "pdfnative-mcp": {
@@ -23,7 +23,7 @@
     }
   },
   "declared": {
-    "tests": 1444,
+    "tests": 1479,
     "coverageStatements": 82,
     "coverageMeasured": 86.06,
     "bundleBudgetBytes": 458752,
@@ -49,7 +49,7 @@
     "manifestCommands": 14,
     "pdfaCorpus": 22,
     "fontAliases": 4,
-    "testFiles": 96,
+    "testFiles": 100,
     "renderSamples": 76,
     "sampleScripts": 85,
     "samplePdfs": 91

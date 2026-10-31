@@ -280,7 +280,7 @@ const pdf = buildDocumentPDFBytes(params, {
 | [02-pdfa-2b.json](render/pdfa/02-pdfa-2b.json) | PDF/A-2b | ISO 19005-2 — transparency, JPEG 2000 |
 | [03-pdfa-3b.json](render/pdfa/03-pdfa-3b.json) | PDF/A-3b | ISO 19005-3 — embedded file attachments |
 | [04-pdfa-2u.json](render/pdfa/04-pdfa-2u.json) | PDF/A-2u | ISO 19005-2 — every glyph mapped to Unicode |
-| [05-form-pdfa2b.json](render/pdfa/05-form-pdfa2b.json) | PDF/A-2b | (v1.5.0) An **AcroForm under a PDF/A claim** — the six field types; the fields' default-resources font is the embedded Latin font (pdfnative 1.8.0), so veraPDF accepts the file |
+| [05-form-pdfa2b.json](render/pdfa/05-form-pdfa2b.json) | PDF/A-2b | (v1.5.0) An **AcroForm under a PDF/A claim** — the six field types; the fields' default-resources font is the embedded Latin font (pdfnative ≥ 1.8.0), so veraPDF accepts the file |
 | [05-form-pdfa2b.sh](render/pdfa/05-form-pdfa2b.sh) | — | (v1.5.0) Renders it with `--font latin --lang latin --strict`, asserts `inspect --check pdfa`, then lists the fields with `fill --export` |
 | [05-form-pdfa2b.ps1](render/pdfa/05-form-pdfa2b.ps1) | — | (v1.5.0) PowerShell equivalent |
 
@@ -367,7 +367,7 @@ can include their output in the baseline.
 | [05-lao.json](render/multilang/05-lao.json) | (v1.5.0) **Lao** — `--font lo --lang lo` (the 1.8.0 Lao shaper) |
 | [06-tai-tham-cham.json](render/multilang/06-tai-tham-cham.json) | (v1.5.0) **Tai Tham, New Tai Lue, Tai Le, Cham** — `--font nod --font khb --font tdd --font cjm` (USE engine) |
 | [07-african-latin.json](render/multilang/07-african-latin.json) | (v1.5.0) **Hausa, Yoruba, Igbo, Swahili** — `--font ha --font yo --font ig --font sw` resolve to the Latin font |
-| [08-european-caucasian.json](render/multilang/08-european-caucasian.json) | (v1.5.0) **Greek, Russian, Georgian, Armenian, Polish, Turkish, Vietnamese** — one section per language: a native paragraph, a table of the cases its module must draw (ogonek letters, dotted / dotless i, stacked Vietnamese diacritics — the glyphs pdfnative 1.8.0 made every module able to draw), a list |
+| [08-european-caucasian.json](render/multilang/08-european-caucasian.json) | (v1.5.0) **Greek, Russian, Georgian, Armenian, Polish, Turkish, Vietnamese** — one section per language: a native paragraph, a table of the cases its module must draw (ogonek letters, dotted / dotless i, stacked Vietnamese diacritics — the glyphs pdfnative ≥ 1.8.0 made every module able to draw), a list |
 | [09-rtl.json](render/multilang/09-rtl.json) | (v1.5.0) **Arabic and Hebrew** — contextual forms, lam-alef, harakat, niqqud, mixed direction, and an ARABIC LETTER MARK (U+061C) the engine strips before measuring |
 | [10-indic.json](render/multilang/10-indic.json) | (v1.5.0) **Hindi, Bengali, Tamil** — the 1.8.0 Indic OpenType engine: reph, rakar, conjuncts, pre-base and two-part vowel signs |
 | [11-cjk.json](render/multilang/11-cjk.json) | (v1.5.0) **Chinese and Korean** — a Simplified Chinese statement table and Hangul with complex finals (Japanese is `02-japanese.json`) |
@@ -591,7 +591,7 @@ Page-tree commands (`merge`, `split`, `extract`) also accept `--password` for en
 | [document.json](extract-text/document.json) | A two-page source document |
 | [01-extract-text.sh](extract-text/01-extract-text.sh) | Extracts text as plain text, JSON, and NDJSON (`--runs` for positioned runs) |
 | [01-extract-text.ps1](extract-text/01-extract-text.ps1) | PowerShell equivalent |
-| [02-actualtext.sh](extract-text/02-actualtext.sh) | (v1.5.0) `/ActualText` (pdfnative 1.8.0): renders `render/multilang/10-indic.json` tagged and untagged, then extracts both — the tagged file returns the logical order of reph and pre-base vowel signs, the untagged one the glyph order |
+| [02-actualtext.sh](extract-text/02-actualtext.sh) | (v1.5.0) `/ActualText` (pdfnative ≥ 1.8.0): renders `render/multilang/10-indic.json` tagged and untagged, then extracts both — the tagged file returns the logical order of reph and pre-base vowel signs, the untagged one the glyph order |
 | [02-actualtext.ps1](extract-text/02-actualtext.ps1) | (v1.5.0) PowerShell equivalent |
 
 No OCR — image-only pages yield empty text. NDJSON (one object per page) streams cleanly into RAG/agent pipelines.

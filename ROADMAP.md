@@ -220,7 +220,7 @@ This document outlines the planned development direction for pdfnative-cli. Prio
   --output-intent-icc --output-intent-id --trapped`, coherence pre-checks, `PDFX_*` diagnostics
   under `--strict`, envelope `pdfx`; `inspect --pdfx` / `--check pdfx` / `pdfxConformance`;
   `validate:pdfx` over a 3-file PDF/X corpus (incl. a negative canary) in the gate.
-- [x] **The 27 scripts of pdfnative 1.8.0 + `--font-file`** — `lo nod khb tdd cjm`, the `ha yo ig sw` aliases,
+- [x] **The 27 scripts of the 1.8.0 engine + `--font-file`** — `lo nod khb tdd cjm`, the `ha yo ig sw` aliases,
   custom TTF/OTF fonts from disk (validated, capped, never from JSON), and font embedding on
   `--variant table` (closes the table-variant PDF/A gap; the canary became a positive).
 - [x] **Reproducible output** — global `--creation-date` / `SOURCE_DATE_EPOCH` via
@@ -238,7 +238,7 @@ This document outlines the planned development direction for pdfnative-cli. Prio
   triggered, 27 script codes and 12 typography keys <!-- verify-docs:allow count-tokens --> rendered by a sample, 91 sample PDFs, a
   `validatePdfX` transmission contract, a generated Gray `prtr` ICC profile, and `inspect` /
   `compare` decoding UTF-16 `/Info` strings (a bug the new samples exposed).
-- [x] **Engineering parity with pdfnative 1.8.0** — `scripts/gate.ts` (fast / CI / publish,
+- [x] **Engineering parity with the 1.8.0 engine** — `scripts/gate.ts` (fast / CI / publish,
   `--require-all`), hermetic sample generator over the built binary with a byte/semantic
   SHA-256 baseline (`verify:samples`, chained `since`), 22-file PDF/A + PDF/X corpus, TypeScript
   validators, `verify:docs` (26 rules) over `docs/assets/ecosystem.json`, `release-prepare.ts`,
@@ -270,7 +270,7 @@ Feasibility is called out honestly: some ideas need pdfnative to expose a primit
 - **Positional arguments in manifest tasks** — `batch --manifest` tasks carry only a flat flag
   map today, so `ltv` (subcommand positional) and `compare` (two positional PDF paths) are
   excluded from the manifest whitelist. Supporting positionals would reintroduce both.
-- **`metadata` keeps the PDF/X identification** — pdfnative 1.8.0's `PdfModifier.updateMetadata`
+- **`metadata` keeps the PDF/X identification** — pdfnative 1.9.0's `PdfModifier.updateMetadata`
   rewrites the XMP packet without `pdfxid:GTS_PDFXVersion`, `xmpMM` and `pdf:Trapped`, so a
   `metadata` edit silently drops a PDF/X-4 claim (`inspect --check pdfx` catches it; the
   integration suite documents it). **Blocked upstream** — needs the modifier to carry the
@@ -280,19 +280,19 @@ Feasibility is called out honestly: some ideas need pdfnative to expose a primit
   signed PDF is never byte-identical across runs even with `--creation-date` and
   `--signing-time` pinned. The sample baseline fingerprints signed samples semantically.
   **Blocked upstream** — needs the signing path to honour the pinned creation instant.
-- **PDF/X-1a / PDF/X-3 / PDF/X-4p, spot colours** — pdfnative 1.8.0 validates and emits
+- **PDF/X-1a / PDF/X-3 / PDF/X-4p, spot colours** — pdfnative 1.9.0 validates and emits
   PDF/X-4 only (`PDF_X_CONFORMANCE_TARGETS`); the older targets need DeviceN / Separation
   colour spaces and externally referenced profiles the engine does not expose. **Blocked upstream**.
 - **PDF/A and PDF/X in one file** — ISO 19005 and ISO 15930 can be claimed together
   (PDF/A-2 + PDF/X-4), but the engine refuses `layout.pdfx` with `tagged` and the CLI mirrors
   that pre-check. **Blocked upstream**.
-- **`formField.fieldType` validated by the engine** — pdfnative 1.8.0 does not check the value:
+- **`formField.fieldType` validated by the engine** — pdfnative 1.9.0 does not check the value:
   anything outside `text` / `multilineText` / `checkbox` / `radio` / `dropdown` / `listbox` falls
   through its geometry table and writes `NaN` rectangles. `render` refuses the value up front
   (`E_INPUT`, v1.5.0); the guard can go once the builder throws. Same family: with
   `layout.typography.kerning` on an untagged document, `extract-text` can read a stray space
   inside a kerned word. **Upstream issues to file** (maintainer, HITL).
-- **Untagged text extraction of shaped scripts** — from UNTAGGED output pdfnative 1.8.0 returns
+- **Untagged text extraction of shaped scripts** — from UNTAGGED output the 1.8.0 engine returned
   stacked Khmer and Myanmar clusters as U+FFFD, CJK ideographs that share a glyph with a Kangxi
   radical as the radical (U+2F49 for U+6708), and reordered glyphs (reph, Tamil and Thai pre-base
   signs) in visual order; glyphs of `subs` / `sups` extract as their own code points. Tagged output

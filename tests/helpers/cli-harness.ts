@@ -18,7 +18,7 @@ import { openPdf } from '../../src/core-bridge/index.js';
 
 export const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
 export const SYNTHETIC_CMYK_ICC = path.join(FIXTURES, 'synthetic-cmyk.icc');
-/** A valid monochrome `prtr` profile (scripts/lib/synthetic-gray-profile.ts) — a non-CMYK PDF/X intent. */
+/** A valid monochrome `prtr` profile (pdfnative/tools buildSyntheticGrayProfile, 1.9.0) — a non-CMYK PDF/X intent. */
 export const SYNTHETIC_GRAY_ICC = path.join(FIXTURES, 'synthetic-gray.icc');
 export const RSA_KEY = path.join(FIXTURES, 'rsa-key.pem');
 export const RSA_CERT = path.join(FIXTURES, 'rsa-cert.pem');

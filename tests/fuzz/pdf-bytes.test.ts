@@ -19,7 +19,7 @@ import { MAX_XREF_CHAIN, MAX_PARSE_DEPTH, setMaxInflateOutputSize, DEFAULT_MAX_I
 import { captured } from '../helpers/cli-harness.js';
 import {
     forEachCaseAsync, onlyCliErrorAsync, assertPrototypeClean, mutatePdf, minimalPdf,
-    buildChainedXrefPdf, buildCyclicXrefPdf, buildDeepNestingPdf, buildFlatePdf, textBombPayload,
+    buildChainedXrefPdf, buildCyclicXrefPdf, buildDeepNestingPdf, buildFlatePdf, textBombPayload, buildObjectsPdf,
 } from '../helpers/fuzz.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'pdfcli-fuzz-pdf-'));
@@ -105,6 +105,28 @@ describe('fuzz: PDF bytes through the read commands', { timeout: 60_000 }, () =>
         // inspect never touches content streams: identical under both caps.
         setMaxInflateOutputSize(1024);
         expect((await onlyCliErrorAsync(() => inspectFile(p), READ_CODES)).outcome).toBe('ok');
+    });
+
+    // pdfnative 1.9.0 (CWE-835): a stray ), { or } made the tokenizer return an
+    // empty keyword without advancing, so every token loop — the ToUnicode CMap
+    // reader among them — spun forever on a one-byte corruption. The suite's
+    // 60 s timeout is the hang detector; the assertion is that the command answers.
+    it('a stray ), { or } in a content stream and in a ToUnicode CMap ends in a value or a stable code, never a hang (CWE-835)', async () => {
+        const stream = (content: string): string => `<< /Length ${content.length} >>\nstream\n${content}\nendstream`;
+        for (const [name, stray] of [['paren', ')'], ['brace-open', '{'], ['brace-close', '}']] as const) {
+            const p = file(`stray-${name}.pdf`, buildObjectsPdf([
+                '<< /Type /Catalog /Pages 2 0 R >>',
+                '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+                '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+                stream(`BT /F1 12 Tf 10 100 Td (ok) Tj ${stray} ET`),
+                '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /ToUnicode 6 0 R >>',
+                stream(`/CIDInit /ProcSet findresource begin ${stray} 1 begincodespacerange <00> <FF> endcodespacerange 1 beginbfchar <6F> <006F> endbfchar endcmap`),
+            ]));
+            const text = await onlyCliErrorAsync(() => captured(() => extractText(parseArgs(['--input', p]))), READ_CODES);
+            expect(['ok', 'error']).toContain(text.outcome);
+            const meta = await onlyCliErrorAsync(() => inspectFile(p), READ_CODES);
+            expect(['ok', 'error']).toContain(meta.outcome);
+        }
     });
 
     it('40 random mutations of a valid PDF end in a value or a stable code for inspect, extract-text and merge', async () => {

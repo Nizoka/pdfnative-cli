@@ -30,20 +30,20 @@ must never be reused outside it; the same key pair signs the sample corpus
 - **`synthetic-cmyk.icc`** is a copy of `docs/assets/synthetic-cmyk.icc` from the
   pdfnative repository (1.8.0): a minimal, valid ICC v2 profile with the `acsp`
   signature at byte 36, device class `prtr` and colour space `CMYK`, generated
-  synthetically — **not a press profile**. pdfnative 1.8.0 validates the ICC
+  synthetically — **not a press profile**. pdfnative ≥ 1.8.0 validates the ICC
   header before accepting an output intent, so the 128-byte stub earlier tests
   used is rejected (`outputIntent.iccProfile is not an ICC profile`). The same
   bytes ship as `samples/render/print/synthetic-cmyk.icc`.
-- **`synthetic-gray.icc`** is generated in this repository by
-  `scripts/lib/synthetic-gray-profile.ts` (the monochrome twin of the engine's CMYK
-  generator, which ships no Gray profile): ICC v2.1, class `prtr`, colour space
+- **`synthetic-gray.icc`** is the output of `buildSyntheticGrayProfile()` on
+  `pdfnative/tools` (pdfnative ≥ 1.9.0, #86; the generator the CLI carried in
+  1.5.0 wrote the same bytes and is gone): ICC v2.1, class `prtr`, colour space
   `GRAY`, XYZ connection space, tags `desc`, `cprt`, `wtpt`, `kTRC` (gamma 2.2) —
-  **not a press profile**. `tests/tools/synthetic-gray-profile.test.ts` holds the
-  committed bytes to the generator; the same bytes ship as
-  `samples/render/print/synthetic-gray.icc`. Regenerate both copies with
-  `npx tsx scripts/lib/synthetic-gray-profile.ts`. The ICC v4 variant the generator
-  can also write is never committed: tests and the conformance corpus build it on
-  the fly to prove that PDF/A-1b refuses it (`PDFA_ICC_PROFILE_VERSION`).
+  **not a press profile**. `tests/tools/synthetic-profiles.test.ts` holds both
+  committed copies (this one and `samples/render/print/synthetic-gray.icc`) and
+  the two CMYK copies to the engine builders, byte for byte. The ICC v4 variant is
+  never committed: `scripts/lib/icc-canary.ts` patches the header's version bytes
+  on the fly so tests and the conformance corpus can prove that PDF/A-1b refuses
+  it (`PDFA_ICC_PROFILE_VERSION`).
 - **`pdfnative-build-errors.json`** is derived from `docs/data/errors.json →
   buildErrors` of the pdfnative repository (1.9.0), with the `${…}` placeholders
   substituted by representative values. `tests/utils/build-errors.test.ts` feeds

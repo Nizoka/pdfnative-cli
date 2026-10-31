@@ -125,7 +125,7 @@ The `verify` command verifies, with no network access by default:
 
 Sign-side LTV is available since v1.4.0: `sign --timestamp` (PAdES B-T),
 `ltv collect|embed|add` (B-LT, `/DSS` + `/VRI`) and `doc-timestamp` (B-LTA). The
-engine (pdfnative 1.8.0) verifies every TSA token before embedding it and never
+engine (pdfnative 1.9.0) verifies every TSA token before embedding it and never
 opens a socket itself — the CLI injects the SSRF-guarded transport, with the
 `sign --timestamp-timeout <ms>` bound on the TSA round-trip (default 10 s).
 

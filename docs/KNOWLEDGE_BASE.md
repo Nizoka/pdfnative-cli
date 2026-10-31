@@ -199,7 +199,7 @@ export { openPdf, verifyCertSignature } from 'pdfnative';
 export { registerFont, registerFonts, loadFontData, hasFontLoader } from 'pdfnative';
 // Types
 export type { DocumentParams, PdfParams, PdfLayoutOptions, FontEntry, FontData, PdfSignOptions, PdfReader, RsaPrivateKey, X509Certificate } from 'pdfnative';
-// (pdfnative 1.8.0) — PDF/X, reproducible dates, URLs, fonts
+// (pdfnative ≥ 1.8.0) — PDF/X, reproducible dates, URLs, fonts
 export { PDF_X_CONFORMANCE_TARGETS, validatePdfX, setDefaultCreationDate, getDefaultCreationDate, validateURL, USE_UNICODE_VERSION, validateFontData } from 'pdfnative';
 export { parseFontData } from 'pdfnative/tools';
 export type { PdfXConformanceTarget, PdfXValidationResult, TypographyOptions, ColourBarOptions, PdfCmykTuple, PdfCmykString, LinkAnnotation, FontValidationResult, FontDataObject } from 'pdfnative';
@@ -791,7 +791,7 @@ pdfnative metadata --input in.pdf --from-json meta.json --output out.pdf
 | `--dry-run` | boolean | false | Validate inputs without writing output |
 
 At least one metadata field is required. `--mod-date` is a deliberate instant, not pinned by
-`--creation-date`. Known upstream limit (pdfnative 1.8.0): the rewrite emits a fresh XMP packet
+`--creation-date`. Known upstream limit (pdfnative 1.9.0): the rewrite emits a fresh XMP packet
 without `pdfxid:GTS_PDFXVersion` / `xmpMM` / `pdf:Trapped`, so a PDF/X-4 identification is
 dropped — re-check with `inspect --check pdfx` (tracked in ROADMAP.md).
 
@@ -1638,4 +1638,4 @@ See [SECURITY.md](../SECURITY.md) for the full policy.
 
 ---
 
-*Verified on 2026-09-17 · pdfnative-cli v1.5.0 · pdfnative 1.8.0*
+*Verified on 2026-09-17 · pdfnative-cli v1.5.0 · pdfnative 1.9.0*

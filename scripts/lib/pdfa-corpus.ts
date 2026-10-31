@@ -33,7 +33,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { REPO_ROOT, TEST_OUTPUT_DIR, SAMPLE_CREATION_ISO } from '../helpers/io.js';
-import { buildSyntheticGrayProfile } from './synthetic-gray-profile.js';
+import { buildSyntheticGrayProfile } from '../../src/core-bridge/index.js';
+import { withIccMajorVersion } from './icc-canary.js';
 
 export const OUT_DIR = join(TEST_OUTPUT_DIR, 'pdfa');
 export const SPECS_DIR = join(OUT_DIR, '.specs');
@@ -114,7 +115,7 @@ const GRAY_PDFX_FLAGS = [
 function writeGrayV4Profile(): string {
     mkdirSync(SPECS_DIR, { recursive: true });
     const file = join(SPECS_DIR, 'synthetic-gray-v4.icc');
-    writeFileSync(file, buildSyntheticGrayProfile({ version: 4 }));
+    writeFileSync(file, withIccMajorVersion(buildSyntheticGrayProfile(), 4));
     return file;
 }
 

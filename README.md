@@ -16,6 +16,7 @@
 
 Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library — render JSON to PDF, apply digital signatures, verify them, and inspect PDF conformance, directly from the terminal. Zero extra runtime dependencies.
 
+<!-- verify-docs:allow version-token -->
 > **What's new in v1.5.0** — built on **pdfnative 1.8.0**. `render` gains a **typography
 > engine** (widow/orphan control, keep-with-next, justification, optical margins, soft hyphens,
 > French punctuation spacing, kerning and OpenType features — `layout.typography` plus four
@@ -134,7 +135,7 @@ Official CLI for the [`pdfnative`](https://github.com/Nizoka/pdfnative) library 
   `tests/regression/baselines/samples.sha256.json`), a PDF/A + PDF/X conformance corpus,
   hardened workflows (egress-audited runners, SHA-pinned actions, Trusted Publishing, SBOM +
   build attestations), a documentation verifier (`npm run verify:docs`) and a committed
-  Claude Code layer with a human-in-the-loop guard hook — 1444 tests.
+  Claude Code layer with a human-in-the-loop guard hook — 1479 tests.
 - **AI-governance / HITL** — the **`govern`** command surfaces pdfnative's Human-in-the-Loop
   contract to agents: they act as *draftsmen*, never autonomous submitters. `govern
   verify-issue` gates a local draft; a human always reviews and submits.
