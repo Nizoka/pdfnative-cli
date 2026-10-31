@@ -482,9 +482,11 @@ describe('render --chunk-size', () => {
         ]);
         const buffered = tmpPath('buf.pdf');
         const chunked = tmpPath('chunked.pdf');
-        await render(parseArgs(['--input', input, '--output', buffered]));
+        // Pinned: two renders straddling a second boundary differ in /CreationDate (a flake, not a parity failure).
+        const pinned = ['--creation-date', '2026-01-01T00:00:00Z'];
+        await render(parseArgs(['--input', input, '--output', buffered, ...pinned]));
         await render(parseArgs([
-            '--input', input, '--output', chunked, '--stream', '--chunk-size', '512',
+            '--input', input, '--output', chunked, '--stream', '--chunk-size', '512', ...pinned,
         ]));
         const a = await fs.readFile(buffered);
         const b = await fs.readFile(chunked);

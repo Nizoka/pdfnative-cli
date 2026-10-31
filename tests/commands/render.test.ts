@@ -394,8 +394,10 @@ describe('render', () => {
         tmpFiles.push(bufferedPath, truePath);
 
         await withTempFile('.json', minimalParams, async (inputPath) => {
-            await render(parseArgs(['--input', inputPath, '--output', bufferedPath]));
-            await render(parseArgs(['--input', inputPath, '--output', truePath, '--stream-true']));
+            // Pinned: two renders straddling a second boundary differ in /CreationDate (a flake, not a parity failure).
+            const pinned = ['--creation-date', '2026-01-01T00:00:00Z'];
+            await render(parseArgs(['--input', inputPath, '--output', bufferedPath, ...pinned]));
+            await render(parseArgs(['--input', inputPath, '--output', truePath, '--stream-true', ...pinned]));
         });
 
         const a = await fs.readFile(bufferedPath);
