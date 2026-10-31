@@ -1,0 +1,6 @@
+# Commits that touched every line without changing any of them. GitHub applies
+# this file to its blame view; locally run once:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# 1.6.0 — line endings normalised to LF (155 CRLF blobs rewritten, eol-lf now fails)
+9b661b1fddf45a9b87c1f5b9a87767a41d8f6ac7
