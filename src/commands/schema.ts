@@ -791,6 +791,11 @@ function statusSchema(): JsonSchema {
             ocspResponses: { type: 'integer', minimum: 0, description: 'ltv: OCSP responses collected or embedded.' },
             crls: { type: 'integer', minimum: 0, description: 'ltv: CRLs collected or embedded.' },
             vri: { type: 'integer', minimum: 0, description: 'ltv: per-signature VRI entries collected or embedded.' },
+            match: {
+                type: 'string', enum: ['all', 'chain'],
+                description: 'ltv embed with offline material (--cert/--ocsp/--crl): how the material was '
+                    + 'attributed to the signatures (--match; pdfnative 1.9.0 composeLtvData), v1.6.0.',
+            },
             equal: { type: 'boolean', const: true, description: 'compare: the documents are equal (a difference is E_CHECK_FAILED, never a success envelope).' },
             modes: {
                 type: 'array', items: { type: 'string', enum: ['structure', 'text'] },

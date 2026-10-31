@@ -99,7 +99,12 @@ paths:
   redirects). Redact CMS parse errors. Report `timestampDigest`; a SHA-1 messageImprint adds a
   weak-digest note and fails under `--strict` (`E_VERIFY_FAILED`).
 - `ltv collect|embed|add` and `doc-timestamp` are incremental (signatures stay valid); network
-  only behind `--online` / `--url`.
+  only behind `--online` / `--url`. `ltv embed` takes `--data <ltv.json>` OR offline material
+  (`--cert <pem|der>`, `--ocsp <der>`, `--crl <der>`, repeatable; `--match all|chain`) composed
+  by the engine's `composeLtvData` (pdfnative ≥ 1.9.0): the two are exclusive (exit 2), a
+  `composeLtvData:` refusal is `E_INPUT`, the envelope carries `match`.
+- `annotate link` goes through the engine's `buildAnnotationBody({ type: 'link', rect, url })`
+  (pdfnative ≥ 1.9.0) after `validateURL`; the CLI builds no PDF dictionary itself.
 
 ## `inspect` / `extract-text` / `compare`
 

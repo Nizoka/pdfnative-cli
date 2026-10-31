@@ -69,7 +69,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     {
         name: 'ltv',
         summary: 'PAdES B-LT: collect/embed OCSP+CRL validation data (/DSS)',
-        flags: ['--input', '--output', '--online', '--prefer', '--extra-cert', '--data', '--timeout'],
+        flags: ['--input', '--output', '--online', '--prefer', '--extra-cert', '--data', '--cert', '--ocsp', '--crl', '--match', '--timeout'],
     },
     {
         name: 'doc-timestamp',

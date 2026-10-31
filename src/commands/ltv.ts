@@ -7,6 +7,11 @@
 //                          data, emit a portable JSON `ltv-data` document.
 //   ltv embed --data <j>   Offline phase: embed pre-collected ltv-data into
 //                          the PDF. Deterministic, replayable, air-gap safe.
+//   ltv embed --cert/--ocsp/--crl [--match all|chain]
+//                          Offline phase from files you already hold (pdfnative
+//                          1.9.0 composeLtvData): certificates (PEM or DER),
+//                          OCSP responses and CRLs (DER), attributed to the
+//                          document's signatures without any network.
 //   ltv add --online       One-pass convenience: collect + embed.
 //
 // Offline doctrine: the network phases hard-require the explicit `--online`
@@ -17,12 +22,13 @@ import {
     collectValidationInfo,
     embedValidationInfo,
     addValidationInfo,
+    composeLtvData,
     getRevocationProvider,
     ensureCryptoReady,
 } from '../core-bridge/index.js';
-import type { LtvData, CollectLtvOptions } from '../core-bridge/index.js';
+import type { LtvData, CollectLtvOptions, LtvMaterial, ComposeLtvOptions } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../utils/args.js';
-import { readFileOrStdin, readBinaryFile, writeOutput, assertJsonSizeLimit } from '../utils/io.js';
+import { readFileOrStdin, readBinaryFile, readBinaryFileCapped, writeOutput, assertJsonSizeLimit } from '../utils/io.js';
 import { CliError, ErrorCode } from '../utils/error.js';
 import { emitStatus, isDryRun } from '../utils/agent.js';
 import { splitPemBlocks, pemToDer } from '../utils/keys.js';
@@ -35,6 +41,9 @@ type LtvMode = (typeof SUBCOMMANDS)[number];
 const LTV_DATA_VERSION = 1;
 
 const DEFAULT_TIMEOUT_MS = 10_000;
+
+/** Cap on one offline material file (an OCSP response, a CRL or a certificate bundle). */
+const MAX_MATERIAL_BYTES = 16 * 1024 * 1024;
 
 // ── Flag helpers ─────────────────────────────────────────────────────
 
@@ -82,6 +91,68 @@ async function loadExtraCertificates(flags: ParsedArgs['flags']): Promise<readon
         }
     }
     return out;
+}
+
+/** `--match` of `ltv embed` (pdfnative 1.9.0 `ComposeLtvOptions.match`): `all` (default) or `chain`. */
+function parseMatch(raw: string | undefined): ComposeLtvOptions['match'] {
+    if (raw === undefined || raw === 'all') return 'all';
+    if (raw === 'chain') return 'chain';
+    throw new CliError(`Invalid --match "${raw}". Valid: all, chain.`, 2);
+}
+
+/**
+ * Read a certificate file as DER: a PEM bundle (every CERTIFICATE block) or a
+ * raw DER certificate. Returns the DERs it holds.
+ */
+async function readCertificateFile(flag: string, filePath: string): Promise<readonly Uint8Array[]> {
+    const bytes = await readBinaryFileCapped(filePath, MAX_MATERIAL_BYTES, `${flag} file`);
+    const head = Buffer.from(bytes.subarray(0, 64)).toString('latin1');
+    if (!head.includes('-----BEGIN')) return [bytes];
+    const blocks = splitPemBlocks(Buffer.from(bytes).toString('utf8'));
+    if (blocks.length === 0) {
+        throw new CliError(`${flag} file "${filePath}" contains no PEM certificate block.`, 1, ErrorCode.INPUT);
+    }
+    try {
+        return blocks.map((block) => pemToDer(block));
+    } catch {
+        throw new CliError(`${flag} file "${filePath}" contains an invalid PEM block.`, 1, ErrorCode.PARSE);
+    }
+}
+
+/**
+ * The offline material of `ltv embed` — `--cert` (PEM or DER, repeatable),
+ * `--ocsp` and `--crl` (DER, repeatable). `null` when none of the three flags
+ * is present.
+ */
+async function loadMaterial(flags: ParsedArgs['flags']): Promise<LtvMaterial | null> {
+    const certFiles = getStringFlagAll(flags, 'cert');
+    const ocspFiles = getStringFlagAll(flags, 'ocsp');
+    const crlFiles = getStringFlagAll(flags, 'crl');
+    if (certFiles.length + ocspFiles.length + crlFiles.length === 0) return null;
+    const certificates: Uint8Array[] = [];
+    for (const file of certFiles) certificates.push(...await readCertificateFile('--cert', file));
+    const ocspResponses: Uint8Array[] = [];
+    for (const file of ocspFiles) ocspResponses.push(await readBinaryFileCapped(file, MAX_MATERIAL_BYTES, '--ocsp file'));
+    const crls: Uint8Array[] = [];
+    for (const file of crlFiles) crls.push(await readBinaryFileCapped(file, MAX_MATERIAL_BYTES, '--crl file'));
+    return { certificates, ocspResponses, crls };
+}
+
+/**
+ * Compose the /DSS data from material on disk (pdfnative 1.9.0). The engine's
+ * own refusals (`composeLtvData: …` — no material, no signed signature) are
+ * the user's input (E_INPUT); anything else is reported with a fixed string.
+ */
+function composeMaterial(pdfBytes: Uint8Array, material: LtvMaterial, match: ComposeLtvOptions['match']): LtvData {
+    try {
+        return composeLtvData(pdfBytes, material, { match });
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (message.startsWith('composeLtvData:')) {
+            throw new CliError(`ltv embed: ${message.slice('composeLtvData:'.length).trim()}`, 1, ErrorCode.INPUT);
+        }
+        throw new CliError('Failed to compose validation information.', 1);
+    }
 }
 
 // ── ltv-data (de)serialization ───────────────────────────────────────
@@ -240,15 +311,34 @@ async function ltvEmbed(args: ParsedArgs, dryRun: boolean): Promise<void> {
     const inputPath = getStringFlag(args.flags, 'input', 'i');
     const outputPath = getStringFlag(args.flags, 'output', 'o');
     const dataPath = getStringFlag(args.flags, 'data');
-    if (dataPath === undefined) {
-        throw new CliError('ltv embed requires --data <ltv.json> (produced by `ltv collect --online`).', 2);
+    const matchRaw = getStringFlag(args.flags, 'match');
+    const material = await loadMaterial(args.flags);
+    if (dataPath !== undefined && material !== null) {
+        throw new CliError('ltv embed takes either --data <ltv.json> or offline material (--cert, --ocsp, --crl), not both.', 2);
     }
-
-    const dataBuf = Buffer.from(await readBinaryFile(dataPath));
-    assertJsonSizeLimit(dataBuf);
-    const data = deserializeLtvData(dataBuf.toString('utf8'));
+    if (dataPath === undefined && material === null) {
+        throw new CliError(
+            'ltv embed requires --data <ltv.json> (produced by `ltv collect --online`) or offline material: '
+            + '--cert <pem|der>, --ocsp <der>, --crl <der> (each repeatable), attributed with --match all|chain.',
+            2,
+        );
+    }
+    if (matchRaw !== undefined && material === null) {
+        throw new CliError('--match applies to offline material (--cert, --ocsp, --crl), not to --data.', 2);
+    }
+    const match = parseMatch(matchRaw);
 
     const pdfBytes = new Uint8Array(await readFileOrStdin(inputPath));
+
+    let data: LtvData;
+    if (material !== null) {
+        data = composeMaterial(pdfBytes, material, match);
+    } else {
+        const dataBuf = Buffer.from(await readBinaryFile(dataPath as string));
+        assertJsonSizeLimit(dataBuf);
+        data = deserializeLtvData(dataBuf.toString('utf8'));
+    }
+    const matchField = material !== null ? { match } : {};
 
     if (dryRun) {
         emitStatus({
@@ -256,6 +346,7 @@ async function ltvEmbed(args: ParsedArgs, dryRun: boolean): Promise<void> {
             mode: 'embed',
             dryRun: true,
             output: outputPath ?? '-',
+            ...matchField,
             certificates: data.certificates.length,
             ocspResponses: data.ocspResponses.length,
             crls: data.crls.length,
@@ -278,6 +369,7 @@ async function ltvEmbed(args: ParsedArgs, dryRun: boolean): Promise<void> {
         mode: 'embed',
         dryRun: false,
         output: outputPath ?? '-',
+        ...matchField,
         certificates: data.certificates.length,
         ocspResponses: data.ocspResponses.length,
         crls: data.crls.length,

@@ -17,7 +17,7 @@
 // (both formats), then exit 1 with E_CHECK_FAILED (same convention as
 // `inspect --check`); unreadable file → E_IO (1); bad usage → 2.
 
-import { openPdf, extractText, listSignatures, readFormFields } from '../core-bridge/index.js';
+import { openPdf, extractText, listSignatures, readFormFields, decodePdfTextString } from '../core-bridge/index.js';
 import type { PdfReader, PdfDict, PdfValue, ExtractTextOptions, StreamErrorPolicy } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, hasFlag } from '../utils/args.js';
 import { readBinaryFile } from '../utils/io.js';
@@ -26,7 +26,6 @@ import { emitStatus, isJsonMode } from '../utils/agent.js';
 import { serializeJson } from '../utils/projection.js';
 import { mapPdfError, parseStreamErrorPolicy } from '../utils/pdfops.js';
 import { parsePageList } from '../utils/pages.js';
-import { decodePdfTextString } from '../utils/pdftext.js';
 
 type DiffKind =
     | 'pageCount' | 'pageSize' | 'box' | 'userUnit' | 'metadata'

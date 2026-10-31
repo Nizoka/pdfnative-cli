@@ -374,6 +374,8 @@ pdfnative ltv — PAdES B-LT: long-term validation data (/DSS + /VRI)
 Usage:
   pdfnative ltv collect --input signed.pdf --online [--output ltv.json]
   pdfnative ltv embed   --input signed.pdf --data ltv.json [--output out.pdf]
+  pdfnative ltv embed   --input signed.pdf --cert chain.pem --ocsp r.der [--crl c.der]
+                        [--match all|chain] [--output out.pdf]
   pdfnative ltv add     --input signed.pdf --online [--output out.pdf]
 
 Archives the certificates, OCSP responses and CRLs needed to validate the
@@ -384,8 +386,9 @@ machine, embed offline.
 Subcommands:
   collect   Fetch validation data (OCSP/CRL) and write a replayable JSON file
             (schema subject: ltv-data). REQUIRES --online.
-  embed     Embed a previously collected JSON into /DSS + /VRI. NEVER performs
-            network I/O.
+  embed     Embed a previously collected JSON into /DSS + /VRI, or compose the
+            /DSS from material you already hold (--cert/--ocsp/--crl; pdfnative
+            1.9.0). NEVER performs network I/O.
   add       collect + embed in one pass. REQUIRES --online.
 
 Options:
@@ -396,7 +399,15 @@ Options:
                    \`ltv embed\` for the offline half.
   --prefer         ocsp (default) | crl — preferred revocation source
   --extra-cert     PEM file with extra chain certificates (repeatable)
-  --data           Collected JSON file (embed mode, required)
+  --data           Collected JSON file (embed mode; or the material below)
+  --cert <file>    Offline material (embed): a certificate — PEM bundle or
+                   DER (repeatable): signer chains, TSA and OCSP responders
+  --ocsp <file>    Offline material (embed): a DER OCSPResponse (repeatable)
+  --crl <file>     Offline material (embed): a DER CRL (repeatable)
+  --match          all (default) | chain — all: every item is referenced from
+                   every signature's VRI (the Adobe-tolerant superset);
+                   chain: each VRI references only what validates that
+                   signature; unmatched material still ships in /DSS
   --timeout        Network timeout in ms (default: 10000)
   --dry-run        Validate inputs; no output, no network
   --help,    -h    Show this help message
@@ -404,6 +415,7 @@ Options:
 Typical PAdES ladder:
   sign --timestamp <tsa> --profile pades   →  B-T
   ltv add --online                         →  B-LT
+  (air-gapped: ltv embed --cert … --ocsp … --crl … from files you hold)
   doc-timestamp --url <tsa>                →  B-LTA
   ltv add --online                         →  LTV for the doc-timestamp itself
 `;
