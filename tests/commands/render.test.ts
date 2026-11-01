@@ -1,8 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { tmpName } from '../helpers/cli-harness.js';
 import * as fs from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { CliError } from '../../src/utils/error.js';
@@ -14,7 +13,7 @@ const minimalParams = JSON.stringify({
 });
 
 async function withTempFile(ext: string, content: string, fn: (p: string) => Promise<void>): Promise<void> {
-    const p = path.join(os.tmpdir(), `pdfcli-test-${randomUUID()}${ext}`);
+    const p = tmpName(`pdfcli-test${ext}`);
     await fs.writeFile(p, content, 'utf8');
     try {
         await fn(p);
@@ -33,7 +32,7 @@ describe('render', () => {
     });
 
     it('produces a valid PDF for minimal DocumentParams', async () => {
-        const outPath = path.join(os.tmpdir(), `render-out-${Date.now()}.pdf`);
+        const outPath = tmpName('render-out.pdf');
         tmpFiles.push(outPath);
 
         await withTempFile('.json', minimalParams, async (inputPath) => {
@@ -46,7 +45,7 @@ describe('render', () => {
     });
 
     it('produces valid PDF with --stream flag', async () => {
-        const outPath = path.join(os.tmpdir(), `render-stream-${Date.now()}.pdf`);
+        const outPath = tmpName('render-stream.pdf');
         tmpFiles.push(outPath);
 
         await withTempFile('.json', minimalParams, async (inputPath) => {
@@ -74,7 +73,7 @@ describe('render', () => {
     });
 
     it('accepts valid --conformance values', async () => {
-        const outPath = path.join(os.tmpdir(), `render-conf-${Date.now()}.pdf`);
+        const outPath = tmpName('render-conf.pdf');
         tmpFiles.push(outPath);
 
         await withTempFile('.json', minimalParams, async (inputPath) => {
@@ -91,7 +90,7 @@ describe('render', () => {
     // ──────────────────────────────────────────────────────────────────
 
     it('accepts --tagged pdfa3b (replacement for --conformance)', async () => {
-        const outPath = path.join(os.tmpdir(), `render-tagged-${Date.now()}.pdf`);
+        const outPath = tmpName('render-tagged.pdf');
         tmpFiles.push(outPath);
         await withTempFile('.json', minimalParams, async (inputPath) => {
             await render(parseArgs(['--input', inputPath, '--output', outPath, '--tagged', 'pdfa3b']));
@@ -101,7 +100,7 @@ describe('render', () => {
     });
 
     it('accepts --page-size and --margin', async () => {
-        const outPath = path.join(os.tmpdir(), `render-pagesize-${Date.now()}.pdf`);
+        const outPath = tmpName('render-pagesize.pdf');
         tmpFiles.push(outPath);
         await withTempFile('.json', minimalParams, async (inputPath) => {
             await render(parseArgs([
@@ -146,7 +145,7 @@ describe('render', () => {
             ],
             footerText: 'footer',
         });
-        const outPath = path.join(os.tmpdir(), `render-table-${Date.now()}.pdf`);
+        const outPath = tmpName('render-table.pdf');
         tmpFiles.push(outPath);
         await withTempFile('.json', tableParams, async (inputPath) => {
             await render(parseArgs(['--input', inputPath, '--output', outPath, '--variant', 'table']));
@@ -181,7 +180,7 @@ describe('render', () => {
     });
 
     it('renders with header/footer templates', async () => {
-        const outPath = path.join(os.tmpdir(), `render-hf-${Date.now()}.pdf`);
+        const outPath = tmpName('render-hf.pdf');
         tmpFiles.push(outPath);
         await withTempFile('.json', minimalParams, async (inputPath) => {
             await render(parseArgs([
@@ -196,7 +195,7 @@ describe('render', () => {
     });
 
     it('renders with --watermark-text', async () => {
-        const outPath = path.join(os.tmpdir(), `render-wm-${Date.now()}.pdf`);
+        const outPath = tmpName('render-wm.pdf');
         tmpFiles.push(outPath);
         await withTempFile('.json', minimalParams, async (inputPath) => {
             await render(parseArgs([
@@ -252,7 +251,7 @@ describe('render', () => {
                 },
             },
         });
-        const outPath = path.join(os.tmpdir(), `render-wm-regression-${Date.now()}.pdf`);
+        const outPath = tmpName('render-wm-regression.pdf');
         tmpFiles.push(outPath);
 
         await withTempFile('.json', withWatermark, async (inputPath) => {
@@ -274,7 +273,7 @@ describe('render', () => {
                 watermark: { text: { text: 'JSON_MARK', opacity: 0.1 } },
             },
         });
-        const outPath = path.join(os.tmpdir(), `render-wm-precedence-${Date.now()}.pdf`);
+        const outPath = tmpName('render-wm-precedence.pdf');
         tmpFiles.push(outPath);
 
         await withTempFile('.json', withJsonWatermark, async (inputPath) => {
@@ -301,7 +300,7 @@ describe('render', () => {
             metadata: { author: 'input-author' }, // overrides only author
             blocks: [{ type: 'paragraph', text: 'INPUT_BODY' }], // arrays replace
         });
-        const outPath = path.join(os.tmpdir(), `render-template-${Date.now()}.pdf`);
+        const outPath = tmpName('render-template.pdf');
         tmpFiles.push(outPath);
 
         await withTempFile('.json', template, async (tplPath) => {
@@ -331,7 +330,7 @@ describe('render', () => {
         const params = JSON.stringify({
             blocks: [{ type: 'paragraph', text: 'Hello world' }],
         });
-        const outPath = path.join(os.tmpdir(), `render-font-${Date.now()}.pdf`);
+        const outPath = tmpName('render-font.pdf');
         tmpFiles.push(outPath);
 
         await withTempFile('.json', params, async (inputPath) => {
@@ -348,7 +347,7 @@ describe('render', () => {
     });
 
     it('--font rejects unknown bundled names', async () => {
-        const outPath = path.join(os.tmpdir(), `render-font-bad-${Date.now()}.pdf`);
+        const outPath = tmpName('render-font-bad.pdf');
         tmpFiles.push(outPath);
 
         await withTempFile('.json', minimalParams, async (inputPath) => {
@@ -376,7 +375,7 @@ describe('render', () => {
     });
 
     it('produces valid PDF with --stream-true (document variant)', async () => {
-        const outPath = path.join(os.tmpdir(), `render-streamtrue-${Date.now()}.pdf`);
+        const outPath = tmpName('render-streamtrue.pdf');
         tmpFiles.push(outPath);
 
         await withTempFile('.json', minimalParams, async (inputPath) => {
@@ -389,8 +388,8 @@ describe('render', () => {
     });
 
     it('--stream-true is byte-identical to non-streaming output', async () => {
-        const bufferedPath = path.join(os.tmpdir(), `render-buf-${Date.now()}.pdf`);
-        const truePath = path.join(os.tmpdir(), `render-true-${Date.now()}.pdf`);
+        const bufferedPath = tmpName('render-buf.pdf');
+        const truePath = tmpName('render-true.pdf');
         tmpFiles.push(bufferedPath, truePath);
 
         await withTempFile('.json', minimalParams, async (inputPath) => {
@@ -418,7 +417,7 @@ describe('render', () => {
             ],
             footerText: 'footer',
         });
-        const outPath = path.join(os.tmpdir(), `render-streamtrue-table-${Date.now()}.pdf`);
+        const outPath = tmpName('render-streamtrue-table.pdf');
         tmpFiles.push(outPath);
 
         await withTempFile('.json', tableParams, async (inputPath) => {
@@ -460,7 +459,7 @@ describe('render', () => {
     });
 
     it('--max-blocks accepts a positive integer', async () => {
-        const outPath = path.join(os.tmpdir(), `render-maxblocks-${Date.now()}.pdf`);
+        const outPath = tmpName('render-maxblocks.pdf');
         tmpFiles.push(outPath);
 
         await withTempFile('.json', minimalParams, async (inputPath) => {
@@ -487,7 +486,7 @@ describe('render', () => {
         const params = JSON.stringify({
             blocks: [{ type: 'paragraph', text: 'తెలుగు' }],
         });
-        const outPath = path.join(os.tmpdir(), `render-font-te-${Date.now()}.pdf`);
+        const outPath = tmpName('render-font-te.pdf');
         tmpFiles.push(outPath);
 
         await withTempFile('.json', params, async (inputPath) => {
@@ -507,7 +506,7 @@ describe('render', () => {
         const params = JSON.stringify({
             blocks: [{ type: 'paragraph', text: 'Hi 🎉' }],
         });
-        const outPath = path.join(os.tmpdir(), `render-font-coloremoji-${Date.now()}.pdf`);
+        const outPath = tmpName('render-font-coloremoji.pdf');
         tmpFiles.push(outPath);
 
         await withTempFile('.json', params, async (inputPath) => {
@@ -535,7 +534,7 @@ describe('render', () => {
                 { type: 'chart', chartType: 'pie', categories: ['A', 'B'], series: [{ label: 'Share', values: [60, 40] }] },
             ],
         });
-        const outPath = path.join(os.tmpdir(), `render-chart-${Date.now()}.pdf`);
+        const outPath = tmpName('render-chart.pdf');
         tmpFiles.push(outPath);
         await withTempFile('.json', params, async (inputPath) => {
             await render(parseArgs(['--input', inputPath, '--output', outPath]));
@@ -550,7 +549,7 @@ describe('render', () => {
     // the legacy --encrypt-* aliases must keep working.
     describe('encryption flag unification', () => {
         it('encrypts via the unified --encrypt / --owner-password flags', async () => {
-            const outPath = path.join(os.tmpdir(), `render-uni-enc-${Date.now()}.pdf`);
+            const outPath = tmpName('render-uni-enc.pdf');
             tmpFiles.push(outPath);
             await withTempFile('.json', minimalParams, async (inputPath) => {
                 await render(parseArgs([
@@ -563,7 +562,7 @@ describe('render', () => {
         });
 
         it('still honours the legacy --encrypt-algorithm / --encrypt-owner-pass aliases', async () => {
-            const outPath = path.join(os.tmpdir(), `render-legacy-enc-${Date.now()}.pdf`);
+            const outPath = tmpName('render-legacy-enc.pdf');
             tmpFiles.push(outPath);
             await withTempFile('.json', minimalParams, async (inputPath) => {
                 await render(parseArgs([
@@ -576,7 +575,7 @@ describe('render', () => {
         });
 
         it('produces an unencrypted PDF when no encryption flags are given', async () => {
-            const outPath = path.join(os.tmpdir(), `render-noenc-${Date.now()}.pdf`);
+            const outPath = tmpName('render-noenc.pdf');
             tmpFiles.push(outPath);
             await withTempFile('.json', minimalParams, async (inputPath) => {
                 await render(parseArgs(['--input', inputPath, '--output', outPath]));
@@ -598,7 +597,7 @@ describe('render', () => {
         });
 
         it('--dry-run validates without writing the output file', async () => {
-            const outPath = path.join(os.tmpdir(), `render-dryrun-${Date.now()}.pdf`);
+            const outPath = tmpName('render-dryrun.pdf');
             await withTempFile('.json', minimalParams, async (inputPath) => {
                 await render(parseArgs(['--input', inputPath, '--output', outPath, '--dry-run']));
             });
@@ -607,7 +606,7 @@ describe('render', () => {
 
         it('--json --dry-run emits an ok:true dryRun envelope on stderr', async () => {
             process.env['PDFNATIVE_JSON'] = '1';
-            const outPath = path.join(os.tmpdir(), `render-dryrun-json-${Date.now()}.pdf`);
+            const outPath = tmpName('render-dryrun-json.pdf');
             const lines: string[] = [];
             const spy = vi.spyOn(process.stderr, 'write').mockImplementation((c: unknown) => {
                 lines.push(String(c));
@@ -632,7 +631,7 @@ describe('render', () => {
 
         it('--json emits an ok:true status envelope with byte count on success', async () => {
             process.env['PDFNATIVE_JSON'] = '1';
-            const outPath = path.join(os.tmpdir(), `render-json-${Date.now()}.pdf`);
+            const outPath = tmpName('render-json.pdf');
             tmpFiles.push(outPath);
             const lines: string[] = [];
             const spy = vi.spyOn(process.stderr, 'write').mockImplementation((c: unknown) => {

@@ -1,9 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { tmpName } from '../helpers/cli-harness.js';
 import * as fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
 import { inspect } from '../../src/commands/inspect.js';
 import { render } from '../../src/commands/render.js';
 import { sign } from '../../src/commands/sign.js';
@@ -37,8 +36,8 @@ afterEach(async () => {
 });
 
 async function generateTestPdf(): Promise<string> {
-    const inputPath = path.join(os.tmpdir(), `inspect-in-${Date.now()}.json`);
-    const outputPath = path.join(os.tmpdir(), `inspect-out-${Date.now()}.pdf`);
+    const inputPath = tmpName('inspect-in.json');
+    const outputPath = tmpName('inspect-out.pdf');
     tmpFiles.push(inputPath, outputPath);
     await fs.writeFile(inputPath, minimalParams, 'utf8');
     await render(parseArgs(['--input', inputPath, '--output', outputPath]));
@@ -48,7 +47,7 @@ async function generateTestPdf(): Promise<string> {
 describe('inspect', () => {
     it('outputs valid JSON for a generated PDF', async () => {
         const pdfPath = await generateTestPdf();
-        const outPath = path.join(os.tmpdir(), `inspect-result-${Date.now()}.json`);
+        const outPath = tmpName('inspect-result.json');
         tmpFiles.push(outPath);
 
         // Capture stdout
@@ -104,7 +103,7 @@ describe('inspect', () => {
     });
 
     it('throws CliError(1) for non-PDF input', async () => {
-        const badPath = path.join(os.tmpdir(), `bad-${Date.now()}.pdf`);
+        const badPath = tmpName('bad.pdf');
         tmpFiles.push(badPath);
         await fs.writeFile(badPath, 'not a pdf', 'utf8');
         const err = await inspect(parseArgs(['--input', badPath])).catch((e: unknown) => e);
@@ -332,8 +331,8 @@ describe('inspect', () => {
     });
 
     it('--check pdfua passes on a tagged (PDF/A) document', async () => {
-        const inputPath = path.join(os.tmpdir(), `inspect-ua-in-${Date.now()}.json`);
-        const outputPath = path.join(os.tmpdir(), `inspect-ua-out-${Date.now()}.pdf`);
+        const inputPath = tmpName('inspect-ua-in.json');
+        const outputPath = tmpName('inspect-ua-out.pdf');
         tmpFiles.push(inputPath, outputPath);
         await fs.writeFile(inputPath, minimalParams, 'utf8');
         await render(parseArgs(['--input', inputPath, '--output', outputPath, '--tagged', 'pdfa2b']));
@@ -350,8 +349,8 @@ describe('inspect', () => {
     });
 
     it('detects PDF/A conformance from XMP metadata', async () => {
-        const inputPath = path.join(os.tmpdir(), `inspect-pdfa-in-${Date.now()}.json`);
-        const outputPath = path.join(os.tmpdir(), `inspect-pdfa-out-${Date.now()}.pdf`);
+        const inputPath = tmpName('inspect-pdfa-in.json');
+        const outputPath = tmpName('inspect-pdfa-out.pdf');
         tmpFiles.push(inputPath, outputPath);
         await fs.writeFile(inputPath, minimalParams, 'utf8');
         await render(parseArgs(['--input', inputPath, '--output', outputPath, '--tagged', 'pdfa2b']));
@@ -390,7 +389,7 @@ describe('inspect', () => {
         });
 
         it('tags an unreadable PDF with E_PARSE', async () => {
-            const badPath = path.join(os.tmpdir(), `inspect-bad-${Date.now()}.pdf`);
+            const badPath = tmpName('inspect-bad.pdf');
             tmpFiles.push(badPath);
             await fs.writeFile(badPath, 'not a pdf', 'utf8');
             const err = await inspect(parseArgs(['--input', badPath])).catch((e: unknown) => e);
@@ -524,9 +523,8 @@ describe('inspect', () => {
         }
 
         async function renderWith(params: unknown, extraFlags: readonly string[] = []): Promise<string> {
-            const stamp = `${randomUUID()}`;
-            const inputPath = path.join(os.tmpdir(), `inspect14-in-${stamp}.json`);
-            const outputPath = path.join(os.tmpdir(), `inspect14-out-${stamp}.pdf`);
+            const inputPath = tmpName('inspect14-in.json');
+            const outputPath = tmpName('inspect14-out.pdf');
             tmpFiles.push(inputPath, outputPath);
             await fs.writeFile(inputPath, JSON.stringify(params), 'utf8');
             await render(parseArgs(['--input', inputPath, '--output', outputPath, ...extraFlags]));
@@ -534,7 +532,7 @@ describe('inspect', () => {
         }
 
         async function writeLayout(layout: unknown): Promise<string> {
-            const layoutPath = path.join(os.tmpdir(), `inspect14-layout-${randomUUID()}.json`);
+            const layoutPath = tmpName('inspect14-layout.json');
             tmpFiles.push(layoutPath);
             await fs.writeFile(layoutPath, JSON.stringify(layout), 'utf8');
             return layoutPath;
@@ -542,7 +540,7 @@ describe('inspect', () => {
 
         async function signedPdf(): Promise<string> {
             const src = await generateTestPdf();
-            const out = path.join(os.tmpdir(), `inspect14-signed-${randomUUID()}.pdf`);
+            const out = tmpName('inspect14-signed.pdf');
             tmpFiles.push(out);
             await sign(parseArgs([
                 '--input', src,

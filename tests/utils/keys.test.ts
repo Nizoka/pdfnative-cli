@@ -1,8 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { tmpName } from '../helpers/cli-harness.js';
 import * as fs from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
 import {
     pemToDer,
     splitPemBlocks,
@@ -78,7 +77,7 @@ describe('loadPem — env precedence', () => {
     });
 
     it('reads from file when env is unset', async () => {
-        const p = path.join(os.tmpdir(), `keys-test-key-${randomUUID()}.pem`);
+        const p = tmpName('keys-test-key.pem');
         tmp.push(p);
         await fs.writeFile(p, FAKE_PEM, 'utf8');
         const pem = await loadPem('TEST_PEM_ENV', p, 'cert', 'cert');
@@ -104,8 +103,8 @@ describe('loadPemChain', () => {
     });
 
     it('reads multiple files', async () => {
-        const p1 = path.join(os.tmpdir(), `c1-${Date.now()}.pem`);
-        const p2 = path.join(os.tmpdir(), `c2-${Date.now()}.pem`);
+        const p1 = tmpName('c1.pem');
+        const p2 = tmpName('c2.pem');
         tmp.push(p1, p2);
         await fs.writeFile(p1, FAKE_PEM, 'utf8');
         await fs.writeFile(p2, FAKE_PEM_2, 'utf8');
@@ -115,7 +114,7 @@ describe('loadPemChain', () => {
 
     it('combines env + files', async () => {
         process.env['TEST_CHAIN_ENV'] = FAKE_PEM;
-        const p = path.join(os.tmpdir(), `c-${Date.now()}.pem`);
+        const p = tmpName('c.pem');
         tmp.push(p);
         await fs.writeFile(p, FAKE_PEM_2, 'utf8');
         const blocks = await loadPemChain('TEST_CHAIN_ENV', [p]);

@@ -7,6 +7,7 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { expect, vi } from 'vitest';
@@ -23,16 +24,43 @@ export const SYNTHETIC_GRAY_ICC = path.join(FIXTURES, 'synthetic-gray.icc');
 export const RSA_KEY = path.join(FIXTURES, 'rsa-key.pem');
 export const RSA_CERT = path.join(FIXTURES, 'rsa-cert.pem');
 
-/** A fresh temp path; every path is removed by {@link cleanup}. */
+let privateTmpDir: string | null = null;
+
 /**
- * A unique path under the OS temp directory. The entropy comes from
+ * One private directory per test process, created with mkdtemp (an
+ * unpredictable name, mode 0700) and removed at exit. Every temp file of the
+ * suites lives under it: a file created straight under `os.tmpdir()` with a
+ * guessable name is CodeQL js/insecure-temporary-file (the shared temp
+ * directory is writable by every local user).
+ */
+export function tmpRoot(): string {
+    if (privateTmpDir === null) {
+        privateTmpDir = mkdtempSync(path.join(os.tmpdir(), 'pdfcli-'));
+        const dir = privateTmpDir;
+        process.once('exit', () => {
+            try {
+                rmSync(dir, { recursive: true, force: true });
+            } catch {
+                /* the OS temp cleaner takes over */
+            }
+        });
+    }
+    return privateTmpDir;
+}
+
+/**
+ * A unique path under {@link tmpRoot}, keeping the extension of `name`
+ * (`notes.json` → `notes-<pid>-<uuid>.json`). The entropy comes from
  * node:crypto (randomUUID), never Math.random: CodeQL traces every value a
  * test derives from a weak generator into the command it drives (a password
  * flag, an owner password), which is a finding on the CLI for a cause in the
- * tests. One helper, so no suite reintroduces it.
+ * tests. One helper, so no suite reintroduces either finding; never
+ * `path.join(os.tmpdir(), …)` in a suite.
  */
 export function tmpName(name: string): string {
-    return path.join(os.tmpdir(), `${name}-${process.pid}-${randomUUID()}`);
+    const ext = path.extname(name);
+    const stem = ext === '' ? name : name.slice(0, -ext.length);
+    return path.join(tmpRoot(), `${stem}-${process.pid}-${randomUUID()}${ext}`);
 }
 
 export class TempFiles {

@@ -162,6 +162,8 @@ files; workflows 9 → 11; tests 1403 → 1555 across 103 files (was 96); npm ke
 | Scorecard #7 (fuzzing) | ClusterFuzzLite (`fuzz.yml`, `fuzz/`, `.clusterfuzzlite/`) |
 | Scorecard #3 (code review), #5 (Best Practices badge) | acknowledged in SECURITY.md; the badge is a maintainer registration (checklist below) |
 | Scorecard #1 (branch protection) | the ruleset is active; re-check after the next weekly run with the seven contexts imported |
+| CodeQL `js/file-system-race` (`src/utils/io.ts`) and `js/insecure-temporary-file` (`io.ts` + the suites), first `security-extended` run on this PR | fixed at the source: `readBinaryFileCapped` sizes and reads through one descriptor; every test temp file comes from `tmpName()` (a private `mkdtemp` directory) — no `path.join(os.tmpdir(), …)` left in `tests/` |
+| Dependency Review: BlueOak-1.0.0 ×5 and CC-BY-4.0 ×1 in `.clusterfuzzlite/engine/package-lock.json` | allow-listed in `dependency-review.yml` with the reason (fuzzing engine only, never in the package; BlueOak-1.0.0 is OSI-approved) |
 
 ## Independent audit
 

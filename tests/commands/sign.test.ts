@@ -1,9 +1,8 @@
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { tmpName } from '../helpers/cli-harness.js';
 import * as fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
 import { sign } from '../../src/commands/sign.js';
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
@@ -95,8 +94,8 @@ describe('sign', () => {
     });
 
     async function makeTestPdf(): Promise<string> {
-        const inPath = path.join(os.tmpdir(), `sign-in-${Date.now()}.json`);
-        const pdfPath = path.join(os.tmpdir(), `sign-src-${Date.now()}.pdf`);
+        const inPath = tmpName('sign-in.json');
+        const pdfPath = tmpName('sign-src.pdf');
         tmpFiles.push(inPath, pdfPath);
         await fs.writeFile(inPath, minimalParams, 'utf8');
         await render(parseArgs(['--input', inPath, '--output', pdfPath]));
@@ -105,7 +104,7 @@ describe('sign', () => {
 
     /** Sign `pdfPath` with the RSA PEM fixtures plus `extra` flags; returns the output path. */
     async function signFixture(pdfPath: string, extra: readonly string[] = []): Promise<string> {
-        const outPath = path.join(os.tmpdir(), `sign-out-${randomUUID()}.pdf`);
+        const outPath = tmpName('sign-out.pdf');
         tmpFiles.push(outPath);
         await sign(parseArgs([
             '--input', pdfPath,
@@ -124,7 +123,7 @@ describe('sign', () => {
 
     it('throws CliError(2) when no key is provided (no env, no flag)', async () => {
         const pdfPath = await makeTestPdf();
-        const outPath = path.join(os.tmpdir(), `sign-out-${Date.now()}.pdf`);
+        const outPath = tmpName('sign-out.pdf');
         tmpFiles.push(outPath);
 
         const err = await sign(parseArgs(['--input', pdfPath, '--output', outPath])).catch((e: unknown) => e);
@@ -134,7 +133,7 @@ describe('sign', () => {
 
     it('throws CliError(2) when cert is missing even if key is provided', async () => {
         const pdfPath = await makeTestPdf();
-        const keyPath = path.join(os.tmpdir(), `sign-test-key-${randomUUID()}.pem`);
+        const keyPath = tmpName('sign-test-key.pem');
         tmpFiles.push(keyPath);
         await fs.writeFile(keyPath, TEST_KEY_PEM, 'utf8');
 
@@ -148,7 +147,7 @@ describe('sign', () => {
         process.env['PDFNATIVE_SIGN_CERT'] = TEST_CERT_PEM;
 
         const pdfPath = await makeTestPdf();
-        const outPath = path.join(os.tmpdir(), `sign-env-out-${Date.now()}.pdf`);
+        const outPath = tmpName('sign-env-out.pdf');
         tmpFiles.push(outPath);
 
         // Should attempt to sign (may fail due to fake test creds, but must not fail on "missing key")
@@ -221,8 +220,8 @@ describe('sign', () => {
 
     it('error messages never contain raw PEM body', async () => {
         const pdfPath = await makeTestPdf();
-        const garbageKey = path.join(os.tmpdir(), `bad-key-${Date.now()}.pem`);
-        const garbageCert = path.join(os.tmpdir(), `bad-cert-${Date.now()}.pem`);
+        const garbageKey = tmpName('bad-key.pem');
+        const garbageCert = tmpName('bad-cert.pem');
         tmpFiles.push(garbageKey, garbageCert);
         await fs.writeFile(garbageKey, '-----BEGIN RSA PRIVATE KEY-----\nSECRETBYTES==\n-----END RSA PRIVATE KEY-----', 'utf8');
         await fs.writeFile(garbageCert, '-----BEGIN CERTIFICATE-----\nSECRETBYTES==\n-----END CERTIFICATE-----', 'utf8');
@@ -239,8 +238,8 @@ describe('sign', () => {
 
     it('rejects signing an encrypted PDF (placeholder injection fails)', async () => {
         // Render an encrypted PDF first.
-        const inPath = path.join(os.tmpdir(), `sign-enc-${Date.now()}.json`);
-        const pdfPath = path.join(os.tmpdir(), `sign-enc-${Date.now()}.pdf`);
+        const inPath = tmpName('sign-enc.json');
+        const pdfPath = tmpName('sign-enc.pdf');
         tmpFiles.push(inPath, pdfPath);
         await fs.writeFile(inPath, minimalParams, 'utf8');
         await render(parseArgs([
@@ -268,7 +267,7 @@ describe('sign', () => {
 
         it('--dry-run validates credentials and PDF without writing output', async () => {
             const pdfPath = await makeTestPdf();
-            const outPath = path.join(os.tmpdir(), `sign-dryrun-${Date.now()}.pdf`);
+            const outPath = tmpName('sign-dryrun.pdf');
             await sign(parseArgs([
                 '--input', pdfPath,
                 '--key', RSA_KEY,
@@ -281,7 +280,7 @@ describe('sign', () => {
 
         it('--json --dry-run emits an ok:true envelope and never leaks key material', async () => {
             const pdfPath = await makeTestPdf();
-            const outPath = path.join(os.tmpdir(), `sign-dryrun-json-${Date.now()}.pdf`);
+            const outPath = tmpName('sign-dryrun-json.pdf');
             process.env['PDFNATIVE_JSON'] = '1';
             const lines: string[] = [];
             const spy = vi.spyOn(process.stderr, 'write').mockImplementation((c: unknown) => {
@@ -372,7 +371,7 @@ describe('sign', () => {
         it('fails with E_PARSE (exit 1) and writes nothing when the TSA rejects (PKIStatus 2)', async () => {
             setTimestampProvider(createMockTimestampProvider(createMockPki(), { status: 2 }));
             const pdfPath = await makeTestPdf();
-            const outPath = path.join(os.tmpdir(), `sign-tsa-rej-${randomUUID()}.pdf`);
+            const outPath = tmpName('sign-tsa-rej.pdf');
             tmpFiles.push(outPath);
             const err = await sign(parseArgs([
                 '--input', pdfPath,
@@ -444,7 +443,7 @@ describe('sign', () => {
                 },
             });
             const pdfPath = await makeTestPdf();
-            const outPath = path.join(os.tmpdir(), `sign-ts-dry-${randomUUID()}.pdf`);
+            const outPath = tmpName('sign-ts-dry.pdf');
             tmpFiles.push(outPath);
             await sign(parseArgs([
                 '--input', pdfPath,

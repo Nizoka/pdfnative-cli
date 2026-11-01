@@ -39,5 +39,9 @@ jobs:
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
-          allow-licenses: MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0, 0BSD, CC0-1.0, Unlicense
+          # BlueOak-1.0.0 (OSI-approved, permissive: tar, minipass, yallist, chownr,
+          # isexe) and CC-BY-4.0 (the caniuse-lite browser table) reach the tree
+          # only through .clusterfuzzlite/engine/package-lock.json, the fuzzing
+          # engine of the ClusterFuzzLite container — never through package.json.
+          allow-licenses: MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0, 0BSD, CC0-1.0, Unlicense, BlueOak-1.0.0, CC-BY-4.0
           comment-summary-in-pr: on-failure

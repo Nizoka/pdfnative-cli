@@ -629,7 +629,7 @@ describe('dependency review and audit', () => {
         expect(review).toMatch(/^on:\s*\n\s*pull_request:/m);
         expect(review).toMatch(/uses: actions\/dependency-review-action@[0-9a-f]{40}/);
         expect(review).toMatch(/fail-on-severity:\s*high/);
-        expect(review).toMatch(/allow-licenses:\s*MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0, 0BSD, CC0-1.0, Unlicense/);
+        expect(review).toMatch(/allow-licenses:\s*MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0, 0BSD, CC0-1.0, Unlicense, BlueOak-1.0.0, CC-BY-4.0/);
         expect(review).toMatch(/comment-summary-in-pr:\s*on-failure/);
     });
 

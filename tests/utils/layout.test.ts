@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { tmpName } from '../helpers/cli-harness.js';
 import * as fs from 'node:fs/promises';
 import { buildLayoutOptions, loadLayoutFile, assertStreamingCompatible, assertIccSignature } from '../../src/utils/layout.js';
 import { parseArgs } from '../../src/utils/args.js';
@@ -195,7 +195,7 @@ describe('layout — file loader', () => {
     });
 
     it('rejects non-object JSON', async () => {
-        const p = path.join(os.tmpdir(), `layout-${Date.now()}.json`);
+        const p = tmpName('layout.json');
         tmp.push(p);
         await fs.writeFile(p, '[1,2,3]', 'utf8');
         const err = await loadLayoutFile(p).catch((e: unknown) => e);
@@ -203,7 +203,7 @@ describe('layout — file loader', () => {
     });
 
     it('strips attachments[].data from layout file', async () => {
-        const p = path.join(os.tmpdir(), `layout-${Date.now()}-2.json`);
+        const p = tmpName('layout-2.json');
         tmp.push(p);
         await fs.writeFile(
             p,
@@ -250,7 +250,7 @@ describe('layout — attachment flag parsing (Windows path regression)', () => {
     // colon correctly on all platforms.
 
     it('parses a POSIX-style attachment path with mime + relationship + description', async () => {
-        const xmlPath = path.join(os.tmpdir(), `attach-posix-${Date.now()}.xml`);
+        const xmlPath = tmpName('attach-posix.xml');
         tmp.push(xmlPath);
         await fs.writeFile(xmlPath, '<root/>', 'utf8');
 
@@ -267,7 +267,7 @@ describe('layout — attachment flag parsing (Windows path regression)', () => {
     });
 
     it('uses application/octet-stream when mime is omitted', async () => {
-        const binPath = path.join(os.tmpdir(), `attach-noext-${Date.now()}`);
+        const binPath = tmpName('attach-noext');
         tmp.push(binPath);
         await fs.writeFile(binPath, 'binary', 'utf8');
 
@@ -279,8 +279,8 @@ describe('layout — attachment flag parsing (Windows path regression)', () => {
     });
 
     it('parses multiple --attachment values as separate entries', async () => {
-        const f1 = path.join(os.tmpdir(), `attach-multi1-${Date.now()}.txt`);
-        const f2 = path.join(os.tmpdir(), `attach-multi2-${Date.now()}.csv`);
+        const f1 = tmpName('attach-multi1.txt');
+        const f2 = tmpName('attach-multi2.csv');
         tmp.push(f1, f2);
         await fs.writeFile(f1, 'hello', 'utf8');
         await fs.writeFile(f2, 'a,b,c', 'utf8');
@@ -308,7 +308,7 @@ describe('layout — attachment flag parsing (Windows path regression)', () => {
     // path unconditionally so the test catches regressions on both Windows and
     // POSIX (on POSIX there is no drive letter, but the parser must still work).
     it('parses the OS temp-dir path (covers Windows drive-letter colon)', async () => {
-        const xmlPath = path.join(os.tmpdir(), `attach-win-${Date.now()}.xml`);
+        const xmlPath = tmpName('attach-win.xml');
         tmp.push(xmlPath);
         await fs.writeFile(xmlPath, '<invoice/>', 'utf8');
 
@@ -334,7 +334,7 @@ describe('--output-intent-icc: the CLI checks the acsp signature itself (v1.5.0,
     });
 
     it('refuses a file without `acsp` at byte 36 with E_INPUT before the engine sees it', async () => {
-        const bogus = path.join(os.tmpdir(), `not-icc-${Date.now()}.icc`);
+        const bogus = tmpName('not-icc.icc');
         tmp.push(bogus);
         await fs.writeFile(bogus, Buffer.alloc(256, 0));
         const err = await buildLayoutOptions(parseArgs(['--output-intent-icc', bogus])).catch((e: unknown) => e);
@@ -345,7 +345,7 @@ describe('--output-intent-icc: the CLI checks the acsp signature itself (v1.5.0,
     });
 
     it('refuses a file shorter than the 128-byte header', async () => {
-        const short = path.join(os.tmpdir(), `short-${Date.now()}.icc`);
+        const short = tmpName('short.icc');
         tmp.push(short);
         await fs.writeFile(short, Buffer.from('acsp'));
         await expect(buildLayoutOptions(parseArgs(['--output-intent-icc', short]))).rejects.toMatchObject({ code: 'E_INPUT' });

@@ -130,6 +130,15 @@ note's compatibility ledger.
   received; `tests/helpers/cli-harness.ts` now has one `tmpName()` on `randomUUID()`, every
   suite uses it, and `tests/tools/workflows.test.ts` refuses `Math.random` under `src/`,
   `scripts/`, `tests/` and `fuzz/`.
+- **CodeQL `security-extended`, first run on the release pull request** — `js/file-system-race`:
+  `readBinaryFileCapped` sized a file with `stat()` and re-opened it by path; it now opens one
+  descriptor, takes the size from it and reads at most that many bytes.
+  `js/insecure-temporary-file`: the suites created files with guessable names straight under
+  `os.tmpdir()`; every test temp file now comes from `tmpName()` (a private `mkdtemp`
+  directory, the extension kept) or a `mkdtemp` directory of the suite's own.
+- **Dependency Review** — BlueOak-1.0.0 (`tar`, `minipass`, `yallist`, `chownr`, `isexe`) and
+  CC-BY-4.0 (`caniuse-lite`) are allow-listed with their reason: they reach the tree only
+  through the ClusterFuzzLite engine lockfile, never through `package.json`.
 - **Scorecard** — `codeql.yml` holds `security-events: write` at job level (#2); the publish
   job installs no npm client from a floating tag (#15; the client is pinned by SHA-512); the
   `attest` job's `contents: write` and its `npm install` of the exact published version are

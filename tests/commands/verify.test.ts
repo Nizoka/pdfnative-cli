@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { tmpName } from '../helpers/cli-harness.js';
 import * as fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { verify } from '../../src/commands/verify.js';
@@ -34,8 +35,8 @@ afterEach(async () => {
 });
 
 async function makeUnsignedPdf(): Promise<string> {
-    const inPath = path.join(os.tmpdir(), `verify-in-${Date.now()}.json`);
-    const pdfPath = path.join(os.tmpdir(), `verify-src-${Date.now()}.pdf`);
+    const inPath = tmpName('verify-in.json');
+    const pdfPath = tmpName('verify-src.pdf');
     tmpFiles.push(inPath, pdfPath);
     await fs.writeFile(inPath, minimalParams, 'utf8');
     await render(parseArgs(['--input', inPath, '--output', pdfPath]));
@@ -92,7 +93,7 @@ describe('verify', () => {
     });
 
     it('throws CliError(1) for non-PDF input', async () => {
-        const bad = path.join(os.tmpdir(), `verify-bad-${Date.now()}.pdf`);
+        const bad = tmpName('verify-bad.pdf');
         tmpFiles.push(bad);
         await fs.writeFile(bad, 'not a pdf', 'utf8');
         const err = await verify(parseArgs(['--input', bad])).catch((e: unknown) => e);
@@ -110,7 +111,7 @@ describe('verify', () => {
     });
 
     it('tags an unreadable PDF with E_PARSE', async () => {
-        const bad = path.join(os.tmpdir(), `verify-badcode-${Date.now()}.pdf`);
+        const bad = tmpName('verify-badcode.pdf');
         tmpFiles.push(bad);
         await fs.writeFile(bad, 'not a pdf', 'utf8');
         const err = await verify(parseArgs(['--input', bad])).catch((e: unknown) => e);

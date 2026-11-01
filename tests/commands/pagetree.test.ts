@@ -1,8 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { tmpName } from '../helpers/cli-harness.js';
 import * as fs from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
 import { render } from '../../src/commands/render.js';
 import { merge } from '../../src/commands/merge.js';
 import { split } from '../../src/commands/split.js';
@@ -21,7 +20,7 @@ afterEach(async () => {
 });
 
 function tmpPath(name: string): string {
-    const p = path.join(os.tmpdir(), `pgtree-${randomUUID()}-${name}`);
+    const p = tmpName(`pgtree-${name}`);
     tmp.push(p);
     return p;
 }

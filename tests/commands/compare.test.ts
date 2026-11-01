@@ -1,8 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { tmpName } from '../helpers/cli-harness.js';
 import * as fs from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
 import { render } from '../../src/commands/render.js';
 import { metadata } from '../../src/commands/metadata.js';
 import { compare } from '../../src/commands/compare.js';
@@ -19,7 +18,7 @@ afterEach(async () => {
 });
 
 function tmpPath(name: string): string {
-    const p = path.join(os.tmpdir(), `cmp-${randomUUID()}-${name}`);
+    const p = tmpName(`cmp-${name}`);
     tmp.push(p);
     return p;
 }

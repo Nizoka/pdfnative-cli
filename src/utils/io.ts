@@ -1,5 +1,5 @@
 import { createWriteStream } from 'node:fs';
-import { readFile, stat, writeFile } from 'node:fs/promises';
+import { open, readFile, writeFile, type FileHandle } from 'node:fs/promises';
 import { CliError, ErrorCode } from './error.js';
 
 const JSON_SIZE_LIMIT = 50 * 1024 * 1024; // 50 MB
@@ -57,22 +57,37 @@ export async function readBinaryFile(filePath: string): Promise<Uint8Array> {
  */
 export async function readBinaryFileCapped(filePath: string, maxBytes: number, label: string): Promise<Uint8Array> {
     validatePath(filePath);
-    let size: number;
+    // One handle for the size check and the read: a path checked with stat()
+    // and then re-opened can be swapped in between (CodeQL js/file-system-race),
+    // so the size is taken from the open descriptor and the read is bounded by
+    // that size — a file that grows after the check still lands capped.
+    let handle: FileHandle;
     try {
-        size = (await stat(filePath)).size;
+        handle = await open(filePath, 'r');
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         throw new CliError(`Failed to read ${label} "${filePath}": ${msg}`, 1, ErrorCode.IO);
     }
-    if (size > maxBytes) {
-        throw new CliError(
-            `${label} "${filePath}" is ${(size / 1024 / 1024).toFixed(1)} MB, over the ${(maxBytes / 1024 / 1024).toFixed(0)} MB limit.`,
-            1,
-            ErrorCode.INPUT,
-        );
+    try {
+        const { size } = await handle.stat();
+        if (size > maxBytes) {
+            throw new CliError(
+                `${label} "${filePath}" is ${(size / 1024 / 1024).toFixed(1)} MB, over the ${(maxBytes / 1024 / 1024).toFixed(0)} MB limit.`,
+                1,
+                ErrorCode.INPUT,
+            );
+        }
+        const buf = Buffer.allocUnsafe(size);
+        let offset = 0;
+        while (offset < size) {
+            const { bytesRead } = await handle.read(buf, offset, size - offset, offset);
+            if (bytesRead === 0) break;
+            offset += bytesRead;
+        }
+        return new Uint8Array(buf.buffer, buf.byteOffset, offset);
+    } finally {
+        await handle.close();
     }
-    const buf = await readFile(filePath);
-    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
 
 /**
