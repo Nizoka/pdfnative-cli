@@ -22,6 +22,8 @@
 *.jpg   binary
 *.jpeg  binary
 *.ico   binary
+*.jp2   binary
+*.j2k   binary
 
 # Generated files: collapsed in GitHub diffs and excluded from language stats.
 .claude/rules/*.md                              linguist-generated=true
