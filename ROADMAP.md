@@ -247,7 +247,7 @@ This document outlines the planned development direction for pdfnative-cli. Prio
   the Claude Code layer (`CLAUDE.md` = `@AGENTS.md`, settings, guard hook, generated rules,
   `release-audit` skill), `docs/AGENT_CONTRACT.md` split out of AGENTS.md, CHANGELOG compare links.
 
-### v1.6.0 — right-to-left, 32 scripts, spot colours & the dual PDF/A + PDF/X claim _(released 2026-10-31)_
+### v1.6.0 — right-to-left, 32 scripts, spot colours & the dual PDF/A + PDF/X claim _(released 2026-11-01)_
 
 - [x] **`pdfnative` bumped** to `^1.9.0` (was `^1.8.0`) — every 1.9.0 feature exposed, traced in
   `tests/regression/engine-surface.json` (72 items: tests and samples, or a motivated waiver).
@@ -354,6 +354,20 @@ Feasibility is called out honestly: some ideas need pdfnative to expose a primit
   every release (an exclusion without a ledger entry is a breaking change by policy). A committed
   `manifest.json` per release and a JSON-LD / `llms-full.txt` variant are deferred: both derive
   from `schema manifest`, whose `$id` already carries the version.
+- **`verify` on an encrypted document** — `verify` reports an encrypted file it cannot open as
+  `E_PARSE` where `inspect` says `E_PASSWORD`, and has no `--password`; routing its read errors
+  through `mapPdfError` and adding the flag is additive but moves a code, so it ships with a
+  ledger entry (found by the v1.6.0 release audit).
+- **Filesystem errors as `E_IO`** — a missing or unreadable `--input` surfaces as `E_RUNTIME`
+  with the raw `ENOENT`, where the contract reserves `E_IO` for filesystem failures; mapping
+  `ENOENT` / `EACCES` / `EISDIR` in `readFileOrStdin` / `readBinaryFile` is one change for every
+  command, declared in the ledger of the release that makes it.
+- **`inspect` validates `--check` before any output** — an invalid check name is refused
+  (exit 2) only after the document is read and the report written to stdout; the names belong
+  with the other flag checks, before the read.
+- **Typed flag metadata in `schema manifest`** — every flag is a bare string today; an additive
+  `flagSpecs` (name, type, enumerated values, repeatable, description) next to the kept `flags`
+  array would let an agent build a call without the usage text.
 - **Synthetic ICC profiles with a chosen version** — the PDF/A-1 canary needs an ICC v4 variant of
   the engine's synthetic Gray profile; `scripts/lib/icc-canary.ts` patches the header byte
   because `buildSyntheticGrayProfile()` takes no `version` option. **Upstream issue to file**

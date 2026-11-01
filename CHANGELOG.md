@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.6.0] – 2026-10-31
+## [1.6.0] – 2026-11-01
 
 Built on **pdfnative 1.9.0**. Exposes every 1.9.0 engine feature — right-to-left layout under
 the full UAX #9, five more Indic scripts (32 Unicode scripts in all), spot colours, the
@@ -48,6 +48,10 @@ note's compatibility ledger.
   (`PdfStreamLimitError`, code `PDF_STREAM_LIMIT`): the default `limit` fails with `E_INPUT`
   naming both remedies, `throw` fails on any undecodable stream, `skip` is the 1.8.0 lenience.
   `compare` applies the policy to both PDFs and never reports an unreadable page as equal.
+  Every command that opens a PDF inherits the error class: an object, cross-reference or
+  content stream past the cap was `E_PARSE` in 1.5.0 and is `E_INPUT` now (`verify` keeps its
+  own `E_PARSE`); only `extract-text` and `compare` additionally lose the silent empty page
+  (release-note ledger C2).
 
 #### `ltv`
 

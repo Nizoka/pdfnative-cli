@@ -30,7 +30,7 @@ repository-code: "https://github.com/Nizoka/pdfnative-cli"
 url: "https://pdfnative.dev"
 license: MIT
 version: 1.6.0
-date-released: "2026-10-31"
+date-released: "2026-11-01"
 keywords:
   - pdf
   - cli

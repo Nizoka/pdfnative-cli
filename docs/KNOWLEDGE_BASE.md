@@ -1702,4 +1702,4 @@ See [SECURITY.md](../SECURITY.md) for the full policy.
 
 ---
 
-*Verified on 2026-10-31 · pdfnative-cli v1.6.0 · pdfnative 1.9.0*
+*Verified on 2026-11-01 · pdfnative-cli v1.6.0 · pdfnative 1.9.0*

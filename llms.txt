@@ -10,7 +10,7 @@
 > Zero extra runtime dependencies; all PDF logic lives in `pdfnative`.
 
 Current version: 1.6.0 (built on pdfnative 1.9.0; requires Node ≥ 22).
-Verified on 2026-10-31 against the source tree.
+Verified on 2026-11-01 against the source tree.
 
 This file is an LLM-facing capability manifest (see https://llmstxt.org). For a
 machine-readable JSON manifest run `pdfnative schema manifest`; the full contract is
@@ -99,7 +99,8 @@ docs/AGENT_CONTRACT.md.
 - `inspect` — metadata (`--iso-dates` → ISO 8601), PDF/A and PDF/X conformance
   (`--pdfx` report), signatures (`--signatures` inventory), annotations, form fields
   (`--form-fields`), encryption scheme (`--encryption`), PDF/UA validation,
-  `--check pdfa|signed|encrypted|pdfua|pdfx|"signatures>=N"`; `--summary` =
+  `--check pdfa|signed|encrypted|pdfua|pdfx|"signatures>=N"` (repeatable, or a comma
+  list: `--check pdfa,pdfx`); `--summary` =
   `{ pages, encrypted, signatures, pdfa, pdfx }`.
 - `batch` — render a directory of JSON inputs in parallel, or run a
   declarative multi-command pipeline (`--manifest tasks.json`, `@<id>` output

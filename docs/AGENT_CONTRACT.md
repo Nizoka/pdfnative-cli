@@ -1,6 +1,6 @@
 # Agent contract — driving pdfnative-cli from autonomous agents
 
-_Verified on 2026-10-31 · pdfnative-cli v1.6.0 · pdfnative 1.9.0_
+_Verified on 2026-11-01 · pdfnative-cli v1.6.0 · pdfnative 1.9.0_
 
 `pdfnative-cli` is built so that an autonomous AI agent — or any program — can
 drive it inside a larger automated process **deterministically and safely**.
@@ -280,9 +280,11 @@ instants.
 **PDF/X-4 preflight (v1.5.0).** `render --pdfx pdfx4 --output-intent-icc <cmyk.icc>
 --font latin --lang latin --trapped false --strict` writes a PDF/X-4 file or fails with
 `E_INPUT` / `E_CHECK_FAILED`; `inspect --check pdfx` (or `--pdfx` for the full report)
-re-validates any file. The check is pdfnative's structural validator, not a certified
-preflight tool; PDF/X and PDF/A cannot be claimed by the same file, and `metadata` rewrites
-the XMP without the PDF/X identification (an upstream limit — re-check after editing).
+re-validates any file; `--check` takes a comma list as well as the repeated form
+(`--check pdfa,pdfx` verifies the v1.6.0 dual claim in one flag). The check is pdfnative's
+structural validator, not a certified preflight tool; PDF/A-2b or 2u may be claimed next to
+PDF/X-4 since v1.6.0 (PDF/A-1b and 3b may not), and `metadata` rewrites the XMP without the
+PDF/X identification (an upstream limit — re-check after editing).
 
 **PDF/A changes → veraPDF gate.** An agent working **on this repository** must run
 `npm run build && npm run corpus:pdfa && npm run validate:pdfx && npm run validate:pdfa`

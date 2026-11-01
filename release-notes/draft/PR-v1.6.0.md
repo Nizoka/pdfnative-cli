@@ -96,7 +96,7 @@ files; workflows 9 → 11; tests 1403 → 1555 across 103 files (was 96); npm ke
   `workflow lint`), `codeql.yml` (job-level permissions, `actions` + `javascript-typescript`,
   build-mode none, `security-extended`), `publish.yml` (guard → build → publish → attest),
   `node-current.yml` (Node 26, advisory), `fuzz.yml` (ClusterFuzzLite, advisory), the other
-  seven on checkout 7.0.1 / codeql-action 4.38.0 with dated harden-runner reasons;
+  six on checkout 7.0.1 / codeql-action 4.38.0 with dated harden-runner reasons;
   `setup-verapdf` returns an output. `dependabot.yml` (four ecosystems, 7-day cooldown).
   `rulesets/main.json` (seven required contexts; `merge` + `squash`).
 - `fuzz/` (nine targets, `surface.ts`, `_contract.js`), `.clusterfuzzlite/` (project.yaml,
@@ -187,6 +187,37 @@ captures, targeted suites, greps with line numbers) ran 28 checks:
 - Not verified by the agent (environment-bound): `compat:previous`, the coverage figures, the
   publish gate and veraPDF — all run by the author, figures below.
 
+**Second pass (2026-11-01, the publish day)** — two independent auditors (internal
+conformance; engine coverage, breaking changes and state of the art) and an adversarial
+verifier that reproduced every piece of evidence itself. 18 findings, none blocking: 14
+legitimate or partial, 3 rejected, 1 unverifiable offline. Every retained finding is applied
+on this branch.
+
+| ID | Verdict | Finding | Outcome |
+|---|---|---|---|
+| A-01 | legitimate | eight release stamps said 2026-10-31 | re-dated 2026-11-01 (`release-prepare --date`; CHANGELOG, the note and ROADMAP by hand); the 14 harden-runner reasons keep their decision date |
+| B-01 | legitimate | ledger C2 named two commands; the over-cap inflate error reaches every command that opens a PDF (E_PARSE → E_INPUT, `verify` excepted) | C2 extended (note, CHANGELOG) |
+| B-02 | partial | the table-variant guard (rendered `undefined :` in 1.5.0, E_INPUT now) had no ledger entry | C6 added |
+| A-03 | legitimate | C5 is not an engine inheritance and not referenced by the allow-list | ledger intro reworded; "four ledger entries" above |
+| A-04 | legitimate | "the other seven" workflows is six | fixed |
+| A-07 | legitimate | the note promised a table here; this section is a summary | reworded |
+| A-02 | legitimate | `ecosystem.json` quoted pdfnative-mcp 1.6.0 (newest tag v1.7.0); no pdfnative-react entry | mcp 1.7.0, react 1.3.0 added |
+| A-05 | legitimate | no `*.jp2` / `*.j2k binary` rule (five fixtures binary by git's heuristic only) | `.gitattributes` extended, no renormalisation |
+| A-06 | legitimate | a literal U+0000 made `annotate-link.test.ts` a binary blob for git (invisible to `eol-lf`) | built with `String.fromCharCode(0)` |
+| B-07 | partial | the comma form of `--check` missing from AGENT_CONTRACT / llms.txt, and a stale "PDF/X and PDF/A cannot be claimed by the same file" sentence | added; sentence corrected |
+| B-08 | legitimate | `engine-surface.json` `$comment` said "every bullet"; the test takes bold-titled bullets, the engine's five Documentation bullets are outside | `$comment` reworded |
+| B-03 | pre-existing | `verify` on an encrypted file is E_PARSE (`inspect`: E_PASSWORD), no `--password` | ROADMAP |
+| B-04 | pre-existing | a missing `--input` is E_RUNTIME with a raw ENOENT, not E_IO | ROADMAP |
+| B-05 | pre-existing | `inspect` writes its artefact before refusing an invalid `--check` | ROADMAP |
+| B-06 | roadmap | `schema manifest` flags carry no type / enum / description | ROADMAP |
+| A-08 | rejected | a "Generated with" footer in the shipped v1.5.0 PR draft | shipped history, untouched; the checklist's scope is this branch's commits and artefacts |
+| A-09 | unverifiable offline | Dependabot / Scorecard / remote-tag items | the maintainer checks on GitHub |
+| B-09 | rejected | `ltv collect` / `add` refusing the embed-only flags | a new flag, not a regression (1.5.0 `ltv` had none of them) |
+
+Holds re-checked by the verifier: `verify:docs` 26 rules, zero CRLF blob, `npm pack --dry-run`
+10 files, the full SHA in `.git-blame-ignore-revs`, `engine-surface.test.ts` "maps every
+bullet" ran (10/10), `schema status` pins the four fields, no `Co-Authored-By` in the branch.
+
 Before the audit, `/code-review high` on the branch diff returned nine findings, all fixed
 in `e26c272` (a PEM preamble longer than 64 bytes was handed to the engine as DER; a
 non-`composeLtvData:` engine error lost its message; `ltv collect` / `add` ignored the
@@ -210,7 +241,8 @@ times with two orders; `--tag` ran under the wrong allow-list; a config read fai
   `npm run validate:pdfa` (veraPDF 1.30.2, JDK 13) → 16 PASS + 4 XFAIL + 5 SKIP (the
   PDF/X-only files), exit 0 — the dual claim and the JPX under PDF/A-2b accepted.
 - `npm run compat:previous` (tag `v1.5.0`) → 67 files, 839 cases of the v1.5.0 suite green
-  against the current sources (14 exclusions, each with a reason; 5 ledger entries).
+  against the current sources (14 exclusions, each with a reason; the exclusions reference
+  four ledger entries, C1–C4; C5 and C6 are repository-side changes outside the allow-list).
 - `npx tsx scripts/gate.ts --publish --require-all` at `4e6ecae` → **15 passed, 0 skipped in
   374 s** (typecheck:all 22 s, lint 8 s, build 10 s, dist-check, smoke — 21 commands —,
   bundle-size 381 KiB of the 448 KiB budget, bundle-check — 2 externals —, test:generate
@@ -273,8 +305,16 @@ times with two orders; `--tag` ran under the wrong allow-list; a config read fai
    the `npm-publish` environment when asked.
 5. Close Dependabot PR #21 (superseded); the other Dependabot PRs close themselves.
 6. Submit the four upstream issue drafts under `.github/drafts/` to Nizoka/pdfnative, and
-   the alignment PR on the engine side (`docs/data/surfaces.json`, `docs/assets/ecosystem.json`
-   → pdfnative-cli 1.6.0; `docs/guides/cli.md`).
+   the alignment PR on the engine side — `docs/assets/ecosystem.json` (pdfnative-cli 1.5.0 →
+   1.6.0, pin `^1.9.0`); `docs/data/surfaces.json` rows `spot-colours`, `images-jpeg2000`,
+   `rtl-direction` (CLI supported, `render`, since 1.6.0) and 1.6.0 notes on the LTV,
+   text-extraction, annotate and PDF/X-4 rows; `docs/guides/cli.md` (header, "9 codes" → 13,
+   "27 script codes" → 32, the render table with `--direction` / `--actual-text` / JPEG 2000 /
+   spot colours / the dual claim replacing "mutually exclusive", `--check` comma list, the four
+   `ltv` flags, `--on-stream-error` under extract-text and compare, the engine-built link body,
+   "31 properties" → 35); `docs/guides/choose.md`, `docs/guides/use-cases-cli.md`, `README.md`,
+   `llms.txt` and `docs/index.html` where they quote the CLI version; then `npm run verify:docs`
+   upstream.
 7. Optional, same session: register at https://www.bestpractices.dev (passing level — the
    project meets every criterion: README / CONTRIBUTING / MIT / CHANGELOG / semver tags;
    rulesets and release notes; SECURITY.md with private reporting; `npm run gate` with
