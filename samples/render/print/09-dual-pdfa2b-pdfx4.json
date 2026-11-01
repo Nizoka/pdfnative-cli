@@ -1,0 +1,25 @@
+{
+  "title": "Print Production — PDF/A-2b and PDF/X-4 in one file",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "The archival and the press claim in the same file (ISO 19005-2 + ISO 15930-7, pdfnative ≥ 1.9.0): pdfaid and pdfxid in XMP, two OutputIntents on one CMYK profile",
+    "keywords": "print, pdf/a-2b, pdf/x-4, dual claim, archival, prepress",
+    "trapped": "False"
+  },
+  "layout": {
+    "print": { "bleed": 14.17 },
+    "outputIntent": {
+      "outputConditionIdentifier": "Synthetic CMYK (pdfnative test profile)",
+      "registryName": "http://www.color.org",
+      "info": "A structurally valid, colourimetrically meaningless CMYK press profile shipped with the samples."
+    }
+  },
+  "blocks": [
+    { "type": "heading", "text": "One file, two claims", "level": 1, "color": [0, 100, 100, 0] },
+    { "type": "paragraph", "text": "Rendered with: pdfnative render --input 09-dual-pdfa2b-pdfx4.json --pdfx pdfx4 --tagged pdfa2b --output-intent-icc synthetic-cmyk.icc --font latin --lang latin --trapped false --strict. The XMP packet carries pdfaid (part 2, conformance B) and pdfxid (GTS_PDFXVersion PDF/X-4) through the PDF/X ID extension schema; the catalog lists two OutputIntents — /GTS_PDFA1 and /GTS_PDFX — on the same embedded ICC stream; the header says PDF 1.6; /Trapped is False.", "align": "justify", "color": [0, 0, 0, 100] },
+    { "type": "heading", "text": "Which levels combine", "level": 2 },
+    { "type": "paragraph", "text": "PDF/A-2b and PDF/A-2u combine with PDF/X-4. PDF/A-1 is PDF 1.4 while PDF/X-4 needs PDF 1.6, and PDF/A-3 allows embedded files that PDF/X-4 forbids: the engine refuses those two pairs with a level-specific message (E_INPUT), which --dry-run reports before anything is written.", "align": "justify", "color": [0, 0, 0, 100] },
+    { "type": "heading", "text": "Checking both", "level": 2 },
+    { "type": "paragraph", "text": "pdfnative inspect --check pdfa,pdfx asserts the two claims in one exit code; veraPDF validates the PDF/A-2b half, pdfnative's structural validator the PDF/X-4 half — the conformance corpus of this repository runs both.", "align": "justify", "color": [0, 0, 0, 100] }
+  ]
+}

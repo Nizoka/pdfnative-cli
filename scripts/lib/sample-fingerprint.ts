@@ -65,6 +65,8 @@ export const SIGNED_SAMPLES: readonly string[] = [
     'sign/rsa-pades.pdf',
     'sign/rsa-sha384.pdf',
     'sign/ecdsa-pure.pdf',
+    // ltv embed over rsa-pkcs7.pdf: the signed revision's /ID travels with it.
+    'sign/rsa-pkcs7-ltv-offline.pdf',
 ];
 
 export type FingerprintMode = 'bytes' | 'semantic';
@@ -181,6 +183,22 @@ export function semanticProjection(bytes: Uint8Array, password: string | undefin
         }))
         : null;
 
+    // The /DSS inventory (PAdES B-LT, `ltv embed`): what is archived, not its
+    // bytes — an OCSP response or a CRL from a mock responder carries dates,
+    // the certificate DERs are the committed fixtures. v1.6.0: the offline
+    // ltv sample is its signed source plus a /DSS, which this field tells apart.
+    const catalog = reader.getCatalog();
+    let dss: Record<string, number> | null = null;
+    if (catalog.has('DSS')) {
+        const dict = reader.resolveValue(catalog.get('DSS') as PdfValue) as PdfDict;
+        const len = (key: string): number => {
+            const value = dict.has(key) ? reader.resolveValue(dict.get(key) as PdfValue) : undefined;
+            return Array.isArray(value) ? value.length : 0;
+        };
+        const vri = dict.has('VRI') ? reader.resolveValue(dict.get('VRI') as PdfValue) as PdfDict : undefined;
+        dss = { certs: len('Certs'), ocsps: len('OCSPs'), crls: len('CRLs'), vri: vri === undefined ? 0 : vri.size };
+    }
+
     const pages = [];
     for (let i = 0; i < reader.pageCount; i++) {
         const page: PdfDict = reader.getPage(i);
@@ -205,6 +223,7 @@ export function semanticProjection(bytes: Uint8Array, password: string | undefin
         pageCount: reader.pageCount,
         encryption: enc === null ? null : { algorithm: enc.algorithm, revision: enc.revision },
         signatures,
+        dss,
         info: infoOut,
         pageLabels: reader.getPageLabels(),
         pages,

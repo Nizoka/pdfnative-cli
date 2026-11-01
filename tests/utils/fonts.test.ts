@@ -21,11 +21,11 @@ import { TempFiles } from '../helpers/cli-harness.js';
 const tmp = new TempFiles();
 afterEach(() => tmp.cleanup());
 
-describe('fonts: the bundled inventory (pdfnative 1.8.0)', () => {
-    it('lists 31 modules: 4 utility faces and 27 script codes', () => {
-        expect(Object.keys(BUNDLED_FONT_MODULES)).toHaveLength(31);
-        expect(SCRIPT_CODES).toHaveLength(27);
-        for (const code of ['lo', 'nod', 'khb', 'tdd', 'cjm']) expect(SCRIPT_CODES).toContain(code);
+describe('fonts: the bundled inventory (pdfnative 1.9.0)', () => {
+    it('lists 36 modules: 4 utility faces and 32 script codes', () => {
+        expect(Object.keys(BUNDLED_FONT_MODULES)).toHaveLength(36);
+        expect(SCRIPT_CODES).toHaveLength(32);
+        for (const code of ['lo', 'nod', 'khb', 'tdd', 'cjm', 'gu', 'pa', 'kn', 'ml', 'or']) expect(SCRIPT_CODES).toContain(code);
         for (const face of ['latin', 'emoji', 'color-emoji', 'math']) expect(BUNDLED_FONT_MODULES).toHaveProperty(face);
     });
 

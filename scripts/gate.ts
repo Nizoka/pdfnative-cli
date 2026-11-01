@@ -52,6 +52,7 @@
 
 import { spawnSync, type SpawnSyncOptions } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeSync } from 'node:fs';
+import { findAllowList, parseAllowList, tagAvailable } from './run-compat.js';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -91,6 +92,25 @@ function veraPdfInstalled(): boolean {
 }
 
 // ── Notes (figures shown next to PASS) ──────────────────────────────
+
+/**
+ * Whether the previous release's tag (the one tests/compat/allow-<version>.json
+ * names) is present in this clone — the skip condition of compat:previous.
+ * CI's shallow checkout has no tags; ci.yml and publish.yml fetch exactly
+ * this one.
+ */
+function previousTagAvailable(): boolean {
+    // The same discovery run-compat.ts uses (numeric order: allow-1.10.0 after
+    // allow-1.9.0). A malformed allow-list is not a skip: the step runs and
+    // run-compat.ts names the file and the error (exit 2 → FAIL).
+    const allowPath = findAllowList(REPO_ROOT);
+    if (allowPath === null) return false;
+    try {
+        return tagAvailable(REPO_ROOT, parseAllowList(readFileSync(allowPath, 'utf8')).tag);
+    } catch {
+        return true;
+    }
+}
 
 function testCount(): string | null {
     if (!existsSync(VITEST_JSON)) return null;
@@ -258,6 +278,13 @@ export const STEPS: readonly Step[] = [
     {
         id: 'validate:pdfa', npmScript: 'validate:pdfa', profiles: ['publish'],
         skipWhen: () => (veraPdfInstalled() ? null : 'veraPDF not installed'),
+    },
+    // v1.6.0 — the previous release's suite against the current sources
+    // (SECURITY.md §Compatibility promise). Publish profile: it needs the
+    // previous tag, which ci.yml's compat-previous job and publish.yml fetch.
+    {
+        id: 'compat:previous', npmScript: 'compat:previous', profiles: ['publish'],
+        skipWhen: () => (previousTagAvailable() ? null : 'previous release tag not fetched (see tests/compat/allow-*.json)'),
     },
 ];
 

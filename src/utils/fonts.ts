@@ -28,8 +28,8 @@ import { readBinaryFileCapped } from './io.js';
  * so the directory is probed on disk — see `doctor`).
  *
  * Adding to this list is intentional (no auto-discovery) so the CLI surface
- * stays predictable and free from path-based RCE vectors. 31 modules:
- * 4 utility faces + 27 script fonts (pdfnative 1.8.0).
+ * stays predictable and free from path-based RCE vectors. 36 modules:
+ * 4 utility faces + 32 script fonts (pdfnative 1.9.0).
  */
 export const BUNDLED_FONT_MODULES: Readonly<Record<string, string>> = Object.freeze({
     // Latin + monochrome / COLRv1 colour emoji
@@ -39,7 +39,7 @@ export const BUNDLED_FONT_MODULES: Readonly<Record<string, string>> = Object.fre
     // Mathematical / technical symbols (pdfnative ≥ 1.5.0). Code points in the
     // math operator / geometric-shape blocks are auto-routed to this font.
     math: 'noto-sans-math-data.js',
-    // 27 Unicode scripts (pdfnative ≥ 1.8.0). The shortcut name doubles as the
+    // 32 Unicode scripts (pdfnative ≥ 1.9.0). The shortcut name doubles as the
     // `--lang` code; pdfnative routes each code point to the font whose cmap
     // covers it, so any registered script font is used automatically.
     ar: 'noto-arabic-data.js',
@@ -70,12 +70,18 @@ export const BUNDLED_FONT_MODULES: Readonly<Record<string, string>> = Object.fre
     khb: 'noto-newtailue-data.js',
     tdd: 'noto-taile-data.js',
     cjm: 'noto-cham-data.js',
+    // pdfnative 1.9.0 — Gujarati, Gurmukhi (Punjabi), Kannada, Malayalam, Odia
+    gu: 'noto-gujarati-data.js',
+    pa: 'noto-gurmukhi-data.js',
+    kn: 'noto-kannada-data.js',
+    ml: 'noto-malayalam-data.js',
+    or: 'noto-oriya-data.js',
 });
 
 /** The utility faces that are not scripts. */
 const UTILITY_FONTS: readonly string[] = ['latin', 'emoji', 'color-emoji', 'math'];
 
-/** The 27 script codes (everything in the allow-list that is not a utility face). */
+/** The 32 script codes (everything in the allow-list that is not a utility face). */
 export const SCRIPT_CODES: readonly string[] = Object.keys(BUNDLED_FONT_MODULES).filter((k) => !UTILITY_FONTS.includes(k));
 
 /**

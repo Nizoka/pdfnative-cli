@@ -16,7 +16,8 @@ and the engine's build-error message corpus.
 | `ec-cert.pem` | Self-signed X.509 cert for the above |
 | `synthetic-cmyk.icc` | Synthetic ICC v2 `prtr` CMYK profile (9 968 bytes) — the output intent of every PDF/X-4 test, corpus entry and sample |
 | `synthetic-gray.icc` | Synthetic ICC v2 `prtr` Gray profile (408 bytes) — the Gray output intent, and the non-CMYK PDF/X intent that triggers `PDFX_DEVICE_CMYK` |
-| `pdfnative-build-errors.json` | The coherence messages pdfnative 1.8.0's builders throw (PDF/X, print geometry, OutputIntent, attachments, watermark) — each must classify as `E_INPUT` |
+| `pdfnative-build-errors.json` | The 33 messages pdfnative ≥ 1.9.0 documents (PDF/X and the dual claim, spot colours, print geometry, OutputIntent, attachments, watermark; plus the annotation-type check and `PdfStreamLimitError`) — every builder message must classify as `E_INPUT` |
+| `minimal-gray.jp2`, `minimal-rgb.jp2`, `minimal-rgba.jp2`, `minimal.j2k` | Minimal JPEG 2000 images (8 × 8, flat mid-grey codestreams; the `rgba` one carries an opacity channel) — the `/JPXDecode` pass-through of pdfnative ≥ 1.9.0 and the `PDFA1_JPX_IMAGE` / `PDFA_JPX_IMAGE` triggers |
 
 These fixtures are committed for deterministic CI runs (no `openssl`
 dependency on the runner). The keys are **only valid for the test suite** and
@@ -29,25 +30,34 @@ must never be reused outside it; the same key pair signs the sample corpus
 - **`synthetic-cmyk.icc`** is a copy of `docs/assets/synthetic-cmyk.icc` from the
   pdfnative repository (1.8.0): a minimal, valid ICC v2 profile with the `acsp`
   signature at byte 36, device class `prtr` and colour space `CMYK`, generated
-  synthetically — **not a press profile**. pdfnative 1.8.0 validates the ICC
+  synthetically — **not a press profile**. pdfnative ≥ 1.8.0 validates the ICC
   header before accepting an output intent, so the 128-byte stub earlier tests
   used is rejected (`outputIntent.iccProfile is not an ICC profile`). The same
   bytes ship as `samples/render/print/synthetic-cmyk.icc`.
-- **`synthetic-gray.icc`** is generated in this repository by
-  `scripts/lib/synthetic-gray-profile.ts` (the monochrome twin of the engine's CMYK
-  generator, which ships no Gray profile): ICC v2.1, class `prtr`, colour space
+- **`synthetic-gray.icc`** is the output of `buildSyntheticGrayProfile()` on
+  `pdfnative/tools` (pdfnative ≥ 1.9.0, #86; the generator the CLI carried in
+  1.5.0 wrote the same bytes and is gone): ICC v2.1, class `prtr`, colour space
   `GRAY`, XYZ connection space, tags `desc`, `cprt`, `wtpt`, `kTRC` (gamma 2.2) —
-  **not a press profile**. `tests/tools/synthetic-gray-profile.test.ts` holds the
-  committed bytes to the generator; the same bytes ship as
-  `samples/render/print/synthetic-gray.icc`. Regenerate both copies with
-  `npx tsx scripts/lib/synthetic-gray-profile.ts`. The ICC v4 variant the generator
-  can also write is never committed: tests and the conformance corpus build it on
-  the fly to prove that PDF/A-1b refuses it (`PDFA_ICC_PROFILE_VERSION`).
+  **not a press profile**. `tests/tools/synthetic-profiles.test.ts` holds both
+  committed copies (this one and `samples/render/print/synthetic-gray.icc`) and
+  the two CMYK copies to the engine builders, byte for byte. The ICC v4 variant is
+  never committed: `scripts/lib/icc-canary.ts` patches the header's version bytes
+  on the fly so tests and the conformance corpus can prove that PDF/A-1b refuses
+  it (`PDFA_ICC_PROFILE_VERSION`).
 - **`pdfnative-build-errors.json`** is derived from `docs/data/errors.json →
-  buildErrors` of the pdfnative repository (1.8.0), with the `${…}` placeholders
+  buildErrors` of the pdfnative repository (1.9.0), with the `${…}` placeholders
   substituted by representative values. `tests/utils/build-errors.test.ts` feeds
-  every message to `classifyBuildError()`; refresh it from the engine's registry
-  when the pin moves.
+  every builder message (`thrownBy` starting with `buildDocumentPDFBytes`) to
+  `classifyBuildError()`; the annotation-type check and the stream-limit error are
+  classified elsewhere (`annotate` validates the type first; `mapPdfError` matches
+  `PdfStreamLimitError` by instance). Refresh it from the engine's registry when
+  the pin moves.
+- **`minimal-*.jp2` / `minimal.j2k`** are written by the engine's own
+  deterministic helpers (`scripts/helpers/images.ts` of the pdfnative repository
+  at 1.9.0: `makeMinimalJP2(components, { alpha, size: 8 })` and
+  `makeMinimalJ2K(1, 8)`) — a JP2 signature box, file-type and header boxes and a
+  minimal codestream the engine passes through without decoding. Regenerate them
+  with the same calls; their bytes are held by the JPEG 2000 render tests.
 
 ## Regeneration
 

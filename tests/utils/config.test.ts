@@ -1,14 +1,14 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { tmpRoot } from '../helpers/cli-harness.js';
 import { loadConfig, applyConfigDefaults, KNOWN_COMMANDS } from '../../src/utils/config.js';
 import { COMMANDS } from '../../src/commands/completion.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { CliError } from '../../src/utils/error.js';
 
 async function mkTempDir(): Promise<string> {
-    return fs.mkdtemp(path.join(os.tmpdir(), 'pdfnativerc-'));
+    return fs.mkdtemp(path.join(tmpRoot(), 'pdfnativerc-'));
 }
 
 describe('loadConfig', () => {

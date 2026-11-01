@@ -17,16 +17,15 @@
 // (both formats), then exit 1 with E_CHECK_FAILED (same convention as
 // `inspect --check`); unreadable file → E_IO (1); bad usage → 2.
 
-import { openPdf, extractText, listSignatures, readFormFields } from '../core-bridge/index.js';
-import type { PdfReader, PdfDict, PdfValue, ExtractTextOptions } from '../core-bridge/index.js';
+import { openPdf, extractText, listSignatures, readFormFields, decodePdfTextString } from '../core-bridge/index.js';
+import type { PdfReader, PdfDict, PdfValue, ExtractTextOptions, StreamErrorPolicy } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, hasFlag } from '../utils/args.js';
 import { readBinaryFile } from '../utils/io.js';
 import { CliError, ErrorCode } from '../utils/error.js';
 import { emitStatus, isJsonMode } from '../utils/agent.js';
 import { serializeJson } from '../utils/projection.js';
-import { mapPdfError } from '../utils/pdfops.js';
+import { mapPdfError, parseStreamErrorPolicy } from '../utils/pdfops.js';
 import { parsePageList } from '../utils/pages.js';
-import { decodePdfTextString } from '../utils/pdftext.js';
 
 type DiffKind =
     | 'pageCount' | 'pageSize' | 'box' | 'userUnit' | 'metadata'
@@ -302,13 +301,14 @@ function collapseWhitespace(text: string): string {
 }
 
 /** Extract text for the given 0-based pages, as pageIndex → text. */
-function extractPageTexts(doc: LoadedDoc, pages: readonly number[]): ReadonlyMap<number, string> {
+function extractPageTexts(doc: LoadedDoc, pages: readonly number[], onStreamError: StreamErrorPolicy | undefined): ReadonlyMap<number, string> {
     const opts: { -readonly [K in keyof ExtractTextOptions]: ExtractTextOptions[K] } = { pages: [...pages] };
     if (doc.password !== undefined) opts.password = doc.password;
+    if (onStreamError !== undefined) opts.onStreamError = onStreamError;
     try {
         return new Map(extractText(doc.bytes, opts).map((p) => [p.pageIndex, p.text]));
     } catch (e) {
-        throw mapPdfError(e, `Failed to extract text from PDF ${doc.label}`);
+        throw mapPdfError(e, `Failed to extract text from PDF ${doc.label}`, { streamErrorFlag: true });
     }
 }
 
@@ -317,10 +317,11 @@ function compareText(
     b: LoadedDoc,
     pageIndices: readonly number[],
     ignoreWhitespace: boolean,
+    onStreamError: StreamErrorPolicy | undefined,
 ): Difference[] {
     const diffs: Difference[] = [];
-    const textsA = extractPageTexts(a, pageIndices);
-    const textsB = extractPageTexts(b, pageIndices);
+    const textsA = extractPageTexts(a, pageIndices, onStreamError);
+    const textsB = extractPageTexts(b, pageIndices, onStreamError);
 
     for (const idx of pageIndices) {
         const ta = textsA.get(idx) ?? '';
@@ -403,6 +404,7 @@ export async function compare(args: ParsedArgs): Promise<void> {
     const tolerance = parseTolerance(getStringFlag(args.flags, 'tolerance'));
     const ignoreWhitespace = hasFlag(args.flags, 'ignore-whitespace');
     const pagesSpec = getStringFlag(args.flags, 'pages');
+    const onStreamError = parseStreamErrorPolicy(getStringFlag(args.flags, 'on-stream-error'));
 
     if (!VALID_MODES.has(modeRaw)) {
         throw new CliError(`Invalid --mode value "${modeRaw}". Valid: text, structure, both.`, 2);
@@ -433,7 +435,7 @@ export async function compare(args: ParsedArgs): Promise<void> {
         const pageIndices = pagesSpec !== undefined
             ? [...new Set(parsePageList(pagesSpec, minPages))]
             : Array.from({ length: minPages }, (_, i) => i);
-        diffs.push(...compareText(a, b, pageIndices, ignoreWhitespace));
+        diffs.push(...compareText(a, b, pageIndices, ignoreWhitespace, onStreamError));
     }
 
     const equal = diffs.length === 0;

@@ -27,12 +27,12 @@ describe('doctor capabilities (v1.5.0)', () => {
         expect(engine?.value).toMatch(/^1\.(8|9|\d{2,})\.\d+$/);
     });
 
-    it('reports 31 bundled modules / 27 scripts, all present on disk, with the aliases', async () => {
+    it('reports 36 bundled modules / 32 scripts, all present on disk, with the aliases', async () => {
         const { checks } = await report();
         const fonts = checks.find((c) => c.name === 'fonts');
         expect(fonts?.status).toBe('ok');
-        expect(fonts?.value).toBe('31 modules / 27 scripts');
-        for (const code of ['lo', 'nod', 'khb', 'tdd', 'cjm', 'ha', 'yo', 'ig', 'sw']) expect(fonts?.detail).toContain(code);
+        expect(fonts?.value).toBe('36 modules / 32 scripts');
+        for (const code of ['lo', 'nod', 'khb', 'tdd', 'cjm', 'gu', 'pa', 'kn', 'ml', 'or', 'ha', 'yo', 'ig', 'sw']) expect(fonts?.detail).toContain(code);
     });
 
     it('reports the Universal Shaping Engine Unicode version (17.0.0 or newer)', async () => {

@@ -1,0 +1,23 @@
+{
+  "subjects": [
+    "render",
+    "inspect",
+    "verify",
+    "batch",
+    "annotate",
+    "extract-text",
+    "fill",
+    "form-export",
+    "inspect-summary",
+    "verify-summary",
+    "batch-summary",
+    "govern-verify",
+    "metadata",
+    "ltv-data",
+    "compare",
+    "batch-manifest",
+    "status",
+    "manifest",
+    "doctor"
+  ]
+}

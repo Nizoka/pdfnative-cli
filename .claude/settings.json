@@ -28,6 +28,7 @@
       "Read(coverage/**)",
       "Read(test-output/**)",
       "Read(samples/output/**)",
+      "Read(fuzz/.build/**)",
       "Read(package-lock.json)",
       "Read(node_modules/**)",
       "Bash(npm publish*)",

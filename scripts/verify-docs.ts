@@ -69,7 +69,7 @@ import {
     unpairedSampleScripts,
     usageCommandList,
 } from './lib/cli-surface.js';
-import { CORPUS } from './lib/pdfa-corpus.js';
+import { CORPUS, claimsStandard } from './lib/pdfa-corpus.js';
 import { AI_GOVERNANCE_POLICY, AGENT_RULES_TEXT } from '../src/utils/governance.js';
 import { markdownAnchors, fragmentLinks } from './lib/markdown-anchors.js';
 
@@ -151,7 +151,7 @@ export const OFFLINE_RULES = [
     'claude-rules-sync', // .claude/rules/ equals a fresh render of .github/instructions/ (npm run agents:rules)
     'claude-rules-budget', // CLAUDE.md + its @imports + unscoped rules ≤ 16 KiB; a scoped rule > 32 KiB warns
     'pr-template-parity', // every PR-template checklist item is verbatim in CONTRIBUTING.md; the template mentions npm run gate
-    'eol-lf', // (git checkouts only) tracked text blobs are LF — warn until the renormalisation commit flips EOL_LF_MODE
+    'eol-lf', // (git checkouts only) every tracked text blob is LF — an error since the v1.6.0 normalisation commit (EOL_LF_MODE)
     'skills-shape', // every .claude/skills/*/SKILL.md names its directory, has a description, and its referenced files exist
     'internal-links', // every relative Markdown link resolves on disk
     'anchor-parity', // every `#fragment` a Markdown link (or a governance reference) targets is a heading anchor of its target
@@ -216,14 +216,60 @@ export function workflowJobs(workflowTexts: readonly string[]): { jobs: Set<stri
             }
             if (!current) continue;
             const jobName = /^ {4}name:\s*(.+?)\s*$/.exec(line);
-            if (jobName) jobs.add(jobName[1].replace(/^["']|["']$/g, ''));
+            // A literal job name is a status-check context; `name: ${{ matrix.name }}`
+            // delegates it to the matrix include entries below.
+            if (jobName && !jobName[1].includes('${{')) jobs.add(jobName[1].replace(/^["']|["']$/g, ''));
             const list = /^ {8}[A-Za-z0-9_-]+:\s*\[([^\]]*)\]\s*$/.exec(line);
             if (list) {
                 for (const v of list[1].split(',')) matrixValues.get(current)!.add(v.trim().replace(/['"]/g, ''));
             }
+            // v1.6.0 — the include form: `- { name: 'ci (22)', os: …, node-version: 22, … }`.
+            // Each entry's name is the context GitHub reports; its node-version a tested major.
+            const include = /^ {10}- \{\s*(.+?)\s*\}\s*$/.exec(line);
+            if (include) {
+                const name = /(?:^|,\s*)name:\s*('([^']*)'|"([^"]*)"|([^,}]+))/.exec(include[1]);
+                if (name) jobs.add((name[2] ?? name[3] ?? name[4] ?? '').trim());
+                const node = /(?:^|,\s*)node-version:\s*([^,}]+)/.exec(include[1]);
+                if (node) matrixValues.get(current)!.add(node[1].trim().replace(/['"]/g, ''));
+            }
         }
     }
     return { jobs, matrixValues };
+}
+
+/**
+ * The Node majors ci.yml tests: a `node-version: [22, 24]` list, or (v1.6.0)
+ * the `node-version:` values of its `matrix.include` entries.
+ */
+export function ciMatrixMajors(ciText: string): number[] {
+    const list = /node-version:\s*\[([^\]]*)\]/.exec(ciText);
+    const raw = list
+        ? list[1].split(',')
+        : [...ciText.matchAll(/^ {10}- \{[^}]*?node-version:\s*([^,}]+)/gm)].map((m) => m[1]);
+    return [...new Set(raw.map((s) => Number(s.trim().replace(/['"]/g, ''))).filter((n) => Number.isFinite(n)))];
+}
+
+/**
+ * Has `release-notes/v<version>.md` shipped, with the next release under way?
+ * True when the tag `v<version>` exists in the checkout AND `CHANGELOG.md`
+ * carries text under `## [Unreleased]` — the two signals of a release branch
+ * on top of a published version. Either one alone keeps the note in the
+ * corpus: a tagged tree with an empty `[Unreleased]` is `main` after a
+ * release, where the note and the manifest must agree; a runner without
+ * tags (shallow checkout) never exempts anything.
+ */
+export function releaseNoteShipped(root: string, version: string): boolean {
+    if (version === '') return false;
+    const tag = spawnSync('git', ['-C', root, 'tag', '-l', `v${version}`], { encoding: 'utf8', windowsHide: true });
+    if (tag.status !== 0 || tag.stdout.trim() !== `v${version}`) return false;
+    const changelog = join(root, 'CHANGELOG.md');
+    if (!existsSync(changelog)) return false;
+    const text = readFileSync(changelog, 'utf8').replace(/\r\n/g, '\n');
+    const start = text.indexOf('\n## [Unreleased]');
+    if (start === -1) return false;
+    const next = text.indexOf('\n## [', start + 1);
+    const body = text.slice(start + '\n## [Unreleased]'.length, next === -1 ? undefined : next);
+    return body.trim() !== '';
 }
 
 function walk(dir: string, filter: (p: string) => boolean, out: string[] = []): string[] {
@@ -284,10 +330,17 @@ export async function verifyDocs(root: string, options: VerifyOptions = {}): Pro
     const coreVersion = manifest.packages['pdfnative']?.version ?? '';
 
     // ── The documentation corpus ──────────────────────────────────
+    // The release note of the manifest's version is live documentation —
+    // until it has shipped. Once its tag exists AND the CHANGELOG carries an
+    // `[Unreleased]` entry, the next release is in progress: the counts in
+    // the manifest describe the tree, the shipped note describes its own
+    // release (AGENTS.md §Never touch), and the two are allowed to differ.
+    // On a runner without tags the note stays in the corpus, where it must
+    // agree with the manifest, as on main after a release.
     const DOC_FILES: string[] = [
         ...['README.md', 'ROADMAP.md', 'AGENTS.md', 'CLAUDE.md', 'CONTRIBUTING.md', 'SECURITY.md', 'llms.txt',
             '.github/copilot-instructions.md', '.github/AGENT_RULES.md', 'samples/README.md', 'tests/fixtures/README.md',
-            `release-notes/v${cliVersion}.md`]
+            ...(releaseNoteShipped(root, cliVersion) ? [] : [`release-notes/v${cliVersion}.md`])]
             .map((f) => join(root, f))
             .filter(existsSync),
         ...walk(join(root, 'docs'), (p) => p.endsWith('.md')),
@@ -382,8 +435,8 @@ export async function verifyDocs(root: string, options: VerifyOptions = {}): Pro
         }
     }
     {
-        const pdfa = CORPUS.filter((e) => e.claims === 'pdfa').length;
-        const pdfx = CORPUS.filter((e) => e.claims === 'pdfx').length;
+        const pdfa = CORPUS.filter((e) => claimsStandard(e.claims, 'pdfa')).length;
+        const pdfx = CORPUS.filter((e) => claimsStandard(e.claims, 'pdfx')).length;
         if (manifest.declared['pdfaSamples'] !== pdfa) fail(MANIFEST_REL, 1, 'derived-counts', `declared.pdfaSamples says ${String(manifest.declared['pdfaSamples'])} but the corpus table claims PDF/A for ${pdfa} files`);
         if (manifest.declared['pdfxSamples'] !== pdfx) fail(MANIFEST_REL, 1, 'derived-counts', `declared.pdfxSamples says ${String(manifest.declared['pdfxSamples'])} but the corpus table claims PDF/X for ${pdfx} files`);
     }
@@ -795,20 +848,28 @@ export async function verifyDocs(root: string, options: VerifyOptions = {}): Pro
                 if (uses.length === 0) continue;
                 const withFile = [...text.matchAll(/node-version-file:\s*\.nvmrc\b/g)].length;
                 if (withFile >= uses.length) continue;
-                const matrix = /node-version:\s*\$\{\{\s*matrix\.node-version\s*\}\}/.test(text) && /node-version:\s*\[([^\]]*)\]/.exec(text);
-                if (name === 'ci.yml' && matrix) {
-                    const majors = matrix[1].split(',').map((s) => Number(s.trim().replace(/['"]/g, '')));
+                const spansMatrix = /node-version:\s*\$\{\{\s*matrix\.node-version\s*\}\}/.test(text);
+                const majors = ciMatrixMajors(text);
+                if (name === 'ci.yml' && spansMatrix && majors.length > 0) {
                     if (pinnedMajor !== null && !majors.includes(pinnedMajor)) {
-                        fail(relPath, lineOf(text, matrix.index), 'node-pin-parity', `matrix [${matrix[1].trim()}] does not include the .nvmrc major ${pinnedMajor}`);
+                        fail(relPath, lineOf(text, text.search(/node-version/)), 'node-pin-parity', `matrix [${majors.join(', ')}] does not include the .nvmrc major ${pinnedMajor}`);
                     }
                     continue;
                 }
-                fail(relPath, lineOf(text, uses[0].index), 'node-pin-parity', 'actions/setup-node must read `node-version-file: .nvmrc` (only ci.yml may span a matrix)');
+                // v1.6.0 — the advisory workflow tests the newest line explicitly
+                // (SECURITY.md §Supported runtimes): a major above the pin, never below.
+                const advisory = name === 'node-current.yml' && /node-version:\s*(\d+)\s*$/m.exec(text);
+                if (advisory) {
+                    if (pinnedMajor !== null && Number(advisory[1]) <= pinnedMajor) {
+                        fail(relPath, lineOf(text, advisory.index), 'node-pin-parity', `node-current tests Node ${advisory[1]}, which is not newer than the .nvmrc major ${pinnedMajor}`);
+                    }
+                    continue;
+                }
+                fail(relPath, lineOf(text, uses[0].index), 'node-pin-parity', 'actions/setup-node must read `node-version-file: .nvmrc` (only ci.yml may span a matrix, only node-current.yml a newer major)');
             }
         }
         const engines = pkgJsonText === null ? null : ((JSON.parse(pkgJsonText) as { engines?: { node?: string } }).engines?.node ?? null);
-        const ciMatrix = /node-version:\s*\[([^\]]*)\]/.exec(readOr('.github/workflows/ci.yml') ?? '')?.[1]
-            .split(',').map((s) => Number(s.trim().replace(/['"]/g, ''))).filter((n) => Number.isFinite(n)) ?? [];
+        const ciMatrix = ciMatrixMajors(readOr('.github/workflows/ci.yml') ?? '');
         report(checkNodeVersionPin({ nodeVersion: readOr('.node-version'), enginesNode: engines, ciMatrix }), 'node-pin-parity');
     }
 

@@ -67,7 +67,8 @@ describe('engine-surface matrix: shape', () => {
         expect(new Set(ids).size).toBe(ids.length);
         for (const item of matrix.items) {
             expect(ITEM_KINDS, item.id).toContain(item.kind);
-            expect(item.changelog.length, item.id).toBeGreaterThan(8);
+            // A prefix of at least five characters: the shortest changelog title is a bare `docs:` (1.9.0).
+            expect(item.changelog.length, item.id).toBeGreaterThan(4);
             const tested = (item.tests?.length ?? 0) > 0;
             expect(tested !== (item.waiver !== undefined), `${item.id}: tests XOR waiver`).toBe(true);
             if (item.waiver !== undefined) {
@@ -125,7 +126,7 @@ describe('engine-surface matrix: every reference is real', () => {
 
 describe('engine-surface: named means exercised', () => {
     it('every diagnostic code the status schema names has a trigger that a test executes', () => {
-        const named = [...new Set(read('src/commands/schema.ts').match(/\b(?:PDFA|PDFX|TYPOGRAPHY)_[A-Z0-9_]+\b/g) ?? [])].sort();
+        const named = [...new Set(read('src/commands/schema.ts').match(/\b(?:PDFA1?|PDFX|TYPOGRAPHY|TEXT)_[A-Z0-9_]+\b/g) ?? [])].sort();
         expect(Object.keys(DIAGNOSTIC_TRIGGERS).sort()).toEqual(named);
         expect(named).toHaveLength(ecosystem.declared['diagnosticCodes']!);
         // The table is executed, not just declared.

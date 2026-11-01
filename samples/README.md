@@ -24,7 +24,7 @@ A comprehensive collection of sample files covering every feature of pdfnative-c
 ```bash
 # From the repo root: build the CLI, then render every sample JSON, the multilang
 # drivers and the derived outputs (merge/split/extract, annotate, fill, metadata,
-# encrypt/decrypt, sign) into test-output/samples/ with the BUILT binary — 91 sample PDFs,
+# encrypt/decrypt, sign) into test-output/samples/ with the BUILT binary — 99 sample PDFs,
 # byte-stable (TZ=UTC, creation date pinned to 2026-01-01T00:00:00Z)
 npm run build && npm run test:generate
 
@@ -68,6 +68,8 @@ samples/
 │   ├── barcode/                  QR codes, Code 128, EAN-13
 │   ├── form/                     Interactive PDF form fields
 │   ├── toc/                      Table of contents
+│   │   ├── 01-document-with-toc.json  Multi-section document with an auto-generated TOC
+│   │   └── 02-long-toc.json      (v1.6.0) 160 entries — the table of contents paginates (pdfnative ≥ 1.9.0)
 │   ├── link/                     Hyperlinks
 │   ├── watermark/                Draft / confidential watermarks
 │   ├── layout/                   Custom page sizes and orientations
@@ -89,6 +91,8 @@ samples/
 │   │   ├── 09-rtl.json           (v1.5.0) Arabic and Hebrew — bidi, contextual forms, marks
 │   │   ├── 10-indic.json         (v1.5.0) Hindi, Bengali, Tamil — the 1.8.0 Indic OpenType engine
 │   │   ├── 11-cjk.json           (v1.5.0) Chinese and Korean
+│   │   ├── 12-five-indic-scripts.json (v1.6.0) Gujarati, Punjabi, Kannada, Malayalam, Odia
+│   │   ├── 13-rtl-direction.json (v1.6.0) Arabic and Hebrew paragraphs under --direction auto (full UAX #9)
 │   │   └── 08-language-families.*  (v1.5.0) Renders 08–11 with the --font / --lang list of each family
 │   ├── table-variant/            (v0.2.0) Table-centric PdfParams (--variant table; fonts embedded since v1.5.0)
 │   ├── font/                     (v0.3.0) `--font` / `--lang` flag demo (latin preset)
@@ -104,12 +108,14 @@ samples/
 │   ├── outline/                  (v1.2.0) PDF bookmarks — `--outline auto` + explicit tree
 │   ├── math/                     (v1.2.0) Math/technical symbols via `--font math`
 │   ├── inspect-layout/           (v1.2.0) `--inspect-layout` report + `--debug-layout` guides
+│   ├── images/                   (v1.6.0) JPEG 2000 image block passed through as /JPXDecode (pdfnative ≥ 1.9.0)
 │   ├── chart/                    (v1.3.0) Native vector charts
 │   │   ├── 01-bar-chart.json     Multi-series bar chart with legend
 │   │   ├── 02-line-and-pie.json  Line chart + donut chart
 │   │   ├── 03-stacked-bars.json  (v1.4.0) stackedBar / stackedBarH + dataLabels
 │   │   ├── 04-area-scatter.json  (v1.4.0) area + dual axes (axis2) + log-scale scatter
-│   │   └── 05-time-axis.json     (v1.4.0) time x-axis (ISO xValues) + labelRotation
+│   │   ├── 05-time-axis.json     (v1.4.0) time x-axis (ISO xValues) + labelRotation
+│   │   └── 06-per-bar-colours.json (v1.6.0) ChartSeries.colors per value, a series without a label
 │   ├── print/                    (v1.4.0) Print production & viewer preferences (pdfnative ≥ 1.7.0)
 │   │   ├── 01-bleed-marks.json   (v1.4.0) layout.print — bleed, TrimBox, crop/registration marks, trapped
 │   │   ├── 02-viewer-prefs.json  (v1.4.0) layout.viewerPreferences — duplex, copies, print range, tray
@@ -118,6 +124,8 @@ samples/
 │   │   ├── 05-pdfx4.json + .sh/.ps1 (v1.5.0) PDF/X-4: --pdfx pdfx4 --output-intent-icc, then inspect --check pdfx
 │   │   ├── 06-gray-pdfx4.*       (v1.5.0) PDF/X-4 under a Gray output intent; CMYK content refused by --strict
 │   │   ├── 07-tight-bleed-marks.* (v1.5.0) Marks in a 3 mm bleed — the 1.8.0 marks clearance
+│   │   ├── 08-spot-colours.*     (v1.6.0) Spot colours under PDF/X-4: /Separation, /DeviceN, per-bar chart inks
+│   │   ├── 09-dual-pdfa2b-pdfx4.* (v1.6.0) PDF/A-2b and PDF/X-4 claimed in one file
 │   │   ├── 03-cmyk-colours.sh/.ps1, 04-colour-bars.sh/.ps1 (v1.5.0) Drivers for 03 and 04
 │   │   ├── synthetic-cmyk.icc    (v1.5.0) Synthetic prtr CMYK profile — NOT a press profile
 │   │   └── synthetic-gray.icc    (v1.5.0) Synthetic prtr Gray profile — NOT a press profile
@@ -140,7 +148,7 @@ samples/
 ├── merge/                        (v1.2.0) Concatenate PDFs (pdfnative page-tree)
 ├── split/                        (v1.2.0) Split one PDF into many (per-page or per-range)
 ├── extract/                      (v1.2.0) Pull selected pages into a new PDF
-├── extract-text/                 (v1.3.0) Reading-order text (text | json | ndjson); 02-actualtext.* = v1.5.0 /ActualText
+├── extract-text/                 (v1.3.0) Reading-order text (text | json | ndjson); 02-actualtext.* = v1.5.0 /ActualText; 03-rtl-logical-order.* = v1.6.0 untagged right-to-left text as typed
 ├── fill/                         (v1.3.0) Fill, flatten & export AcroForms
 ├── encrypt/                      (v1.3.0) Encrypt / decrypt (AES-128/256, --password, --stream)
 ├── doctor/                       (v1.3.0) Environment / capability preflight (02-capabilities.* = v1.5.0 fonts/unicode/conformance)
@@ -171,7 +179,8 @@ samples/
 │   ├── 07-native-crypto.*        (v1.2.0) Native node:crypto (default) vs pure-JS (--pure-crypto)
 │   ├── 08-ltv.*                  (v1.4.0) Full PAdES ladder: B-B → B-T → B-LT → B-LTA
 │   ├── 09-multiple-signatures.*  (v1.4.0) Two signers via --allow-multiple / --field-name
-│   └── 10-timestamp-timeout.*    (v1.5.0) sign --timestamp <tsa> --timestamp-timeout <ms> (network only with PDFNATIVE_TSA_URL)
+│   ├── 10-timestamp-timeout.*    (v1.5.0) sign --timestamp <tsa> --timestamp-timeout <ms> (network only with PDFNATIVE_TSA_URL)
+│   └── 11-ltv-offline.*          (v1.6.0) ltv embed --cert/--ocsp/--crl --match chain|all — /DSS from files, no network
 ├── inspect/                      PDF inspection shell / PowerShell scripts
 │   ├── 01-json.*                 JSON metadata report
 │   ├── 02-text.*                 Human-readable text report
@@ -238,6 +247,7 @@ samples/
 | File | Description |
 |------|-------------|
 | [01-document-with-toc.json](render/toc/01-document-with-toc.json) | Multi-section document with auto-generated TOC block |
+| [02-long-toc.json](render/toc/02-long-toc.json) | (v1.6.0) A **160-entry table of contents**: it breaks at entry boundaries and continues on the following pages (pdfnative ≥ 1.9.0; `--inspect-layout` reports the same pages as the render) |
 
 ### `render/link/` — Hyperlinks
 
@@ -279,7 +289,7 @@ const pdf = buildDocumentPDFBytes(params, {
 | [02-pdfa-2b.json](render/pdfa/02-pdfa-2b.json) | PDF/A-2b | ISO 19005-2 — transparency, JPEG 2000 |
 | [03-pdfa-3b.json](render/pdfa/03-pdfa-3b.json) | PDF/A-3b | ISO 19005-3 — embedded file attachments |
 | [04-pdfa-2u.json](render/pdfa/04-pdfa-2u.json) | PDF/A-2u | ISO 19005-2 — every glyph mapped to Unicode |
-| [05-form-pdfa2b.json](render/pdfa/05-form-pdfa2b.json) | PDF/A-2b | (v1.5.0) An **AcroForm under a PDF/A claim** — the six field types; the fields' default-resources font is the embedded Latin font (pdfnative 1.8.0), so veraPDF accepts the file |
+| [05-form-pdfa2b.json](render/pdfa/05-form-pdfa2b.json) | PDF/A-2b | (v1.5.0) An **AcroForm under a PDF/A claim** — the six field types; the fields' default-resources font is the embedded Latin font (pdfnative ≥ 1.8.0), so veraPDF accepts the file |
 | [05-form-pdfa2b.sh](render/pdfa/05-form-pdfa2b.sh) | — | (v1.5.0) Renders it with `--font latin --lang latin --strict`, asserts `inspect --check pdfa`, then lists the fields with `fill --export` |
 | [05-form-pdfa2b.ps1](render/pdfa/05-form-pdfa2b.ps1) | — | (v1.5.0) PowerShell equivalent |
 
@@ -299,7 +309,7 @@ pdfnative render --input doc.json --output doc.pdf --conformance 2b --font latin
 > `scripts/lib/sample-plan.ts`, applies them to the `pdfa` and `attachments`
 > categories). Without them the render emits a `PDFA_NO_FONT_ENTRIES` warning and
 > the output fails the reference validator. PDF/A outputs are validated with
-> veraPDF in CI (blocking — a 22-file conformance corpus with negative canaries;
+> veraPDF in CI (blocking — a 25-file conformance corpus with negative canaries;
 > its PDF/X-4 entries are validated by pdfnative's validator); run
 > `npm run corpus:pdfa && npm run validate:pdfx && npm run validate:pdfa`
 > locally, but note the PDF/A step exits 0 as a *skip* when veraPDF is not
@@ -341,11 +351,11 @@ This is the Factur-X / ZUGFeRD pattern — a human-readable PDF/A-3 with a machi
 
 ### `render/multilang/` — Non-Latin Scripts & Multilingual PDFs (v0.2.0)
 
-pdfnative ships Noto Sans font data for 27 Unicode scripts (plus a math font and
-COLRv1 colour emoji — 31 font modules) inside the package itself
+pdfnative ships Noto Sans font data for 32 Unicode scripts (plus a math font and
+COLRv1 colour emoji — 36 font modules) inside the package itself
 (`pdfnative/dist/../fonts/noto-*-data.js`). No external font files, no network
 access, no extra dependencies. Font data is loaded lazily on first use and cached.
-The `render --font <code>` allow-list covers all 27 script codes plus the
+The `render --font <code>` allow-list covers all 32 script codes plus the
 `ha` / `yo` / `ig` / `sw` aliases of `latin` — see the README feature table.
 
 `--font <code> --lang <code>` registers a bundled script for the duration of one
@@ -366,14 +376,16 @@ can include their output in the baseline.
 | [05-lao.json](render/multilang/05-lao.json) | (v1.5.0) **Lao** — `--font lo --lang lo` (the 1.8.0 Lao shaper) |
 | [06-tai-tham-cham.json](render/multilang/06-tai-tham-cham.json) | (v1.5.0) **Tai Tham, New Tai Lue, Tai Le, Cham** — `--font nod --font khb --font tdd --font cjm` (USE engine) |
 | [07-african-latin.json](render/multilang/07-african-latin.json) | (v1.5.0) **Hausa, Yoruba, Igbo, Swahili** — `--font ha --font yo --font ig --font sw` resolve to the Latin font |
-| [08-european-caucasian.json](render/multilang/08-european-caucasian.json) | (v1.5.0) **Greek, Russian, Georgian, Armenian, Polish, Turkish, Vietnamese** — one section per language: a native paragraph, a table of the cases its module must draw (ogonek letters, dotted / dotless i, stacked Vietnamese diacritics — the glyphs pdfnative 1.8.0 made every module able to draw), a list |
+| [08-european-caucasian.json](render/multilang/08-european-caucasian.json) | (v1.5.0) **Greek, Russian, Georgian, Armenian, Polish, Turkish, Vietnamese** — one section per language: a native paragraph, a table of the cases its module must draw (ogonek letters, dotted / dotless i, stacked Vietnamese diacritics — the glyphs pdfnative ≥ 1.8.0 made every module able to draw), a list |
 | [09-rtl.json](render/multilang/09-rtl.json) | (v1.5.0) **Arabic and Hebrew** — contextual forms, lam-alef, harakat, niqqud, mixed direction, and an ARABIC LETTER MARK (U+061C) the engine strips before measuring |
 | [10-indic.json](render/multilang/10-indic.json) | (v1.5.0) **Hindi, Bengali, Tamil** — the 1.8.0 Indic OpenType engine: reph, rakar, conjuncts, pre-base and two-part vowel signs |
 | [11-cjk.json](render/multilang/11-cjk.json) | (v1.5.0) **Chinese and Korean** — a Simplified Chinese statement table and Hangul with complex finals (Japanese is `02-japanese.json`) |
+| [12-five-indic-scripts.json](render/multilang/12-five-indic-scripts.json) | (v1.6.0) **Gujarati, Punjabi, Kannada, Malayalam, Odia** — the five scripts pdfnative ≥ 1.9.0 adds to its Indic engine: reph, subjoined and half forms, two-part vowel signs, legacy and atomic chillus, the sentence-final danda; untagged output extracts in logical order (`/ActualText`). `--font gu --font pa --font kn --font ml --font or --font latin --lang gu,pa,kn,ml,or,latin` |
+| [13-rtl-direction.json](render/multilang/13-rtl-direction.json) | (v1.6.0) **Arabic and Hebrew under `--direction auto`** (full UAX #9, pdfnative ≥ 1.9.0): every paragraph resolves its own base direction — right-to-left paragraphs are right-aligned and justified in visual order, a Latin one is not, one block overrides with `direction: "ltr"`; untagged output carries each right-to-left run as `/ActualText`. `--direction auto --font ar --font he --font latin --lang ar,he,latin` |
 | [08-language-families.sh](render/multilang/08-language-families.sh) | (v1.5.0) Renders `08`–`11`, each with the `--font` / `--lang` list of its family |
 | [08-language-families.ps1](render/multilang/08-language-families.ps1) | (v1.5.0) PowerShell equivalent |
 
-The native text of `05`–`11` and of `render/font/04` is demonstration content taken from the language documents of the pdfnative repository (`scripts/data/language-docs-data.ts`, MIT, same author); with `01`–`04`, `render/font/02` and `render/font/04` **every one of the 27 script codes is rendered by the corpus** (`tests/regression/engine-surface.test.ts` holds the plan to it).
+The native text of `05`–`11` and of `render/font/04` is demonstration content taken from the language documents of the pdfnative repository (`scripts/data/language-docs-data.ts`, MIT, same author); with `01`–`04`, `render/font/02` and `render/font/04` **every one of the 32 script codes is rendered by the corpus** (`tests/regression/engine-surface.test.ts` holds the plan to it).
 
 #### Node.js driver scripts (Font loader + render)
 
@@ -452,7 +464,7 @@ const pdf = buildDocumentPDFBytes({
 | Cham | `cjm` | `noto-cham-data.js` (1.8.0) |
 | Hausa / Yoruba / Igbo / Swahili | `ha` `yo` `ig` `sw` | aliases of `latin` (`noto-sans-data.js`) |
 
-`pdfnative doctor` lists the whole inventory (`fonts: 31 modules / 27 scripts`) and checks every module is on disk.
+`pdfnative doctor` lists the whole inventory (`fonts: 36 modules / 32 scripts`) and checks every module is on disk.
 
 ### `render/table-variant/` — Table-centric API (v0.2.0)
 
@@ -589,8 +601,10 @@ Page-tree commands (`merge`, `split`, `extract`) also accept `--password` for en
 | [document.json](extract-text/document.json) | A two-page source document |
 | [01-extract-text.sh](extract-text/01-extract-text.sh) | Extracts text as plain text, JSON, and NDJSON (`--runs` for positioned runs) |
 | [01-extract-text.ps1](extract-text/01-extract-text.ps1) | PowerShell equivalent |
-| [02-actualtext.sh](extract-text/02-actualtext.sh) | (v1.5.0) `/ActualText` (pdfnative 1.8.0): renders `render/multilang/10-indic.json` tagged and untagged, then extracts both — the tagged file returns the logical order of reph and pre-base vowel signs, the untagged one the glyph order |
+| [02-actualtext.sh](extract-text/02-actualtext.sh) | (v1.5.0) `/ActualText` (pdfnative ≥ 1.8.0): renders `render/multilang/10-indic.json` tagged and untagged, then extracts both — the tagged file returns the logical order of reph and pre-base vowel signs, the untagged one the glyph order |
 | [02-actualtext.ps1](extract-text/02-actualtext.ps1) | (v1.5.0) PowerShell equivalent |
+| [03-rtl-logical-order.sh](extract-text/03-rtl-logical-order.sh) | (v1.6.0) Untagged **right-to-left text extracts as typed** (pdfnative ≥ 1.9.0 `/ActualText` on every right-to-left run): renders `render/multilang/13-rtl-direction.json` under `--direction auto`, then once more with `--actual-text false` (the bare 1.8.0 runs, visual order) and extracts both |
+| [03-rtl-logical-order.ps1](extract-text/03-rtl-logical-order.ps1) | (v1.6.0) PowerShell equivalent |
 
 No OCR — image-only pages yield empty text. NDJSON (one object per page) streams cleanly into RAG/agent pipelines.
 
@@ -620,10 +634,19 @@ Passwords are read from `$PDFNATIVE_ENCRYPT_OWNER_PASS` / `$PDFNATIVE_ENCRYPT_US
 |------|-------------|
 | [01-doctor.sh](doctor/01-doctor.sh) | Human-readable + `--format json` capability report (agent pre-flight) |
 | [01-doctor.ps1](doctor/01-doctor.ps1) | PowerShell equivalent |
-| [02-capabilities.sh](doctor/02-capabilities.sh) | (v1.5.0) Projects the `fonts` (31 modules / 27 scripts), `unicode` and `conformance` checks with `--fields` — the pre-flight an agent runs before `--pdfx` or `--font lo` |
+| [02-capabilities.sh](doctor/02-capabilities.sh) | (v1.5.0) Projects the `fonts` (36 modules / 32 scripts), `unicode` and `conformance` checks with `--fields` — the pre-flight an agent runs before `--pdfx` or `--font lo` |
 | [02-capabilities.ps1](doctor/02-capabilities.ps1) | (v1.5.0) PowerShell equivalent |
 
 `doctor` checks the CLI/Node/pdfnative versions, Web Crypto (CSPRNG) availability — which `encrypt` requires — the registered command count and, since v1.5.0, the bundled font inventory (each module probed on disk), the engine's Unicode version and the claimable conformance targets (`pdfa1b,pdfa2b,pdfa2u,pdfa3b,pdfx4`). Exit code 0 when all checks pass, 1 otherwise. Fully offline.
+
+### `render/images/` — JPEG 2000 (v1.6.0)
+
+| File | Description |
+|------|-------------|
+| [01-jpeg2000.json](render/images/01-jpeg2000.json) | (v1.6.0) An image block whose `src` is a `.jp2` file: embedded as `/JPXDecode` with the colour and opacity the codestream declares, header raised to PDF 1.5 (pdfnative ≥ 1.9.0). The 8 × 8 flat-grey `minimal-rgb.jp2` is the engine's own test codestream; under `--tagged pdfa1b` the filter is `PDFA1_JPX_IMAGE`, an opacity channel under PDF/A-2 `PDFA_JPX_IMAGE` |
+| [minimal-rgb.jp2](render/images/minimal-rgb.jp2) | (v1.6.0) The minimal RGB JPEG 2000 image (175 bytes) the sample embeds |
+
+---
 
 ### `render/chart/` — Native Vector Charts
 
@@ -634,6 +657,7 @@ Passwords are read from `$PDFNATIVE_ENCRYPT_OWNER_PASS` / `$PDFNATIVE_ENCRYPT_US
 | [03-stacked-bars.json](render/chart/03-stacked-bars.json) | (v1.4.0) `stackedBar` / `stackedBarH` with per-segment `dataLabels` (prefix/suffix/decimals) |
 | [04-area-scatter.json](render/chart/04-area-scatter.json) | (v1.4.0) `area` with a secondary right axis (`series.yAxis` + `axis2`) and a `scatter` on a linear `xAxis` with a log-scale value axis |
 | [05-time-axis.json](render/chart/05-time-axis.json) | (v1.4.0) `line` on a time `xAxis` (ISO 8601 `xValues`) + bar chart with `labelRotation: 45` |
+| [06-per-bar-colours.json](render/chart/06-per-bar-colours.json) | (v1.6.0) `ChartSeries.colors` — one colour per value on `bar` / `barH` (hex, RGB and CMYK forms), and a series **without a `label`** listed as `Series 1` (pdfnative ≥ 1.9.0) |
 
 Charts render as pure PDF path operators — zero dependencies, no rasterisation, tagged `/Figure` with alt text. Charts v2 (v1.4.0, pdfnative ≥ 1.7.0) grows the family to 9 types (`bar`, `barH`, `stackedBar`, `stackedBarH`, `line`, `area`, `scatter`, `pie`, `donut`) with dual axes (`axis2`), `xAxis` `category|linear|time`, logarithmic value scale, `dataLabels`, and `labelStride`/`labelRotation`. Series colours accept CMYK since v1.5.0. Rendered by the generator like any other document sample.
 
@@ -699,6 +723,12 @@ operations: metadata editing, PDF comparison, manifest pipelines, and print prod
 | [07-tight-bleed-marks.json](render/print/07-tight-bleed-marks.json) | (v1.5.0) Crop marks, registration targets and colour bars in a **3 mm (8.5 pt) bleed** — the 1.8.0 marks clearance: re-centred, shrunk, strokes inside the MediaBox |
 | [07-tight-bleed-marks.sh](render/print/07-tight-bleed-marks.sh) | (v1.5.0) Renders it and prints the page boxes (`inspect --pages`) |
 | [07-tight-bleed-marks.ps1](render/print/07-tight-bleed-marks.ps1) | (v1.5.0) PowerShell equivalent |
+| [08-spot-colours.json](render/print/08-spot-colours.json) | (v1.6.0) **Spot colours** under PDF/X-4 (pdfnative ≥ 1.9.0): three inks declared in `layout.print.spotColours`, `{ spot }` / `{ spot, tint }` paragraphs through `/Separation`, an `{ inks }` mix through `/DeviceN` (+ `/Colorants`), a chart painting each bar in its plate's ink (`ChartSeries.colors`) |
+| [08-spot-colours.sh](render/print/08-spot-colours.sh) | (v1.6.0) Renders it with the PDF/X-4 recipe, asserts `inspect --check pdfx`, then shows an undeclared ink refused with `E_INPUT` under `--dry-run` |
+| [08-spot-colours.ps1](render/print/08-spot-colours.ps1) | (v1.6.0) PowerShell equivalent |
+| [09-dual-pdfa2b-pdfx4.json](render/print/09-dual-pdfa2b-pdfx4.json) | (v1.6.0) **PDF/A-2b and PDF/X-4 in one file** (pdfnative ≥ 1.9.0): `pdfaid` + `pdfxid` in the XMP, two OutputIntents on one CMYK profile, PDF 1.6, `/Trapped /False` |
+| [09-dual-pdfa2b-pdfx4.sh](render/print/09-dual-pdfa2b-pdfx4.sh) | (v1.6.0) `render --pdfx pdfx4 --tagged pdfa2b … --strict --json`, `inspect --check pdfa,pdfx`, then the PDF/A-1b pairing refused by the engine (`E_INPUT`, `--dry-run`) |
+| [09-dual-pdfa2b-pdfx4.ps1](render/print/09-dual-pdfa2b-pdfx4.ps1) | (v1.6.0) PowerShell equivalent |
 | [03-cmyk-colours.sh](render/print/03-cmyk-colours.sh) | (v1.5.0) Renders `03`, then under `--tagged pdfa2b`: the `PDFA_DEVICE_CMYK_CONTENT` warning, and the `--strict` refusal |
 | [03-cmyk-colours.ps1](render/print/03-cmyk-colours.ps1) | (v1.5.0) PowerShell equivalent |
 | [04-colour-bars.sh](render/print/04-colour-bars.sh) | (v1.5.0) Renders `04` and prints the page boxes |
@@ -706,7 +736,7 @@ operations: metadata editing, PDF comparison, manifest pipelines, and print prod
 | [synthetic-cmyk.icc](render/print/synthetic-cmyk.icc) | (v1.5.0) A synthetic ICC v2 `prtr` CMYK profile (from pdfnative's docs) — valid for the validators, **not a press profile** |
 | [synthetic-gray.icc](render/print/synthetic-gray.icc) | (v1.5.0) A synthetic ICC v2 `prtr` **Gray** profile (408 bytes, generated by `scripts/lib/synthetic-gray-profile.ts`) — valid for the validators, **not a press profile** |
 
-`01`–`04` and `07` are plain document samples rendered by the generator; `05-pdfx4.json` and `06-gray-pdfx4.json` are rendered with the PDF/X-4 flags and their output profile (`scripts/lib/sample-plan.ts`, `FILE_FLAGS` + `FILE_ICC`). `layout.print` also accepts explicit `trimBox`/`bleedBox`/`artBox`/`cropBox` and `userUnit`; an `outputIntent` (ICC RGB for PDF/A-style characterisation, ICC `prtr` CMYK for PDF/X) can be declared in the JSON as a number array or passed with `--output-intent-icc`.
+`01`–`04` and `07` are plain document samples rendered by the generator; `05-pdfx4.json`, `06-gray-pdfx4.json`, `08-spot-colours.json` and `09-dual-pdfa2b-pdfx4.json` (the last one also `--tagged pdfa2b`) are rendered with the PDF/X-4 flags and their output profile (`scripts/lib/sample-plan.ts`, `FILE_FLAGS` + `FILE_ICC`). `layout.print` also accepts explicit `trimBox`/`bleedBox`/`artBox`/`cropBox` and `userUnit`; an `outputIntent` (ICC RGB for PDF/A-style characterisation, ICC `prtr` CMYK for PDF/X) can be declared in the JSON as a number array or passed with `--output-intent-icc`.
 
 ### `render/typography/` — The Typography Engine (v1.5.0)
 
@@ -804,6 +834,8 @@ Demonstrate the `pdfnative sign` command. Both Unix shell and PowerShell scripts
 | [sign/09-multiple-signatures.ps1](sign/09-multiple-signatures.ps1) | (v1.4.0) PowerShell equivalent |
 | [sign/10-timestamp-timeout.sh](sign/10-timestamp-timeout.sh) | (v1.5.0) `sign --timestamp <tsa> --timestamp-timeout <ms>` — a bounded TSA round-trip reported as `timestamp.timeoutMs`; the `--dry-run` never opens a socket; network only when `PDFNATIVE_TSA_URL` is set |
 | [sign/10-timestamp-timeout.ps1](sign/10-timestamp-timeout.ps1) | (v1.5.0) PowerShell equivalent |
+| [sign/11-ltv-offline.sh](sign/11-ltv-offline.sh) | (v1.6.0) **LTV from files, no network** — `ltv embed --cert <pem\|der> [--ocsp <der>] [--crl <der>] --match chain\|all` composes the `/DSS` from material you already hold (pdfnative ≥ 1.9.0 `composeLtvData`); `--dry-run --json` reports the counts first |
+| [sign/11-ltv-offline.ps1](sign/11-ltv-offline.ps1) | (v1.6.0) PowerShell equivalent |
 
 **Prerequisites:** `openssl` on your PATH (ships with Git for Windows).
 
@@ -974,7 +1006,7 @@ npx tsx scripts/verify-samples.ts --update      # rebaseline — declare it in t
 `scripts/generate-samples.ts` (v1.5.0, replaces `run-all.js`) clears `test-output/samples/`
 and drives the **built** CLI (`dist/cli.cjs`, or `PDFNATIVE_CLI`) under `TZ=UTC` with the
 creation instant pinned twice — `--creation-date 2026-01-01T00:00:00Z` and
-`SOURCE_DATE_EPOCH=1767225600` — so every run yields the same 91 sample PDFs. The plan is
+`SOURCE_DATE_EPOCH=1767225600` — so every run yields the same 99 sample PDFs. The plan is
 `scripts/lib/sample-plan.ts`: per-category flags (`pdfa` / `attachments` → `--font latin
 --lang latin --tagged …`, `typography` → `--font latin --lang latin`, `base14` → none on purpose, `print/05-pdfx4.json`
 and `06-gray-pdfx4.json` → the PDF/X-4 flags and their output profile, the `multilang` families

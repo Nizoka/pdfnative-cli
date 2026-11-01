@@ -5,14 +5,14 @@
 
 import { describe, it, expect, afterAll, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { tmpRoot } from '../helpers/cli-harness.js';
 import { reviveLayoutJson, deepMerge, mergeNestedLayout, loadLayoutFile, isPlainObject, MAX_JSON_DEPTH, MAX_ICC_PROFILE_BYTES } from '../../src/utils/layout.js';
 import { ErrorCode } from '../../src/utils/error.js';
 import { forEachCase, forEachCaseAsync, onlyCliError, onlyCliErrorAsync, randomJson, randomToken, deepNested, assertPrototypeClean, HOSTILE_KEYS } from '../helpers/fuzz.js';
 import type { PdfLayoutOptions } from '../../src/core-bridge/index.js';
 
-const dir = mkdtempSync(join(tmpdir(), 'pdfcli-fuzz-layout-'));
+const dir = mkdtempSync(join(tmpRoot(), 'pdfcli-fuzz-layout-'));
 afterAll(() => { assertPrototypeClean(); rmSync(dir, { recursive: true, force: true }); });
 afterEach(assertPrototypeClean);
 

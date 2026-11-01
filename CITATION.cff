@@ -7,9 +7,11 @@ abstract: >-
   A zero-dependency command-line interface for pdfnative — a pure-TypeScript,
   ISO 32000-1 compliant PDF generation library. pdfnative-cli exposes 21
   composable commands covering the full document lifecycle: rendering JSON
-  document definitions to PDF (PDF/A and PDF/X-4 conformance, typography,
-  CMYK, 27 Unicode scripts, custom fonts, native vector charts, print
-  production, streaming, byte-reproducible output), reading-order text extraction,
+  document definitions to PDF (PDF/A and PDF/X-4 conformance, claimable
+  together, typography, right-to-left layout under UAX #9, CMYK and spot
+  colours, JPEG 2000, 32 Unicode scripts, custom fonts, native vector charts,
+  print production, streaming, byte-reproducible output), logical-order text
+  extraction,
   AcroForm filling and flattening, page-tree operations (merge, split,
   extract), AES-128/256 encryption and decryption, metadata editing,
   annotation, and CMS/PKCS#7 digital signatures with RFC 3161 timestamps and
@@ -27,8 +29,8 @@ authors:
 repository-code: "https://github.com/Nizoka/pdfnative-cli"
 url: "https://pdfnative.dev"
 license: MIT
-version: 1.5.0
-date-released: "2026-09-17"
+version: 1.6.0
+date-released: "2026-11-01"
 keywords:
   - pdf
   - cli
@@ -55,6 +57,10 @@ keywords:
   - markup-annotations
   - shell
   - pipeline
+  - right-to-left
+  - spot-colours
+  - jpeg-2000
+  - backward-compatible
 references:
   - type: software
     title: "pdfnative — Zero-dependency native PDF generation library"

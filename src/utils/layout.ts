@@ -21,6 +21,7 @@ import type {
     TypographyOptions,
     CustomOutputIntent,
     PdfXConformanceTarget,
+    TextDirection,
 } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag, getBoolFlag } from './args.js';
 import { validatePath, readBinaryFile, readBinaryFileCapped, assertJsonSizeLimit } from './io.js';
@@ -58,6 +59,9 @@ export const MAX_ICC_PROFILE_BYTES = 16 * 1024 * 1024;
  * their replace semantics (byte-identical to 1.4.0).
  */
 export const NESTED_LAYOUT_KEYS: readonly string[] = ['typography', 'outputIntent'];
+
+/** `--direction` values (pdfnative 1.9.0 `TextDirection`). */
+export const VALID_DIRECTIONS: readonly TextDirection[] = ['auto', 'ltr', 'rtl'];
 
 /** Built-in named page sizes (points). Matches pdfnative `PAGE_SIZES`. */
 const NAMED_PAGE_SIZES: Readonly<Record<string, readonly [number, number]>> = {
@@ -706,6 +710,23 @@ export async function buildLayoutOptions(
         out.tagged = conformanceToTagged(conformance);
     }
 
+    // --direction auto|ltr|rtl (pdfnative 1.9.0, full UAX #9): paragraph
+    // alignment and justification follow the resolved base direction; a
+    // paragraph block's own `direction` still wins inside the engine.
+    const direction = getStringFlag(args.flags, 'direction');
+    if (direction !== undefined) {
+        if (!VALID_DIRECTIONS.includes(direction as TextDirection)) {
+            throw new CliError(`Invalid --direction "${direction}". Valid: ${VALID_DIRECTIONS.join(', ')}.`, 2);
+        }
+        out.direction = direction as TextDirection;
+    }
+
+    // --actual-text [true|false] (pdfnative 1.9.0): untagged shaped and
+    // right-to-left runs carry their logical text as /Span /ActualText so
+    // extraction returns the source string; `false` restores the bare 1.8.0 runs.
+    const actualText = getBoolFlag(args.flags, 'actual-text');
+    if (actualText !== undefined) out.actualText = actualText;
+
     // --pdfx [pdfx4] (pdfnative 1.8.0 PDF/X-4 claim)
     const pdfxRaw = args.flags['pdfx'];
     if (pdfxRaw !== undefined) {
@@ -759,13 +780,10 @@ export async function buildLayoutOptions(
             2,
         );
     }
+    // PDF/A-2b or 2u may be claimed next to PDF/X-4 since pdfnative 1.9.0;
+    // the engine refuses PDF/A-1b and 3b with a level-specific message the
+    // CLI transmits as E_INPUT (utils/build-errors.ts) — no pre-check here.
     if (out.pdfx !== undefined) {
-        if (tg !== undefined && tg !== false) {
-            throw new CliError(
-                '--pdfx and --tagged are mutually exclusive: pdfnative writes one conformance claim per file (PDF/X-4 or PDF/A).',
-                2,
-            );
-        }
         if (out.encryption !== undefined) {
             throw new CliError(
                 '--pdfx is mutually exclusive with encryption (PDF/X forbids encryption, ISO 15930-7).',

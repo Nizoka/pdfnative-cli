@@ -1,14 +1,16 @@
 # pdfnative-cli
 
 > Official command-line interface for **pdfnative** — an agent-native PDF toolkit.
-> Render JSON to PDF (typography, PDF/A, PDF/X-4, CMYK, 27 Unicode scripts), extract
-> text, fill/flatten AcroForms, merge/split/extract pages, encrypt/decrypt, sign and
-> verify (CMS, LTV), inspect and compare — with a deterministic process contract
-> designed to be driven by autonomous AI agents, and byte-reproducible output.
+> Render JSON to PDF (typography, right-to-left text under UAX #9, 32 Unicode scripts,
+> PDF/A, PDF/X-4 and both in one file, CMYK and spot colours, JPEG 2000), extract text
+> in logical order, fill/flatten AcroForms, merge/split/extract pages, encrypt/decrypt,
+> sign and verify (CMS, LTV online or from material on disk), inspect and compare — with
+> a deterministic process contract designed to be driven by autonomous AI agents, a
+> compatibility promise proved on every pull request, and byte-reproducible output.
 > Zero extra runtime dependencies; all PDF logic lives in `pdfnative`.
 
-Current version: 1.5.0 (built on pdfnative 1.8.0; requires Node ≥ 22).
-Verified on 2026-09-17 against the source tree.
+Current version: 1.6.0 (built on pdfnative 1.9.0; requires Node ≥ 22).
+Verified on 2026-11-01 against the source tree.
 
 This file is an LLM-facing capability manifest (see https://llmstxt.org). For a
 machine-readable JSON manifest run `pdfnative schema manifest`; the full contract is
@@ -32,6 +34,10 @@ docs/AGENT_CONTRACT.md.
 - **Token economy**: `--summary` (minimal verdict), `--fields a,b.c` (dot-path
   projection), compact JSON by default under `--json` (`--pretty` opts out).
 - **`--dry-run`** validates inputs without writing output and never touches the network.
+- **Compatibility promise** (v1.6.0): within 1.x no command, flag, error code, exit code,
+  schema subject or envelope field is removed or renamed — a minor only adds; the previous
+  release's test suite and `schema` captures are replayed on every pull request
+  (SECURITY.md §Compatibility promise).
 - **Reproducible output** (v1.5.0): global `--creation-date <iso8601>` (or
   `SOURCE_DATE_EPOCH`) pins every date in UTC — the same input renders to identical
   bytes on every host. Encrypted output is never reproducible (CSPRNG keys).
@@ -44,16 +50,23 @@ docs/AGENT_CONTRACT.md.
 
 ## Commands (21 commands)
 
-- `render` — JSON document/table → PDF (27 Unicode scripts + `--font-file`, math,
-  colour emoji, bookmarks, native charts, watermarks, PDF/A, PDF/X-4
-  (`--pdfx pdfx4 --output-intent-icc <cmyk.icc> --trapped false`), CMYK colours,
-  typography (`layout.typography`; `--split-paragraphs`, `--keep-headings-with-next`,
-  `--kerning`, `--font-features`), encryption, streaming). `--strict` turns the 9
-  diagnostic codes into `E_CHECK_FAILED`. PDF/A outputs are validated against veraPDF
-  in CI (blocking); recipe: `--tagged pdfa<level> --font latin --lang latin`.
+- `render` — JSON document/table → PDF (32 Unicode scripts incl. five Indic ones added
+  in v1.6.0 (`gu pa kn ml or`) + `--font-file`, math, colour emoji, bookmarks, native
+  charts (per-value `colors`), watermarks, PDF/A, PDF/X-4 (`--pdfx pdfx4
+  --output-intent-icc <cmyk.icc> --trapped false`) and the PDF/A-2 + PDF/X-4 dual claim
+  (`--tagged pdfa2b --pdfx pdfx4`), CMYK and spot colours (`layout.print.spotColours`,
+  `{ spot, tint }` / `{ inks }` values), JPEG 2000 images (`/JPXDecode` pass-through),
+  right-to-left text (`--direction auto|ltr|rtl`, full UAX #9; `--actual-text false` opts
+  out of the logical-order `/ActualText` runs), typography (`layout.typography`;
+  `--split-paragraphs`, `--keep-headings-with-next`, `--kerning`, `--font-features`),
+  encryption, streaming). `--strict` turns the 13 diagnostic codes into `E_CHECK_FAILED`.
+  PDF/A outputs are validated against veraPDF in CI (blocking); recipe:
+  `--tagged pdfa<level> --font latin --lang latin`.
 - `extract-text` — reading-order Unicode text as `text | json | ndjson`
   (`--runs` for positioned runs, `--password` for encrypted PDFs). No OCR; tagged
-  input yields the `/ActualText` source text.
+  input — and, since v1.6.0, untagged shaped and right-to-left runs — yield the
+  `/ActualText` source text in logical order. `--on-stream-error limit|throw|skip`:
+  a stream over `--max-inflate-size` is `E_INPUT` (default), never a silently empty page.
 - `fill` — fill, flatten, and/or **export** an AcroForm (`--data values.json`,
   `--flatten`, `--export`); incremental save keeps existing signatures valid.
 - `encrypt` / `decrypt` — re-secure with AES-128/256, or remove encryption
@@ -63,7 +76,8 @@ docs/AGENT_CONTRACT.md.
   (`--password`), output re-encryption (`--encrypt`), and constant-memory
   streaming (`--stream`).
 - `annotate` — attach markup annotations and (v1.5.0) `link` annotations (`url`
-  validated: http/https/mailto) via incremental save (`--password` for encrypted PDFs).
+  validated: http/https/mailto; the `/Link` body is built by the engine since v1.6.0)
+  via incremental save (`--password` for encrypted PDFs).
 - `metadata` — update /Info + XMP metadata via incremental save (existing
   signatures stay valid); reading metadata stays in `inspect`. Note: the rewrite drops
   a PDF/X identification (upstream limit) — re-check with `inspect --check pdfx`.
@@ -73,16 +87,20 @@ docs/AGENT_CONTRACT.md.
   multi-signatures, visible `--signature-rect`) and verification with LTV (RFC 3161
   timestamps, /DocTimeStamp revisions, OCSP, CRL). `verify` reports `timestampDigest`
   and refuses a SHA-1 messageImprint under `--strict`.
-- `ltv` — PAdES B-LT: `collect` (needs `--online`) / `embed` (100% offline) /
-  `add` — archive OCSP+CRL validation data into /DSS + /VRI.
+- `ltv` — PAdES B-LT: `collect` (needs `--online`) / `embed` (100% offline: a
+  collected `--data ltv.json`, or since v1.6.0 material you hold — `--cert <pem|der>`,
+  `--ocsp <der>`, `--crl <der>`, repeatable, `--match all|chain`) / `add` — archive
+  OCSP+CRL validation data into /DSS + /VRI.
 - `doc-timestamp` — PAdES B-LTA: append an RFC 3161 /DocTimeStamp revision
   (`--url <tsa>` required; repeat to renew).
 - `compare` — diff two PDFs by text + structure; identical → exit 0,
-  different → exit 1 / `E_CHECK_FAILED`. No visual/raster diff.
+  different → exit 1 / `E_CHECK_FAILED`; `--on-stream-error` as in `extract-text`
+  (an unreadable page is never "equal"). No visual/raster diff.
 - `inspect` — metadata (`--iso-dates` → ISO 8601), PDF/A and PDF/X conformance
   (`--pdfx` report), signatures (`--signatures` inventory), annotations, form fields
   (`--form-fields`), encryption scheme (`--encryption`), PDF/UA validation,
-  `--check pdfa|signed|encrypted|pdfua|pdfx|"signatures>=N"`; `--summary` =
+  `--check pdfa|signed|encrypted|pdfua|pdfx|"signatures>=N"` (repeatable, or a comma
+  list: `--check pdfa,pdfx`); `--summary` =
   `{ pages, encrypted, signatures, pdfa, pdfx }`.
 - `batch` — render a directory of JSON inputs in parallel, or run a
   declarative multi-command pipeline (`--manifest tasks.json`, `@<id>` output
@@ -96,7 +114,7 @@ docs/AGENT_CONTRACT.md.
   (bash|zsh|fish|powershell).
 - `doctor` — offline environment/capability preflight (`--format json`): CLI /
   Node / pdfnative versions, Web Crypto CSPRNG (required by `encrypt`), command
-  count, font inventory (31 font modules / 27 scripts), Unicode version, conformance
+  count, font inventory (36 font modules / 32 scripts), Unicode version, conformance
   targets. Exit 0/1 — run it as an agent pre-flight.
 
 ## Governance (read before autonomous use)
@@ -112,5 +130,5 @@ gates drafts (exit `1` / `E_POLICY` on violation). See docs/AGENT_CONTRACT.md §
 - docs/AGENT_CONTRACT.md — the full agent-automation contract (consumers).
 - AGENTS.md — rules for agents working on the repository itself.
 - docs/KNOWLEDGE_BASE.md — deep reference.
-- release-notes/v1.5.0.md — what changed in this release.
-- Requires Node ≥ 22 (also runs on Bun and Deno). MIT licensed.
+- release-notes/v1.6.0.md — what changed in this release.
+- Requires Node ≥ 22 (tested on Ubuntu, Windows and macOS; Bun and Deno are not tested). MIT licensed.

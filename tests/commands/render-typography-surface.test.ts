@@ -181,10 +181,11 @@ describe('fontFeatures', () => {
         expect(textOf(bytes)).toContain('zero');
     });
 
-    it('a feature whose glyphs carry their own code points (subs) extracts the source text once the output is tagged', async () => {
+    it('a feature whose glyphs carry their own code points (subs) extracts the source text, tagged or not (pdfnative 1.9.0: the encoded code point wins)', async () => {
         const doc = docOf([para('Water is H2O.')], { fontFeatures: ['subs'] });
         const untagged = textOf((await renderTo(tmp, doc, LATIN, 'untagged.pdf')).bytes);
-        expect(untagged).toContain('₂');
+        expect(untagged).toContain('H2O');
+        expect(untagged).not.toContain('₂');
         const tagged = textOf((await renderTo(tmp, doc, [...LATIN, '--tagged', 'pdfa2b'], 'tagged.pdf')).bytes);
         expect(tagged).toContain('H2O');
     });

@@ -68,28 +68,47 @@ function renderSchema(): JsonSchema {
                     + '{type: "category"|"linear"|"time"}, dataLabels, labelStride and '
                     + 'labelRotation (pdfnative 1.7.0). Image blocks accept "src" (a '
                     + 'path resolved against the --input JSON\'s directory), '
-                    + '"dataBase64" (inline base64 JPEG/PNG), or "data" (byte array) — '
-                    + 'the CLI resolves them to bytes before rendering. Paragraph '
+                    + '"dataBase64" (inline base64 JPEG, PNG or JPEG 2000), or "data" (byte array) — '
+                    + 'the CLI resolves them to bytes before rendering; a JPEG 2000 '
+                    + 'file (.jp2) or raw codestream (.j2k/.jpx) is passed through as '
+                    + '/JPXDecode with the colour and opacity its header declares, and '
+                    + 'raises the header to PDF 1.5 (pdfnative 1.9.0; PDFA1_JPX_IMAGE '
+                    + 'under pdfa1b, PDFA_JPX_IMAGE for an opacity channel under '
+                    + 'pdfa2b/pdfa3b). Paragraph '
                     + 'blocks accept align "left"|"right"|"center"|"justify", '
-                    + 'keepWithNext and splittable; heading blocks keepWithNext; text '
-                    + 'may carry soft hyphens U+00AD (pdfnative 1.8.0). Every colour '
-                    + 'field (PdfColor) accepts hex "#rrggbb", "r g b" (0–1), [r, g, b] '
-                    + '(0–255), or CMYK as "c m y k" operands (0–1) / [c, m, y, k] '
-                    + 'percent — emitted as DeviceCMYK (pdfnative 1.8.0).',
+                    + 'direction "auto"|"ltr"|"rtl" (overrides layout.direction, '
+                    + 'pdfnative 1.9.0), keepWithNext and splittable; heading blocks '
+                    + 'keepWithNext; text may carry soft hyphens U+00AD (pdfnative '
+                    + '1.8.0). Every colour field (PdfColor) accepts hex "#rrggbb", '
+                    + '"r g b" (0–1), [r, g, b] (0–255), CMYK as "c m y k" operands '
+                    + '(0–1) / [c, m, y, k] percent — emitted as DeviceCMYK (pdfnative '
+                    + '1.8.0) — or, since pdfnative 1.9.0, a spot colour {spot: '
+                    + '"<ink>", tint?: 0–1} (/Separation) or an ink mix {inks: {"<ink>": '
+                    + 'tint, …}} (/DeviceN); every ink must be declared in '
+                    + 'layout.print.spotColours, else E_INPUT. Chart series accept '
+                    + 'colors (one colour per value on bar charts) and an optional label '
+                    + '(pdfnative 1.9.0).',
                 items: { type: 'object' },
             },
             layout: {
                 type: 'object',
                 description: 'PdfLayoutOptions overrides. Includes print production '
                     + '(print: {bleed, trimBox, bleedBox, artBox, cropBox, marks: true | '
-                    + '{colourBars: true | {tints, size}}, userUnit}), outputIntent '
+                    + '{colourBars: true | {tints, size}}, userUnit, spotColours: '
+                    + '[{name, alternate: [c, m, y, k] percent | [r, g, b]}] — the inks '
+                    + '{spot}/{inks} colours may name, pdfnative 1.9.0}), direction '
+                    + '("auto"|"ltr"|"rtl" — the base direction of every paragraph, full '
+                    + 'UAX #9; --direction sets it), actualText (false opts out of the '
+                    + '/Span /ActualText the engine writes on untagged shaped and '
+                    + 'right-to-left runs; --actual-text false), outputIntent '
                     + '({iccProfile: number[], outputConditionIdentifier, registryName, '
                     + 'info} — an RGB, CMYK or Gray ICC profile; a prtr output profile '
                     + 'for PDF/X-4; the CLI also reads one from --output-intent-icc), '
                     + 'viewerPreferences (duplex, pickTrayByPDFSize, printPageRange '
                     + '[[first,last]…], numCopies), strict (escalate diagnostics to '
-                    + 'errors), tagged (PDF/A level), pdfx ("pdfx4" — mutually '
-                    + 'exclusive with tagged and encryption; needs outputIntent, '
+                    + 'errors), tagged (PDF/A level), pdfx ("pdfx4" — claimable next '
+                    + 'to tagged "pdfa2b"|"pdfa2u" since pdfnative 1.9.0, refused with '
+                    + 'pdfa1b/pdfa3b and with encryption; needs outputIntent, '
                     + 'embedded fonts and metadata.trapped True|False), creationDate '
                     + '(ISO 8601 string, revived to a Date; pins /CreationDate, '
                     + 'xmp:CreateDate, {date} and the trailer /ID for byte-identical '
@@ -117,9 +136,11 @@ function renderSchema(): JsonSchema {
             fontEntries: {
                 type: 'array',
                 description: 'Pre-registered font entries (usually set via --font/--lang; '
-                    + '--font <code> registers a bundled module — 27 scripts: ar, hy, bn, '
+                    + '--font <code> registers a bundled module — 32 scripts: ar, hy, bn, '
                     + 'ru, hi, am, ka, el, he, ja, km, ko, my, pl, zh, si, ta, te, th, bo, '
-                    + 'tr, vi, lo, nod, khb, tdd, cjm, plus latin, emoji, color-emoji, '
+                    + 'tr, vi, lo, nod, khb, tdd, cjm, gu, pa, kn, ml, or (Gujarati, '
+                    + 'Gurmukhi, Kannada, Malayalam and Odia since pdfnative 1.9.0), '
+                    + 'plus latin, emoji, color-emoji, '
                     + 'math; ha, yo, ig, sw alias latin — and --font-file <path.ttf> '
                     + 'registers a font you ship).',
                 items: { type: 'object' },
@@ -134,9 +155,28 @@ function renderSchema(): JsonSchema {
             + '--pdfx claim can be conformant.',
         required: ['title', 'headers', 'rows'],
         properties: {
+            docTitle: { type: 'string', description: 'The /Info /Title (the visible title is `title`).' },
             title: { type: 'string' },
+            infoItems: {
+                type: 'array',
+                description: 'Key/value lines under the title. Each entry is { label, value } — a bare '
+                    + 'string is refused with E_INPUT (v1.6.0; the engine renders item.label and item.value).',
+                items: {
+                    type: 'object',
+                    required: ['label', 'value'],
+                    properties: { label: { type: 'string' }, value: { type: 'string' } },
+                },
+            },
+            balanceText: { type: 'string', description: 'Text of the highlighted balance box ("" for none).' },
+            countText: { type: 'string', description: 'Text under the balance box, e.g. "42 operations".' },
             headers: { type: 'array', items: { type: 'string' } },
-            rows: { type: 'array', items: { type: 'array' } },
+            rows: {
+                type: 'array',
+                description: 'Rows as { cells: string[], type: "data" | "credit" | "debit" | "normal", pointed: boolean } '
+                    + 'objects (a row that is not that shape is E_INPUT, v1.6.0).',
+                items: { type: 'object', required: ['cells'], properties: { cells: { type: 'array', items: { type: 'string' } }, type: { type: 'string' }, pointed: { type: 'boolean' } } },
+            },
+            footerText: { type: 'string' },
             fontEntries: { type: 'array', items: { type: 'object' } },
             metadata: {
                 type: 'object',
@@ -770,6 +810,11 @@ function statusSchema(): JsonSchema {
             ocspResponses: { type: 'integer', minimum: 0, description: 'ltv: OCSP responses collected or embedded.' },
             crls: { type: 'integer', minimum: 0, description: 'ltv: CRLs collected or embedded.' },
             vri: { type: 'integer', minimum: 0, description: 'ltv: per-signature VRI entries collected or embedded.' },
+            match: {
+                type: 'string', enum: ['all', 'chain'],
+                description: 'ltv embed with offline material (--cert/--ocsp/--crl): how the material was '
+                    + 'attributed to the signatures (--match; pdfnative 1.9.0 composeLtvData), v1.6.0.',
+            },
             equal: { type: 'boolean', const: true, description: 'compare: the documents are equal (a difference is E_CHECK_FAILED, never a success envelope).' },
             modes: {
                 type: 'array', items: { type: 'string', enum: ['structure', 'text'] },
@@ -790,6 +835,24 @@ function statusSchema(): JsonSchema {
                 enum: ['pdfx4'],
                 description: 'render: the PDF/X target claimed (--pdfx / layout.pdfx), v1.5.0.',
             },
+            tagged: {
+                type: 'string',
+                enum: ['pdfa1b', 'pdfa2b', 'pdfa2u', 'pdfa3b'],
+                description: 'render: the PDF/A level claimed (--tagged / layout.tagged), v1.6.0 — '
+                    + 'present next to pdfx for the PDF/A-2 + PDF/X-4 dual claim (pdfnative 1.9.0).',
+            },
+            direction: {
+                type: 'string',
+                enum: ['auto', 'ltr', 'rtl'],
+                description: 'render: the base text direction set by --direction / layout.direction '
+                    + '(pdfnative 1.9.0, full UAX #9), v1.6.0. Absent when the engine default applies.',
+            },
+            actualText: {
+                type: 'boolean',
+                enum: [false],
+                description: 'render: present (false) when --actual-text false / layout.actualText '
+                    + 'false opted out of the untagged /Span /ActualText runs (pdfnative 1.9.0), v1.6.0.',
+            },
             creationDate: {
                 type: 'string',
                 format: 'date-time',
@@ -803,7 +866,9 @@ function statusSchema(): JsonSchema {
                     + 'PDFA_UNEMBEDDED_FORM_FONT, PDFA_DEVICE_CMYK_IMAGE, '
                     + 'PDFA_DEVICE_CMYK_CONTENT, PDFA_ICC_PROFILE_VERSION, '
                     + 'PDFX_NO_FONT_ENTRIES, PDFX_DEVICE_CMYK, PDFX_ANNOTATIONS, '
-                    + 'TYPOGRAPHY_FEATURE_INEFFECTIVE (pdfnative 1.8.0; additions-only).',
+                    + 'TYPOGRAPHY_FEATURE_INEFFECTIVE (pdfnative 1.8.0), '
+                    + 'PDFA_GLYPH_WITHOUT_UNICODE, PDFA1_JPX_IMAGE, PDFA_JPX_IMAGE, '
+                    + 'TEXT_GLYPH_NOT_COVERED (pdfnative 1.9.0); additions-only.',
                 items: {
                     type: 'object',
                     properties: {

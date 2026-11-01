@@ -5,7 +5,154 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.0] – 2026-11-01
+
+Built on **pdfnative 1.9.0**. Exposes every 1.9.0 engine feature — right-to-left layout under
+the full UAX #9, five more Indic scripts (32 Unicode scripts in all), spot colours, the
+PDF/A-2 + PDF/X-4 dual claim, JPEG 2000 images, four more diagnostics, the stream-limit
+policy of `extractText`, offline LTV material, engine-built link bodies and text-string
+decoding — and delivers every roadmap item the engine unblocked (logical-order extraction of
+untagged shaped text, the paginating table of contents, label-less chart series, the dual
+claim, spot colours). The repository aligns its CI/CD with the engine's: the gate required on
+Ubuntu, Windows and macOS, the previous release's suite and `schema` captures replayed on every
+pull request (a compatibility promise, now a check), workflow lint, CodeQL hardening, a
+guard → build → publish → attest release pipeline, ClusterFuzzLite over the CLI's parsers, and
+a repository normalised to LF. 21 commands, 19 schema subjects, 12 stable error codes and
+10 global flags are unchanged. 100 % backward-compatible command surface — every envelope
+field is additive; the byte changes inherited from the engine are listed in the release
+note's compatibility ledger.
+
+### Added
+
+#### `render`
+
+- **pdfnative 1.9.0 surface** — `--direction auto|ltr|rtl` (full UAX #9: right-to-left
+  paragraphs aligned and justified in visual order; per-paragraph `direction` in the JSON),
+  `--actual-text [true|false]` (the untagged `/Span /ActualText` runs that make `extract-text`
+  return shaped and right-to-left text in logical order; `false` restores the bare 1.8.0 runs),
+  five more Indic scripts `gu pa kn ml or` (Gujarati, Gurmukhi, Kannada, Malayalam, Odia —
+  32 Unicode scripts, 36 font modules), spot colours (`layout.print.spotColours` and the
+  `{spot, tint}` / `{inks}` colour values, `/Separation` and `/DeviceN`; an undeclared ink is
+  `E_INPUT`), the PDF/A-2b|2u + PDF/X-4 dual claim (`--tagged pdfa2b --pdfx pdfx4`; the CLI
+  pre-check that refused the pair is gone, the engine's level-specific refusals for pdfa1b and
+  pdfa3b are `E_INPUT`), JPEG 2000 image blocks and watermarks (`.jp2` files and raw `.j2k`
+  codestreams, `/JPXDecode`), per-value chart `colors` and an optional series `label`.
+- **Four 1.9.0 diagnostics** under `--strict` / in the `--json` envelope:
+  `PDFA_GLYPH_WITHOUT_UNICODE`, `PDFA1_JPX_IMAGE`, `PDFA_JPX_IMAGE`, `TEXT_GLYPH_NOT_COVERED`
+  (13 diagnostic codes); the envelope gains `tagged`, `direction` and `actualText`.
+
+#### `extract-text`, `compare`
+
+- **`--on-stream-error limit|throw|skip`** — pdfnative 1.9.0 reports a content or font stream
+  past `--max-inflate-size` instead of silently returning the page without its text
+  (`PdfStreamLimitError`, code `PDF_STREAM_LIMIT`): the default `limit` fails with `E_INPUT`
+  naming both remedies, `throw` fails on any undecodable stream, `skip` is the 1.8.0 lenience.
+  `compare` applies the policy to both PDFs and never reports an unreadable page as equal.
+  Every command that opens a PDF inherits the error class: an object, cross-reference or
+  content stream past the cap was `E_PARSE` in 1.5.0 and is `E_INPUT` now (`verify` keeps its
+  own `E_PARSE`); only `extract-text` and `compare` additionally lose the silent empty page
+  (release-note ledger C2).
+
+#### `ltv`
+
+- **`ltv embed` from material on disk** — `--cert <pem|der>`, `--ocsp <der>` and `--crl <der>`
+  (repeatable; PEM bundles split, DER accepted, 16 MiB cap each) compose the `/DSS` + `/VRI`
+  through the engine's `composeLtvData` with `--match all|chain` (every item from every VRI,
+  or only what validates each signature); exclusive with `--data` (exit 2); a `composeLtvData`
+  refusal is `E_INPUT`; `--dry-run` composes without writing; the envelope carries `match`.
+  The PAdES ladder gains an offline B-LT rung (`samples/sign/11-ltv-offline.*`).
+
+#### `annotate`, `inspect`, `compare`
+
+- **Engine-built `/Link` bodies** — `annotate` type `link` is `buildAnnotationBody({ type:
+  'link', rect, url })` (pdfnative 1.9.0); the CLI's own dictionary builder is gone.
+- **Engine text-string decoding** — `inspect` and `compare` decode `/Info` strings through
+  `decodePdfTextString` (PDFDocEncoding and UTF-16); `src/utils/pdftext.ts` is deleted.
+- **`inspect --check` takes a comma list** (`--check pdfa,pdfx`) as well as the repeated form.
+
+#### Compatibility, CI/CD and tooling
+
+- **Compatibility promise, proved** — `tests/compat/` holds the v1.5.0 `schema manifest`,
+  `status` and `list` captures (`tests/tools/manifest-compat.test.ts`: every command, flag,
+  error code, subject and envelope field kept, with its type) and `allow-1.5.0.json`, the
+  exclusions of the v1.5.0 test suite replayed against the current sources by
+  `npm run compat:previous` (`scripts/run-compat.ts`; each exclusion with a reason and, for a
+  behaviour change, the release note's ledger entry). A required check (`compat-previous`)
+  and a publish-gate step. SECURITY.md gains §Compatibility promise and §Supported runtimes.
+- **Windows and macOS required** — `ci.yml` runs the gate as `ci (22)`, `ci (24)`, `windows`
+  and `macos`, with no path filter; `.github/rulesets/main.json` requires seven contexts and
+  allows a merge commit next to squash.
+- **`workflow lint`** — zizmor (1.30.1) and actionlint (1.7.12, checksum-verified) on every pull
+  request; every action pinned to one SHA across the tree; `setup-verapdf` hands its directory
+  back as an output instead of writing `GITHUB_ENV`.
+- **Publish pipeline** — `guard` (a `v*` tag matching `package.json`, before any approval) →
+  `build` (the publish gate with veraPDF and the previous tag, one tarball with its SHA-256 and
+  SHA-512) → `publish` (nothing installed; the tarball verified by digest and version; an npm
+  client pinned by the SHA-512 of its registry tarball; Trusted Publishing, `--provenance`) →
+  `attest` (the registry bytes checked against the build digests and `npm audit signatures`,
+  CycloneDX + SPDX + toolchain SBOMs, the Sigstore bundle on the release). SLSA Build L2,
+  stated as such.
+- **ClusterFuzzLite** — nine targets under `fuzz/` (argv, config, manifest, annotations,
+  layout, pages, pdfdate, url, font-file) over the CLI's own parsers through `#fuzz-surface`
+  (`fuzz/surface.ts`, bundled with the engine by tsup into `fuzz/.build/`, aliased to the
+  source under vitest); `parseConfigText` and `parseFetchUrl` are the pure halves extracted
+  for them; Jazzer.js pinned by lockfile under `.clusterfuzzlite/engine/`, never in
+  `package.json`; `tests/fuzz/targets.test.ts` runs the seeded, truncated and mutated corpus
+  and proves every target rethrows a planted engine error. `fuzz.yml` runs on pull requests
+  (code-change) and weekly (batch); advisory.
+- **`node-current.yml`** — the gate on Node 26 (advisory until it joins `ci.yml`); CodeQL with
+  job-level permissions, the `actions` language, build-mode `none` and `security-extended`;
+  Dependabot with a seven-day cooldown on npm, GitHub Actions, the fuzzing engine and its
+  Docker base image.
+- **`verify:docs`** reads the include-form CI matrix (status-check names, tested majors) and
+  allows the advisory newer major; `tests/tools/workflows.test.ts` holds every workflow,
+  ruleset, publish and fuzzing invariant.
+
+### Changed
+
+- **`render --variant table`** refuses a malformed `PdfParams` (`infoItems` must be
+  `{ label, value }` objects, rows `{ cells: [] }`) with `E_INPUT` instead of letting the
+  engine throw a `TypeError` (`E_RUNTIME`); the table-variant sample is corrected.
+- **The `--pdfx` × `--tagged` pre-check is gone** — the engine accepts PDF/A-2b|2u with
+  PDF/X-4 and refuses PDF/A-1b|3b with its own message (`E_INPUT`).
+- **Engine behaviour inherited from pdfnative 1.9.0** — untagged shaped and right-to-left
+  runs extract in logical order (the `it.fails` markers for Khmer, Myanmar and CJK extraction
+  are gone), `subs`/`sups` glyphs extract as their source characters, every embedded subset
+  is lean and compact (bytes shrink; one rebaseline, declared in the release note), subset
+  font names carry the six-letter tag, a character no registered font covers is reported.
+- **`verify:docs`** — a shipped release note (its tag exists, the CHANGELOG has an
+  `[Unreleased]` entry) is frozen history and leaves the count-checked corpus.
+
+### Security
+
+- **CodeQL `js/insecure-randomness` (#16, #17)** — the tests' temp-file names drew their
+  entropy from `Math.random()`, which CodeQL traced into the owner password a command
+  received; `tests/helpers/cli-harness.ts` now has one `tmpName()` on `randomUUID()`, every
+  suite uses it, and `tests/tools/workflows.test.ts` refuses `Math.random` under `src/`,
+  `scripts/`, `tests/` and `fuzz/`.
+- **CodeQL `security-extended`, first run on the release pull request** — `js/file-system-race`:
+  `readBinaryFileCapped` sized a file with `stat()` and re-opened it by path; it now opens one
+  descriptor, takes the size from it and reads at most that many bytes.
+  `js/insecure-temporary-file`: the suites created files with guessable names straight under
+  `os.tmpdir()`; every test temp file now comes from `tmpName()` and every temp directory
+  from `mkdtemp` under `tmpRoot()` — the harness holds the only `os.tmpdir()` call in the
+  tree. `js/regex/missing-regexp-anchor`: a workflows assertion is a substring check.
+- **Dependency Review** — BlueOak-1.0.0 (`tar`, `minipass`, `yallist`, `chownr`, `isexe`) and
+  CC-BY-4.0 (`caniuse-lite`) are allow-listed with their reason: they reach the tree only
+  through the ClusterFuzzLite engine lockfile, never through `package.json`.
+- **Scorecard** — `codeql.yml` holds `security-events: write` at job level (#2); the publish
+  job installs no npm client from a floating tag (#15; the client is pinned by SHA-512); the
+  `attest` job's `contents: write` and its `npm install` of the exact published version are
+  deliberate and documented (#14). Fuzzing (#7) is covered by ClusterFuzzLite.
+- **Dev toolchain** — vitest 4.1.12, vite 8.3.5, brace-expansion 1.1.21 / 5.0.12, source-map-js
+  1.2.2 (Dependabot alerts 18–26, all development scope, none shipped); the lockfile is
+  regenerated with npm 11.19.1. The remaining moderate advisory (minimatch < 11.0.1,
+  GHSA-g3hv-75wg-m249) has no fix inside the eslint 9 / typescript-eslint 8 lines.
+
+### Internal
+
+- **Line endings** — every tracked text blob is LF (155 CRLF blobs rewritten in one commit,
+  listed in `.git-blame-ignore-revs`); `verify:docs` rule `eol-lf` is an error from now on.
 
 ## [1.5.0] – 2026-09-17
 
@@ -1104,7 +1251,7 @@ gains config-file, batch, completion and global-flag ergonomics.
 - `docs/KNOWLEDGE_BASE.md` updated with complete block type reference table (all 10 block
   types: heading, paragraph, table, list, barcode, link, toc, formField, spacer, pageBreak).
 
-[Unreleased]: https://github.com/Nizoka/pdfnative-cli/compare/v1.5.0...HEAD
+[1.6.0]: https://github.com/Nizoka/pdfnative-cli/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/Nizoka/pdfnative-cli/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/Nizoka/pdfnative-cli/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Nizoka/pdfnative-cli/compare/v1.2.0...v1.3.0

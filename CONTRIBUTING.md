@@ -13,7 +13,7 @@ npm run build                # the gate's smoke step and the sample generator dr
 
 ### Requirements
 
-- Node.js 22 (`.nvmrc` / `.node-version`; CI also runs 24) — `engines.node` is `>=22`
+- Node.js 22 (`.nvmrc` / `.node-version`; CI also runs 24 on Linux, and 22 on Windows and macOS) — `engines.node` is `>=22`
 - npm ≥ 10 (`packageManager` pins the version npm itself reads; publishing uses npm ≥ 11.5.1)
 - Optional: [veraPDF](https://verapdf.org) 1.30.2 + Java for the PDF/A step (see below)
 
@@ -41,9 +41,11 @@ verifiable; the rulesets do not require signatures yet, so an unsigned contribut
 welcome.
 
 Every file the project writes uses LF line endings (`.gitattributes` says
-`* text=auto eol=lf`); on Windows, Git converts on checkout and the pre-commit hook refuses a
-staged CRLF file. Do not run `git add --renormalize` in a feature branch — the maintainer does
-that in one dedicated commit.
+`* text=auto eol=lf`); every tracked text blob is LF since the v1.6.0 normalisation commit
+listed in `.git-blame-ignore-revs` (run `git config blame.ignoreRevsFile .git-blame-ignore-revs`
+once so `git blame` skips it). On Windows, Git converts on checkout, the pre-commit hook
+refuses a staged CRLF file and `verify:docs` (rule `eol-lf`) fails on a CRLF blob. Do not run
+`git add --renormalize` in a feature branch: rewrite the offending file with LF and stage it.
 
 Windows notes: run the `.sh` samples and shell one-liners under Git Bash
 (`C:\Program Files\Git\bin\bash.exe`); PowerShell swallows a bare `--` after `npm run`, so
@@ -58,7 +60,7 @@ pass script flags by calling the script directly (`npx tsx scripts/gate.ts --fas
 |---|---|---|
 | Fast — before every commit | `npm run gate:fast` | `typecheck:all`, `lint`, `test`, `verify:docs` |
 | CI — the default | `npm run gate` | `typecheck:all`, `lint`, `build`, `dist-check`, `smoke`, `bundle-size`, `bundle-check`, `test:generate`, `test:coverage`, `verify:docs`, `verify:samples`, `corpus:pdfa`, `validate:pdfx` — the build and the samples come before the coverage run so the `runIf` suites execute (and fail, not skip, when their input is missing) |
-| Publish — release branches | `npx tsx scripts/gate.ts --publish --require-all` | + `validate:pdfa` (veraPDF); `--require-all` turns any skipped step into a failure |
+| Publish — release branches | `npx tsx scripts/gate.ts --publish --require-all` | + `validate:pdfa` (veraPDF) and `compat:previous` (the previous release's suite, its tag fetched); `--require-all` turns any skipped step into a failure |
 
 `--only <step>` runs one step, `--json` emits a machine-readable result. The individual
 scripts still exist:
@@ -75,12 +77,43 @@ npm run verify:samples     # compare it with tests/regression/baselines/samples.
 npm run corpus:pdfa        # write the conformance corpus to test-output/pdfa/
 npm run validate:pdfx      # validate the PDF/X-4 entries in-process (pdfnative's validator)
 npm run validate:pdfa      # validate the PDF/A entries with veraPDF (SKIP when absent)
+npm run compat:previous    # the previous release's test suite against the current src/ (SKIP without its tag)
 ```
 
 All new code must include tests. Coverage thresholds are enforced once, in `vitest.config.ts`
 (statements / branches / functions / lines), mirrored by `declared.coverageStatements` in
 `docs/assets/ecosystem.json`, re-measured at each release and **never lowered** to make a
 change pass — add tests.
+
+### Compatibility with the previous release
+
+`npm run compat:previous` runs the previous release's test suite, exactly as tagged, against the
+current sources (`scripts/run-compat.ts`; the tag must be present: `git fetch --no-tags origin
++refs/tags/v1.5.0:refs/tags/v1.5.0`). The files it may skip are listed in
+`tests/compat/allow-<previous>.json`, each with a reason and, when the reason is a behaviour
+change, the compatibility-ledger entry (`C1`, `C2`, …) of the release note that justifies it.
+`tests/tools/manifest-compat.test.ts` holds every command, flag, global flag, error code,
+`schema` subject and envelope field of the previous release (`tests/compat/manifest-<previous>.json`,
+`status-<previous>.json`, `subjects-<previous>.json`, captured once from the published package)
+to the current `schema` command: a 1.x minor only adds. Both are part of the required
+`compat-previous` check and of the publish gate; SECURITY.md §Compatibility promise is the policy
+they enforce. At each release the allow-list is reviewed: an exclusion without a ledger entry is a
+breaking change by policy.
+
+### Fuzzing
+
+The deterministic hostile-input suites under `tests/fuzz/` are the blocking half: they reproduce
+from a printed seed and run in every gate. The exploring half is ClusterFuzzLite
+(`.github/workflows/fuzz.yml`, advisory — never a required check, never `continue-on-error`):
+the nine targets under `fuzz/` (argv, config, manifest, annotations, layout, pages, pdfdate, url,
+font-file) reach the CLI's parsers through `#fuzz-surface` (`fuzz/surface.ts`), which tsup
+bundles with the engine into `fuzz/.build/` for the container and vitest aliases to the source
+file here. `tests/fuzz/targets.test.ts` runs every target on the seeded corpus
+(`tests/fuzz/_fuzz-seeds.ts`), truncated and mutated, and proves each one rethrows a planted
+engine error. The fuzzing engine (Jazzer.js) lives only in `.clusterfuzzlite/engine/`, pinned by
+its own lockfile; it is never a dependency of the package, and `files` never ships `fuzz/`. A
+new target is a file in `fuzz/`, a seed list in `_fuzz-seeds.ts`, a line in
+`.clusterfuzzlite/build.sh` — the test fails until all three agree.
 
 ## Samples and the byte baseline
 
@@ -117,12 +150,13 @@ encrypted and signed output through a canonical projection (`ENCRYPTED_SAMPLES` 
 The CLI's PDF/A claims are checked against the official reference validator,
 [veraPDF](https://verapdf.org). `npm run corpus:pdfa` drives the **built** CLI
 (`scripts/generate-pdfa-corpus.ts`, corpus table in `scripts/lib/pdfa-corpus.ts`) to write
-22 files to `test-output/pdfa/` — 18 claiming PDF/A (renders at all four levels 1b / 2b /
+25 files to `test-output/pdfa/` — 20 claiming PDF/A (renders at all four levels 1b / 2b /
 2u / 3b, a PDF/A-3b XML attachment, header/footer templates, `--outline auto`, an opaque
 watermark, a `--variant table` render with embedded fonts, an AcroForm, a Gray and a CMYK
-output intent, an incremental PAdES signature over a claiming file and an incremental
-`metadata` update) and 4 claiming PDF/X-4 (a CMYK and a Gray print render, a signed print
-render and a negative canary broken by `annotate`). The corpus is
+output intent, an incremental PAdES signature over a claiming file, an incremental
+`metadata` update, a JPEG 2000 image under PDF/A-2b and the PDF/A-2b + PDF/X-4 dual claim)
+and 6 claiming PDF/X-4 (a CMYK and a Gray print render, a signed print render, a spot-colour
+render, the dual claim and a negative canary broken by `annotate`). The corpus is
 reproducible: pinned dates, the committed test key pair, a per-file SHA-256 in `manifest.json`.
 
 `npm run validate:pdfa` (`scripts/validate-pdfa.ts`, pure core in `scripts/lib/verapdf.ts`)
@@ -288,6 +322,12 @@ docs/                      # KNOWLEDGE_BASE.md, AGENT_CONTRACT.md, assets/ecosys
   nothing of that is a runtime dependency.
 - Agents never push, tag, open PRs or publish (`.github/AGENT_RULES.md`; enforced in Claude
   Code by `.claude/hooks/guard.mjs`).
+- Every action in `.github/workflows/` is pinned to a commit SHA with its version in a trailing
+  comment, one SHA per action across the tree. Resolve a new pin read-only, never from a
+  floating tag: `gh api repos/<owner>/<repo>/git/ref/tags/<version> --jq .object.sha` (an
+  annotated tag points at a tag object — follow it with `git/tags/<sha> --jq .object.sha`);
+  `tests/tools/workflows.test.ts` holds the invariants and `workflow lint` (zizmor, actionlint)
+  checks every pull request.
 
 ## Pull Request Checklist
 
@@ -345,12 +385,14 @@ agent) and **merged, tagged and published by the maintainer only**:
    audit ledger, what actually ran, backward compatibility, out of scope, self-review). The
    per-version bodies are committed — they are the auditable record of what each release
    claimed and what was run — and every figure in them comes from a command, never from memory.
-6. **Maintainer:** push the branch, open the PR with that body, wait for `ci (22)`, `ci (24)`
-   and `sample-regression` (required by `.github/rulesets/main.json`), squash-merge as
-   `release: vX.Y.Z — …`, tag `vX.Y.Z` on the merge commit, publish the GitHub Release with
-   the note as body, approve the `npm-publish` environment; `publish.yml` re-runs the publish
-   gate, publishes with provenance through Trusted Publishing, and attaches the SBOM and the
-   attestations to the release. Afterwards `npm view pdfnative-cli version` confirms the
+6. **Maintainer:** push the branch, open the PR with that body, wait for the seven required
+   checks — `ci (22)`, `ci (24)`, `windows`, `macos`, `compat-previous`, `workflow lint` and
+   `sample-regression` (`.github/rulesets/main.json`) — merge as `release: vX.Y.Z — …` (a merge
+   commit when the branch carries a commit listed in `.git-blame-ignore-revs`, a squash
+   otherwise), tag `vX.Y.Z` on the merge commit, publish the GitHub Release with the note as
+   body, approve the `npm-publish` environment; `publish.yml` refuses anything but that tag,
+   re-runs the publish gate, publishes with provenance through Trusted Publishing, and attaches
+   the SBOMs, the attestation and the Sigstore bundle to the release. Afterwards `npm view pdfnative-cli version` confirms the
    publish and the weekly `docs.yml --online` run confirms the manifest against npm.
 
 ### Bumping the engine pin
@@ -376,14 +418,19 @@ changelog must end up exercised through the CLI, or waived in writing. In the sa
 
 The rules for `main` are versioned in [.github/rulesets/main.json](.github/rulesets/main.json),
 GitHub's ruleset format: no deletion, no force-push, pull request required (single maintainer,
-so zero approvals — but every review thread resolved, stale reviews dismissed on push, squash
-merges only), and the status checks `ci (22)`, `ci (24)` and `sample-regression` required and
-up to date with `main`. `verapdf`, the Docs workflow and the other path-filtered workflows are
-deliberately **not** required: a required check that never reports leaves a pull request stuck
-on "Expected — waiting for status to be reported". For the same reason the repository Admin
-role may bypass the ruleset through a pull request only — `ci.yml` ignores documentation-only
-changes, so such a pull request has no `ci` run to wait for — never by pushing to `main`
-directly. Release tags are protected by [.github/rulesets/tags.json](.github/rulesets/tags.json)
+so zero approvals — but every review thread resolved, stale reviews dismissed on push, merge
+commits and squash merges only), and seven status checks required and up to date with `main`:
+`ci (22)` and `ci (24)` (the gate on Linux, the two LTS lines), `windows` and `macos` (the
+gate on Node 22, `windows-latest` and `macos-latest`), `compat-previous` (the previous
+release's suite), `workflow lint` (zizmor + actionlint) and `sample-regression`. The check
+name is the job's `name:` — the `ci` job names its legs through its matrix include, so
+renaming an entry means re-importing the ruleset. None of the workflows that report a required
+check carries a `paths:` filter: a required check that never reports leaves a pull request
+stuck on "Expected — waiting for status to be reported", so each decides its scope inside the
+job instead. `verapdf`, `fuzz`, `node-current` and the Docs workflow are deliberately **not**
+required: the first is path-filtered and re-run by the publish gate, the others are advisory.
+The repository Admin role may bypass the ruleset through a pull request only, never by pushing
+to `main` directly. Release tags are protected by [.github/rulesets/tags.json](.github/rulesets/tags.json)
 (`refs/tags/v*`: no deletion, no force-update, no update; creation stays with the maintainer).
 `verify:docs` (rule `ruleset-parity`) fails when a required check names no workflow job.
 

@@ -4,8 +4,8 @@
 // `render` command.
 
 import { describe, it, expect, afterEach } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { tmpName } from '../helpers/cli-harness.js';
 import * as fs from 'node:fs/promises';
 import { render } from '../../src/commands/render.js';
 import { parseArgs } from '../../src/utils/args.js';
@@ -21,7 +21,7 @@ afterEach(async () => {
 });
 
 function tmpPath(name: string): string {
-    const p = path.join(os.tmpdir(), `render-charts-${Date.now()}-${Math.random().toString(36).slice(2)}-${name}`);
+    const p = tmpName(`render-charts-${name}`);
     tmp.push(p);
     return p;
 }

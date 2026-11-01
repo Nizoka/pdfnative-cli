@@ -7,9 +7,9 @@
 // the in-process mock providers — ZERO network.
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { render } from '../../src/commands/render.js';
 import { sign } from '../../src/commands/sign.js';
 import { ltv } from '../../src/commands/ltv.js';
@@ -24,13 +24,14 @@ import {
     derSequence,
     derInteger,
 } from '../../src/core-bridge/index.js';
-import type { RsaPrivateKey } from '../../src/core-bridge/index.js';
+import type { RsaPrivateKey, PdfValue, PdfDict } from '../../src/core-bridge/index.js';
 import {
     createMockPki,
     createMockRevocationProvider,
     createMockTimestampProvider,
     toPem,
 } from '../helpers/mock-pki.js';
+import { withJsonEnvelope, tmpRoot } from '../helpers/cli-harness.js';
 
 // ── Fixtures ─────────────────────────────────────────────────────────
 
@@ -51,10 +52,14 @@ function rsaPrivateKeyPkcs1Der(key: RsaPrivateKey): Uint8Array {
 
 let dir: string;
 let signedPdf: string;
+/** The unsigned document, the signer and root PEM files (offline-material tests). */
+let unsignedPdf: string;
+let signerCertPem: string;
+let rootCertPem: string;
 
 beforeAll(async () => {
     const pki = createMockPki();
-    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ltv-test-'));
+    dir = await fs.mkdtemp(path.join(tmpRoot(), 'ltv-test-'));
 
     // PEM credentials from the mock signer (AIA/CRL URLs included).
     const keyPath = path.join(dir, 'signer-key.pem');
@@ -63,6 +68,8 @@ beforeAll(async () => {
     await fs.writeFile(keyPath, toPem('RSA PRIVATE KEY', rsaPrivateKeyPkcs1Der(pki.signerKey)), 'utf8');
     await fs.writeFile(certPath, toPem('CERTIFICATE', pki.signerCert.raw), 'utf8');
     await fs.writeFile(rootPath, toPem('CERTIFICATE', pki.rootCert.raw), 'utf8');
+    signerCertPem = certPath;
+    rootCertPem = rootPath;
 
     // Render → sign (the CMS embeds signer + root so the collector can build
     // the chain and the OCSP CertID).
@@ -75,6 +82,7 @@ beforeAll(async () => {
         'utf8',
     );
     await render(parseArgs(['--input', paramsPath, '--output', docPath]));
+    unsignedPdf = docPath;
     await sign(parseArgs([
         '--input', docPath, '--output', signedPdf,
         '--key', keyPath, '--cert', certPath, '--cert-chain', rootPath,
@@ -96,7 +104,7 @@ afterEach(() => {
 });
 
 function out(name: string): string {
-    return path.join(dir, `${Date.now()}-${Math.random().toString(36).slice(2)}-${name}`);
+    return path.join(dir, `${randomUUID()}-${name}`);
 }
 
 async function fileExists(p: string): Promise<boolean> {
@@ -217,6 +225,136 @@ describe('ltv embed', () => {
         const outPdf = out('never.pdf');
         await ltv(parseArgs(['embed', '--input', signedPdf, '--data', jsonPath, '--output', outPdf, '--dry-run']));
         expect(await fileExists(outPdf)).toBe(false);
+    });
+});
+
+// ── ltv embed — offline material (pdfnative 1.9.0 composeLtvData) ────
+
+describe('ltv embed — offline material', () => {
+    /** The OCSP response and CRL the mock responders serve, as DER files (what an operator holds on an air-gapped host). */
+    async function materialFiles(): Promise<{ readonly ocspDer: string; readonly crlDer: string }> {
+        const { data } = await collectToFile(['--prefer', 'ocsp']);
+        const ocspDer = out('response.ocsp');
+        await fs.writeFile(ocspDer, Buffer.from(data.ocspResponses[0]!, 'base64'));
+        const crl = await collectToFile(['--prefer', 'crl']);
+        const crlDer = out('list.crl');
+        await fs.writeFile(crlDer, Buffer.from(crl.data.crls[0]!, 'base64'));
+        return { ocspDer, crlDer };
+    }
+
+    /** The /DSS dictionary of a written PDF, through the engine's reader. */
+    function dss(bytes: Uint8Array): { certs: number; ocsps: number; crls: number; vri: number } {
+        const reader = openPdf(bytes);
+        const dict = reader.resolveValue(reader.getCatalog().get('DSS') as PdfValue) as PdfDict;
+        const len = (key: string): number => {
+            const value = dict.has(key) ? reader.resolveValue(dict.get(key) as PdfValue) : undefined;
+            return Array.isArray(value) ? value.length : 0;
+        };
+        const vri = dict.has('VRI') ? reader.resolveValue(dict.get('VRI') as PdfValue) as PdfDict : undefined;
+        return { certs: len('Certs'), ocsps: len('OCSPs'), crls: len('CRLs'), vri: vri === undefined ? 0 : vri.size };
+    }
+
+    it('composes the /DSS from --cert (PEM) and --ocsp (DER) with --match chain — zero network, and the envelope reports the match', async () => {
+        const { ocspDer } = await materialFiles();
+        setRevocationProvider(null);
+        const outPdf = out('offline-chain.pdf');
+        const { envelope } = await withJsonEnvelope(() => ltv(parseArgs([
+            'embed', '--input', signedPdf, '--cert', signerCertPem, '--cert', rootCertPem, '--ocsp', ocspDer, '--match', 'chain', '--output', outPdf,
+        ])));
+        expect(envelope).toMatchObject({ ok: true, command: 'ltv', mode: 'embed', match: 'chain', ocspResponses: 1, vri: 1 });
+        const bytes = new Uint8Array(await fs.readFile(outPdf));
+        expect(Buffer.from(bytes).toString('latin1')).toContain('/DSS');
+        const d = dss(bytes);
+        expect(d.ocsps).toBe(1);
+        expect(d.certs).toBeGreaterThanOrEqual(2);
+        expect(d.vri).toBe(1);
+    });
+
+    it('--match all (the default) references every item, CRL included; a DER certificate file needs no PEM armour', async () => {
+        const { ocspDer, crlDer } = await materialFiles();
+        const signerDer = out('signer.der');
+        await fs.writeFile(signerDer, Buffer.from(createMockPki().signerCert.raw));
+        setRevocationProvider(null);
+        const outPdf = out('offline-all.pdf');
+        const { envelope } = await withJsonEnvelope(() => ltv(parseArgs([
+            'embed', '--input', signedPdf, '--cert', signerDer, '--cert', rootCertPem, '--ocsp', ocspDer, '--crl', crlDer, '--output', outPdf,
+        ])));
+        expect(envelope).toMatchObject({ ok: true, match: 'all', ocspResponses: 1, crls: 1, vri: 1 });
+        const d = dss(new Uint8Array(await fs.readFile(outPdf)));
+        expect(d).toMatchObject({ ocsps: 1, crls: 1, vri: 1 });
+    });
+
+    it('--data and material are exclusive, one of them is required, and --match belongs to the material', async () => {
+        const { jsonPath } = await collectToFile();
+        await expect(ltv(parseArgs(['embed', '--input', signedPdf, '--data', jsonPath, '--cert', signerCertPem, '--output', out('x.pdf')])))
+            .rejects.toMatchObject({ exitCode: 2 });
+        await expect(ltv(parseArgs(['embed', '--input', signedPdf, '--output', out('x.pdf')])))
+            .rejects.toMatchObject({ exitCode: 2 });
+        await expect(ltv(parseArgs(['embed', '--input', signedPdf, '--data', jsonPath, '--match', 'chain', '--output', out('x.pdf')])))
+            .rejects.toMatchObject({ exitCode: 2 });
+        await expect(ltv(parseArgs(['embed', '--input', signedPdf, '--cert', signerCertPem, '--match', 'some', '--output', out('x.pdf')])))
+            .rejects.toMatchObject({ exitCode: 2 });
+    });
+
+    it('a document without a signed signature is E_INPUT (the engine\'s own refusal, transmitted)', async () => {
+        await expect(ltv(parseArgs(['embed', '--input', unsignedPdf, '--cert', signerCertPem, '--output', out('x.pdf')])))
+            .rejects.toMatchObject({ code: ErrorCode.INPUT, message: expect.stringContaining('no signed signature') });
+    });
+
+    it('a --cert file without a PEM block, and an invalid PEM block, are refused', async () => {
+        const empty = out('empty.pem');
+        await fs.writeFile(empty, '-----BEGIN NOTHING-----\n', 'utf8');
+        await expect(ltv(parseArgs(['embed', '--input', signedPdf, '--cert', empty, '--output', out('x.pdf')])))
+            .rejects.toMatchObject({ code: ErrorCode.INPUT });
+        const bad = out('bad.pem');
+        await fs.writeFile(bad, '-----BEGIN CERTIFICATE-----\n%%%\n-----END CERTIFICATE-----\n', 'utf8');
+        await expect(ltv(parseArgs(['embed', '--input', signedPdf, '--cert', bad, '--output', out('x.pdf')])))
+            .rejects.toMatchObject({ code: ErrorCode.PARSE });
+    });
+
+    it('--dry-run composes the material (counts in the envelope) and writes nothing', async () => {
+        const { ocspDer } = await materialFiles();
+        setRevocationProvider(null);
+        const outPdf = out('never-offline.pdf');
+        const { envelope } = await withJsonEnvelope(() => ltv(parseArgs([
+            'embed', '--input', signedPdf, '--cert', signerCertPem, '--ocsp', ocspDer, '--output', outPdf, '--dry-run',
+        ])));
+        expect(envelope).toMatchObject({ ok: true, dryRun: true, match: 'all', ocspResponses: 1 });
+        expect(await fileExists(outPdf)).toBe(false);
+    });
+
+    it('a PEM bundle with a textual preamble (openssl x509 -text, a PKCS#12 export) is read as PEM, not handed to the engine as DER', async () => {
+        const { ocspDer } = await materialFiles();
+        setRevocationProvider(null);
+        const pem = await fs.readFile(signerCertPem, 'utf8');
+        const preamble = 'Certificate:\n    Data:\n        Version: 3 (0x2)\n        Serial Number: 4660 (0x1234)\n        Signature Algorithm: sha256WithRSAEncryption\n        Issuer: CN = Mock Root\n';
+        expect(preamble.length).toBeGreaterThan(64);
+        const withPreamble = out('signer-text.pem');
+        await fs.writeFile(withPreamble, preamble + pem, 'utf8');
+        const outPdf = out('offline-preamble.pdf');
+        const { envelope } = await withJsonEnvelope(() => ltv(parseArgs([
+            'embed', '--input', signedPdf, '--cert', withPreamble, '--cert', rootCertPem, '--ocsp', ocspDer, '--match', 'chain', '--output', outPdf,
+        ])));
+        expect(envelope).toMatchObject({ ok: true, match: 'chain', ocspResponses: 1, vri: 1 });
+    });
+
+    it('a material file the engine cannot parse is E_PARSE with the engine\'s message, never a bare E_RUNTIME', async () => {
+        // The engine keeps unparseable material as opaque blobs; what it cannot
+        // read at all is the document itself — the parse error reaches the user
+        // with its message and the stable E_PARSE code, like every other command.
+        const notAPdf = out('not-a-pdf.bin');
+        await fs.writeFile(notAPdf, Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\ntrailer\n'));
+        await expect(ltv(parseArgs(['embed', '--input', notAPdf, '--cert', signerCertPem, '--output', out('x.pdf')])))
+            .rejects.toMatchObject({ code: ErrorCode.PARSE, message: expect.stringContaining('Failed to compose validation information: ') });
+    });
+
+    it('ltv collect and ltv add refuse the embed-only material flags instead of ignoring them', async () => {
+        for (const sub of ['collect', 'add']) {
+            for (const material of [['--cert', signerCertPem], ['--crl', out('any.crl')], ['--match', 'chain']]) {
+                await expect(ltv(parseArgs([sub, '--input', signedPdf, '--online', ...material, '--output', out('x.pdf')])))
+                    .rejects.toMatchObject({ exitCode: 2, message: expect.stringMatching(/belongs? to `ltv embed`/) });
+            }
+        }
     });
 });
 

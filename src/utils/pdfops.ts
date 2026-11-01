@@ -6,8 +6,25 @@ import { CliError, ErrorCode } from './error.js';
 import { validatePath } from './io.js';
 import type { ParsedArgs } from './args.js';
 import { getStringFlag } from './args.js';
-import { PdfPasswordError, PdfEncryptionUnsupportedError } from '../core-bridge/index.js';
-import type { EncryptionOptions } from '../core-bridge/index.js';
+import { PdfPasswordError, PdfEncryptionUnsupportedError, PdfStreamLimitError } from '../core-bridge/index.js';
+import type { EncryptionOptions, StreamErrorPolicy } from '../core-bridge/index.js';
+
+const STREAM_ERROR_POLICIES: readonly StreamErrorPolicy[] = ['limit', 'throw', 'skip'];
+
+/**
+ * Parse `--on-stream-error` (pdfnative 1.9.0 `extractText({ onStreamError })`):
+ * `limit` (default — an over-cap stream is an error, E_INPUT), `throw` (any
+ * undecodable stream is an error) or `skip` (the 1.8.0 lenience: the page
+ * is returned without that stream's text). Anything else is a usage error.
+ */
+export function parseStreamErrorPolicy(raw: string | undefined): StreamErrorPolicy | undefined {
+    if (raw === undefined) return undefined;
+    const value = raw.trim().toLowerCase();
+    if (!STREAM_ERROR_POLICIES.includes(value as StreamErrorPolicy)) {
+        throw new CliError(`Invalid --on-stream-error "${raw}". Valid: ${STREAM_ERROR_POLICIES.join(', ')}.`, 2);
+    }
+    return value as StreamErrorPolicy;
+}
 
 /**
  * Parse the optional `--max-output-size` flag (bytes). Accepts a positive
@@ -174,14 +191,26 @@ export function buildEncryptOptions(args: ParsedArgs, algoRaw: string | undefine
 /**
  * Map a value thrown by a pdfnative parse/crypto call to a {@link CliError}
  * with the correct stable error code, without leaking secrets. `context` is a
- * short human prefix (e.g. "Failed to read PDF").
+ * short human prefix (e.g. "Failed to read PDF"); `streamErrorFlag` is set by
+ * the two commands that accept `--on-stream-error` (extract-text, compare),
+ * so the remedy named for a stream over the inflate cap is one the command
+ * actually has.
  */
-export function mapPdfError(e: unknown, context: string): CliError {
+export function mapPdfError(e: unknown, context: string, options: { readonly streamErrorFlag?: boolean } = {}): CliError {
     if (e instanceof PdfPasswordError) {
         return new CliError(`${context}: ${e.message}`, 1, ErrorCode.PASSWORD);
     }
     if (e instanceof PdfEncryptionUnsupportedError) {
         return new CliError(`${context}: ${e.message}`, 1, ErrorCode.UNSUPPORTED);
+    }
+    // pdfnative 1.9.0: a content or font stream past the inflate cap (code
+    // PDF_STREAM_LIMIT). The document is well-formed — the CLI's own read caps
+    // are E_INPUT too — and the remedy is a flag, which the message names.
+    if (e instanceof PdfStreamLimitError) {
+        const remedy = options.streamErrorFlag === true
+            ? 'raise --max-inflate-size, or pass --on-stream-error skip to read the other streams'
+            : 'raise --max-inflate-size';
+        return new CliError(`${context}: ${e.message} (${remedy})`, 1, ErrorCode.INPUT);
     }
     const message = e instanceof Error ? e.message : String(e);
     return new CliError(`${context}: ${message}`, 1, ErrorCode.PARSE);

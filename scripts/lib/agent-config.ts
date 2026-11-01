@@ -341,11 +341,12 @@ export function checkPrTemplateParity(template: string | null, contributing: str
 // ── eol-lf ───────────────────────────────────────────────────────────
 
 /**
- * `'warn'` while the tree still carries CRLF blobs; flip to `'fail'` in the
- * renormalisation commit (`git add --renormalize .`, run by the maintainer
- * after `.gitattributes` gained `eol=lf`).
+ * `'fail'` since the v1.6.0 normalisation commit (listed in
+ * `.git-blame-ignore-revs`): every tracked text blob is LF, and a CRLF blob
+ * is an error, not a warning. It was `'warn'` while the tree still carried
+ * the blobs committed before `.gitattributes` gained `eol=lf`.
  */
-export const EOL_LF_MODE: 'warn' | 'fail' = 'warn';
+export const EOL_LF_MODE: 'warn' | 'fail' = 'fail';
 
 export interface EolEntry {
     readonly index: string;
@@ -374,7 +375,7 @@ export function checkEol(lsFilesEol: string, mode: 'warn' | 'fail' = EOL_LF_MODE
     if (offenders.length === 0) return [];
     const make = mode === 'fail' ? error : warning;
     return offenders.map((e) =>
-        make(e.path, `blob is ${e.index.slice(2).toUpperCase()} — .gitattributes says eol=lf; the maintainer's renormalisation commit (\`git add --renormalize .\`) rewrites it`),
+        make(e.path, `blob is ${e.index.slice(2).toUpperCase()} — .gitattributes says eol=lf; rewrite the file with LF line endings and stage it again`),
     );
 }
 

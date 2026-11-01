@@ -8,8 +8,8 @@
 # Text files are LF in the repository AND in every working copy (eol=lf), so
 # a Windows checkout produces the same bytes as CI and the sample baseline
 # (tests/regression/baselines/samples.sha256.json) does not depend on the OS.
-# Blobs committed as CRLF before this line are rewritten by the maintainer's
-# renormalisation commit; `verify:docs` (rule eol-lf) lists them until then.
+# Every tracked text blob is LF since the v1.6.0 normalisation commit listed in
+# .git-blame-ignore-revs; `verify:docs` (rule eol-lf) fails on a CRLF blob.
 * text=auto eol=lf
 
 *.pdf   binary
@@ -22,6 +22,8 @@
 *.jpg   binary
 *.jpeg  binary
 *.ico   binary
+*.jp2   binary
+*.j2k   binary
 
 # Generated files: collapsed in GitHub diffs and excluded from language stats.
 .claude/rules/*.md                              linguist-generated=true

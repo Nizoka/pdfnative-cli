@@ -7,8 +7,9 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { expect, vi } from 'vitest';
 
 import { render } from '../../src/commands/render.js';
@@ -18,17 +19,55 @@ import { openPdf } from '../../src/core-bridge/index.js';
 
 export const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
 export const SYNTHETIC_CMYK_ICC = path.join(FIXTURES, 'synthetic-cmyk.icc');
-/** A valid monochrome `prtr` profile (scripts/lib/synthetic-gray-profile.ts) — a non-CMYK PDF/X intent. */
+/** A valid monochrome `prtr` profile (pdfnative/tools buildSyntheticGrayProfile, 1.9.0) — a non-CMYK PDF/X intent. */
 export const SYNTHETIC_GRAY_ICC = path.join(FIXTURES, 'synthetic-gray.icc');
 export const RSA_KEY = path.join(FIXTURES, 'rsa-key.pem');
 export const RSA_CERT = path.join(FIXTURES, 'rsa-cert.pem');
 
-/** A fresh temp path; every path is removed by {@link cleanup}. */
+let privateTmpDir: string | null = null;
+
+/**
+ * One private directory per test process, created with mkdtemp (an
+ * unpredictable name, mode 0700) and removed at exit. Every temp file of the
+ * suites lives under it: a file created straight under `os.tmpdir()` with a
+ * guessable name is CodeQL js/insecure-temporary-file (the shared temp
+ * directory is writable by every local user).
+ */
+export function tmpRoot(): string {
+    if (privateTmpDir === null) {
+        privateTmpDir = mkdtempSync(path.join(os.tmpdir(), 'pdfcli-'));
+        const dir = privateTmpDir;
+        process.once('exit', () => {
+            try {
+                rmSync(dir, { recursive: true, force: true });
+            } catch {
+                /* the OS temp cleaner takes over */
+            }
+        });
+    }
+    return privateTmpDir;
+}
+
+/**
+ * A unique path under {@link tmpRoot}, keeping the extension of `name`
+ * (`notes.json` → `notes-<pid>-<uuid>.json`). The entropy comes from
+ * node:crypto (randomUUID), never Math.random: CodeQL traces every value a
+ * test derives from a weak generator into the command it drives (a password
+ * flag, an owner password), which is a finding on the CLI for a cause in the
+ * tests. One helper, so no suite reintroduces either finding; never
+ * `path.join(os.tmpdir(), …)` in a suite.
+ */
+export function tmpName(name: string): string {
+    const ext = path.extname(name);
+    const stem = ext === '' ? name : name.slice(0, -ext.length);
+    return path.join(tmpRoot(), `${stem}-${process.pid}-${randomUUID()}${ext}`);
+}
+
 export class TempFiles {
     private readonly paths: string[] = [];
 
     path(name: string): string {
-        const p = path.join(os.tmpdir(), `pdfcli-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}-${name}`);
+        const p = tmpName(`pdfcli-${name}`);
         this.paths.push(p);
         return p;
     }

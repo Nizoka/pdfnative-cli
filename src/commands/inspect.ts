@@ -1,4 +1,4 @@
-import { openPdf, validatePdfUA, validatePdfX, isStream, readFormFields, listSignatures, nameValue } from '../core-bridge/index.js';
+import { openPdf, validatePdfUA, validatePdfX, isStream, readFormFields, listSignatures, nameValue, decodePdfTextString } from '../core-bridge/index.js';
 import type { PdfReader, PdfUAValidationResult, PdfXValidationResult, PageLabelRange, ParsedAnnotation, PdfEncryptionInfo, PdfSignatureInfo, PdfDict } from '../core-bridge/index.js';
 import { type ParsedArgs, getStringFlag, getStringFlagAll, hasFlag } from '../utils/args.js';
 import { readFileOrStdin } from '../utils/io.js';
@@ -7,7 +7,6 @@ import { isJsonMode } from '../utils/agent.js';
 import { selectFields, serializeJson, parseFieldList } from '../utils/projection.js';
 import { resolveSourcePassword, mapPdfError } from '../utils/pdfops.js';
 import { pdfDateToIso } from '../utils/pdfdate.js';
-import { decodePdfTextString } from '../utils/pdftext.js';
 
 /** `--check` assertions; `pdfx` (structural PDF/X-4, pdfnative 1.8.0) since v1.5.0. */
 const VALID_CHECKS = new Set(['pdfa', 'signed', 'encrypted', 'pdfua', 'pdfx']);
@@ -470,7 +469,9 @@ export async function inspect(args: ParsedArgs): Promise<void> {
     const includeEncryption = hasFlag(args.flags, 'encryption');
     const includeSignatures = hasFlag(args.flags, 'signatures');
     const password = resolveSourcePassword(args.flags);
-    const checks = getStringFlagAll(args.flags, 'check');
+    // Repeatable, and (v1.6.0) a comma list: `--check pdfa,pdfx` is the documented
+    // form of the dual claim. An empty piece ("pdfa,") stays and is refused below.
+    const checks = getStringFlagAll(args.flags, 'check').flatMap((c) => c.split(',')).map((c) => c.trim());
     const includePdfua = hasFlag(args.flags, 'pdfua') || checks.includes('pdfua');
     const includePdfx = hasFlag(args.flags, 'pdfx') || checks.includes('pdfx');
     // v1.5.0: normalise /Info dates (D:YYYYMMDDHHmmSS+HH'mm') to ISO 8601.

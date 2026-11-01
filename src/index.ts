@@ -134,14 +134,24 @@ outputIntent objects merge one level deep instead of replacing each other):
   --margin        Uniform N or "top,right,bottom,left" in points
   --compress      Enable Flate compression (initialises Node compression)
   --max-blocks    Max document blocks before pdfnative aborts (default 100000)
+  --direction     auto|ltr|rtl — base text direction of every paragraph
+                  (full UAX #9, pdfnative 1.9.0): "auto" aligns right-to-left
+                  paragraphs to the right and justifies them in visual order;
+                  a paragraph block's own "direction" wins
+  --actual-text   [true|false] untagged shaped and right-to-left runs carry
+                  their logical text as /Span /ActualText (pdfnative 1.9.0),
+                  so extract-text returns the source string; false restores
+                  the bare 1.8.0 runs
 
-Conformance (one claim per file — --tagged and --pdfx are mutually exclusive):
+Conformance (PDF/A-2b or 2u and PDF/X-4 may be claimed together since
+pdfnative 1.9.0; PDF/A-1b and 3b with --pdfx are refused by the engine, E_INPUT):
   --tagged        none|pdfa1b|pdfa2b|pdfa2u|pdfa3b (PDF/A claim)
   --pdfx [pdfx4]  PDF/X-4 claim (ISO 15930-7; pdfnative 1.8.0). Needs an
                   output (printer) ICC profile, every font embedded (--font
                   latin --lang latin), metadata.trapped True|False and a
                   TrimBox or ArtBox per page. Forbids encryption. Check the
-                  result with \`pdfnative inspect --check pdfx\`.
+                  result with \`pdfnative inspect --check pdfx\` (and
+                  --check pdfa,pdfx for the dual claim).
   --output-intent-icc <file.icc>
                   ICC profile for layout.outputIntent (RGB, CMYK or Gray;
                   \`prtr\` class for PDF/X-4; validated by the engine; 16 MB
@@ -155,11 +165,18 @@ Conformance (one claim per file — --tagged and --pdfx are mutually exclusive):
                   PDFA_UNEMBEDDED_FORM_FONT, PDFA_DEVICE_CMYK_IMAGE,
                   PDFA_DEVICE_CMYK_CONTENT, PDFA_ICC_PROFILE_VERSION,
                   PDFX_NO_FONT_ENTRIES, PDFX_DEVICE_CMYK, PDFX_ANNOTATIONS,
-                  TYPOGRAPHY_FEATURE_INEFFECTIVE. Without it, diagnostics are
-                  stderr warnings (and a diagnostics[] array in the --json
-                  envelope). PDF/X coherence errors (layout.pdfx and
-                  layout.tagged combined, missing output profile, unknown
-                  trapping state, …) are E_INPUT.
+                  TYPOGRAPHY_FEATURE_INEFFECTIVE and, since pdfnative 1.9.0,
+                  PDFA_GLYPH_WITHOUT_UNICODE (pdfa2u: a used glyph the
+                  ToUnicode CMap cannot name), PDFA1_JPX_IMAGE (JPEG 2000
+                  under pdfa1b), PDFA_JPX_IMAGE (an opacity channel or an odd
+                  channel count under pdfa2b/3b) and TEXT_GLYPH_NOT_COVERED
+                  (a character no registered font covers — drawn as .notdef
+                  or "?"; register a covering font or replace it). Without
+                  --strict, diagnostics are stderr warnings (and a
+                  diagnostics[] array in the --json envelope). PDF/X coherence
+                  errors (layout.pdfx with pdfa1b/pdfa3b, missing output
+                  profile, unknown trapping state, an undeclared spot colour,
+                  …) are E_INPUT.
   --conformance   DEPRECATED — alias for --tagged pdfa{1b|2b|3b}
 
 Typography (pdfnative 1.8.0 layout.typography; the full option set —
@@ -183,10 +200,12 @@ Fonts:
                   of latin — combining tone marks are anchored by Noto Sans.
   --font          Register a bundled font shortcut (repeatable). The name
                   doubles as the --lang code. Allowed: latin, emoji,
-                  color-emoji, math, and the 27 script codes ar, hy, bn, ru,
+                  color-emoji, math, and the 32 script codes ar, hy, bn, ru,
                   hi, am, ka, el, he, ja, km, ko, my, pl, zh, si, ta, te, th,
                   bo, tr, vi, lo, nod, khb, tdd, cjm (Lao, Tai Tham, New Tai
-                  Lue, Tai Le and Cham since pdfnative 1.8.0).
+                  Lue, Tai Le and Cham since pdfnative 1.8.0), gu, pa, kn, ml,
+                  or (Gujarati, Gurmukhi, Kannada, Malayalam and Odia since
+                  pdfnative 1.9.0).
   --font-file <path.ttf>[:name]
                   Register a TrueType/OpenType font you ship (repeatable) and
                   embed it (added to --lang). Guarded: path checked, 32 MB
@@ -198,7 +217,10 @@ Fonts:
 Images (document blocks):
   { "type": "image", "src": "logo.png" }        path, resolved relative to the
                                                 --input JSON's directory
-  { "type": "image", "dataBase64": "…" }        inline base64 (JPEG/PNG)
+  { "type": "image", "dataBase64": "…" }        inline base64 (JPEG/PNG/JP2)
+  JPEG 2000 (.jp2 files and raw .j2k/.jpx codestreams, pdfnative 1.9.0) is
+  passed through as /JPXDecode with the colour and opacity its header
+  declares (PDF 1.5; PDFA1_JPX_IMAGE under pdfa1b).
   Print production (bleed/trimBox/artBox/marks incl. colourBars/userUnit),
   outputIntent and viewerPreferences (duplex, numCopies, printPageRange,
   pickTrayByPDFSize) are set in the --layout JSON — see
@@ -213,7 +235,7 @@ Header / Footer:
 
 Watermark:
   --watermark-text       Text watermark
-  --watermark-image      Image path (PNG/JPEG)
+  --watermark-image      Image path (PNG/JPEG/JPEG 2000)
   --watermark-opacity    0.0–1.0
   --watermark-angle      degrees (text watermark)
   --watermark-color      PdfColor (hex "#rrggbb", "r g b", CMYK "c m y k", …)
@@ -352,6 +374,8 @@ pdfnative ltv — PAdES B-LT: long-term validation data (/DSS + /VRI)
 Usage:
   pdfnative ltv collect --input signed.pdf --online [--output ltv.json]
   pdfnative ltv embed   --input signed.pdf --data ltv.json [--output out.pdf]
+  pdfnative ltv embed   --input signed.pdf --cert chain.pem --ocsp r.der [--crl c.der]
+                        [--match all|chain] [--output out.pdf]
   pdfnative ltv add     --input signed.pdf --online [--output out.pdf]
 
 Archives the certificates, OCSP responses and CRLs needed to validate the
@@ -362,8 +386,9 @@ machine, embed offline.
 Subcommands:
   collect   Fetch validation data (OCSP/CRL) and write a replayable JSON file
             (schema subject: ltv-data). REQUIRES --online.
-  embed     Embed a previously collected JSON into /DSS + /VRI. NEVER performs
-            network I/O.
+  embed     Embed a previously collected JSON into /DSS + /VRI, or compose the
+            /DSS from material you already hold (--cert/--ocsp/--crl; pdfnative
+            1.9.0). NEVER performs network I/O.
   add       collect + embed in one pass. REQUIRES --online.
 
 Options:
@@ -374,7 +399,15 @@ Options:
                    \`ltv embed\` for the offline half.
   --prefer         ocsp (default) | crl — preferred revocation source
   --extra-cert     PEM file with extra chain certificates (repeatable)
-  --data           Collected JSON file (embed mode, required)
+  --data           Collected JSON file (embed mode; or the material below)
+  --cert <file>    Offline material (embed): a certificate — PEM bundle or
+                   DER (repeatable): signer chains, TSA and OCSP responders
+  --ocsp <file>    Offline material (embed): a DER OCSPResponse (repeatable)
+  --crl <file>     Offline material (embed): a DER CRL (repeatable)
+  --match          all (default) | chain — all: every item is referenced from
+                   every signature's VRI (the Adobe-tolerant superset);
+                   chain: each VRI references only what validates that
+                   signature; unmatched material still ships in /DSS
   --timeout        Network timeout in ms (default: 10000)
   --dry-run        Validate inputs; no output, no network
   --help,    -h    Show this help message
@@ -382,6 +415,7 @@ Options:
 Typical PAdES ladder:
   sign --timestamp <tsa> --profile pades   →  B-T
   ltv add --online                         →  B-LT
+  (air-gapped: ltv embed --cert … --ocsp … --crl … from files you hold)
   doc-timestamp --url <tsa>                →  B-LTA
   ltv add --online                         →  LTV for the doc-timestamp itself
 `;
@@ -463,6 +497,9 @@ Options:
   --pages              1-based selector limiting the text diff (e.g. "1,3-5")
   --password-a         Password for the first PDF
   --password-b         Password for the second PDF
+  --on-stream-error    limit (default) | throw | skip — an over-cap or
+                       undecodable stream in either PDF is E_INPUT (limit /
+                       throw) or read as empty text (skip); pdfnative 1.9.0
   --pretty             Force indented JSON even under --json
   --help,    -h        Show this help message
 `;
@@ -495,9 +532,9 @@ Options:
                   PDF date string (D:YYYYMMDDHHmmSS+HH'mm') to ISO 8601
   --signatures    List signature fields (fieldName, subFilter, byteRange,
                   isDocTimestamp, isPlaceholder — never the signature bytes)
-  --check         Assert a property; repeatable; AND semantics; exits 1 on
-                  failure. Values: pdfa | signed | encrypted | pdfua | pdfx |
-                  "signatures>=N"
+  --check         Assert a property; repeatable or a comma list (--check
+                  pdfa,pdfx); AND semantics; exits 1 on failure. Values:
+                  pdfa | signed | encrypted | pdfua | pdfx | "signatures>=N"
   --summary       Emit only the minimal verdict { pages, encrypted, signatures, pdfa, pdfx }
   --fields        Comma-separated dot-paths to keep (e.g. pageCount,metadata.title)
   --pretty        Force indented JSON even under --json (agent mode is compact)
@@ -657,6 +694,12 @@ Options:
   --runs          Include positioned text runs { text, x, y, fontSize, fontName }
   --password      Password for an encrypted PDF (env: PDFNATIVE_PASSWORD)
   --max-length    Hard cap on total characters (default 16000000; 0/none off)
+  --on-stream-error
+                  limit (default) | throw | skip — what an undecodable content
+                  or font stream does (pdfnative 1.9.0): limit fails with
+                  E_INPUT when a stream exceeds --max-inflate-size, throw fails
+                  on any undecodable stream, skip returns the page without that
+                  stream's text (the 1.8.0 lenience)
   --summary       (json) Emit only { pages, characters }
   --fields        (json) Comma-separated dot-paths to keep
   --pretty        Force indented JSON even under --json
@@ -752,7 +795,7 @@ Usage:
 
 Reports the CLI version, Node version, Web Crypto (CSPRNG) availability — which
 \`encrypt\` requires — the resolved pdfnative version, the registered command
-count, the bundled font inventory (31 modules / 27 scripts, each probed on
+count, the bundled font inventory (36 modules / 32 scripts, each probed on
 disk), the Universal Shaping Engine's Unicode version and the conformance
 targets (--tagged / --pdfx). Fully offline. Exit code 0 when all checks pass,
 1 otherwise.

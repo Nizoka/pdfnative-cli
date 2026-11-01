@@ -33,7 +33,7 @@ pdfnative-cli is the official terminal wrapper of the pdfnative engine: 21 comma
 |---|---|---|
 | Fast — before every commit | `npm run gate:fast` | typecheck:all, lint, test, verify:docs |
 | CI — the default | `npm run gate` | typecheck:all, lint, build, dist-check, smoke, bundle-size, bundle-check, test:generate, test:coverage, verify:docs, verify:samples, corpus:pdfa, validate:pdfx — build and samples precede the tests |
-| Publish — release branches | `npx tsx scripts/gate.ts --publish --require-all` | everything, incl. validate:pdfa (veraPDF; `--require-all` fails on a skip) |
+| Publish — release branches | `npx tsx scripts/gate.ts --publish --require-all` | everything, incl. validate:pdfa (veraPDF) and compat:previous (the v-previous suite; `--require-all` fails on a skip) |
 
 PowerShell swallows a bare `--`, so pass flags by calling the script: `npx tsx scripts/gate.ts --fast`, `--only <step>`, `--json`.
 One suite: `npx vitest run tests/<path>.test.ts` (dot reporter). Smoke-test the **built** CLI (`node dist/cli.cjs …`) before claiming a change works.
@@ -46,8 +46,8 @@ One suite: `npx vitest run tests/<path>.test.ts` (dot reporter). Smoke-test the 
 | `src/commands/` | One file per command; `completion.ts` = COMMANDS/flags table (completions + capability manifest); `schema.ts` = 19 subjects | `commands.instructions.md` |
 | `src/utils/` | args/argv, io, error codes, envelopes, projection, layout (PDF/X, typography), fonts, reproducible dates, build errors, PKI, fetch-guard | `commands.instructions.md` |
 | `src/core-bridge/index.ts` | The single `pdfnative` import point (selective re-exports, `pdfnative/tools` included) | `copilot-instructions.md` |
-| `scripts/` | gate, sample generator (`generators/`, `helpers/`, `lib/`), baseline, conformance corpus + validators, verify-docs, release-prepare | `testing.instructions.md` |
-| `tests/` | vitest: `commands/`, `utils/`, `integration/`, `tools/`, `regression/` (sample baseline, engine-surface matrix), `fuzz/` (hostile input), `docs/`; `helpers/`, `fixtures/` | `testing.instructions.md` |
+| `scripts/` | gate, sample generator (`generators/`, `helpers/`, `lib/`), baseline, conformance corpus + validators, verify-docs, release-prepare, run-compat (the previous release's suite) | `testing.instructions.md` |
+| `tests/` | vitest: `commands/`, `utils/`, `integration/`, `tools/`, `regression/` (baseline, engine matrix), `fuzz/` (+ the `fuzz/` targets), `compat/` (previous release), `docs/`; `helpers/`, `fixtures/` | `testing.instructions.md` |
 | `samples/` | Runnable dual-shell demos (`.sh` + `.ps1`, one pair per feature) and the JSON documents the generator renders | `samples/README.md` |
 | `docs/` | `KNOWLEDGE_BASE.md` (deep reference), `AGENT_CONTRACT.md` (consumer contract), `assets/ecosystem.json` (every count and version) | — |
 
@@ -89,9 +89,9 @@ Adding or changing a command touches ALL of these (`verify:docs` rules `command-
 
 ## Counts and versions
 
-21 commands, 19 subjects, 12 stable error codes, 10 global flags, 27 Unicode scripts (31 font modules), 1403 tests, 91 sample PDFs in the baseline, 22 corpus files.
+21 commands, 19 subjects, 12 stable error codes, 10 global flags, 32 Unicode scripts (36 font modules), 1555 tests, 99 sample PDFs in the baseline, 25 corpus files.
 `docs/assets/ecosystem.json` is the source of every count and version quoted in the docs; run `npm run verify:docs` after touching any of them.
-Coverage: ≥ 82 % statements enforced by CI (the thresholds live once in `vitest.config.ts`). Engine: pdfnative 1.8.0 (`^1.8.0`); Node ≥ 22.
+Coverage: ≥ 82 % statements enforced by CI (the thresholds live once in `vitest.config.ts`). Engine: pdfnative 1.9.0 (`^1.9.0`); Node ≥ 22 (the gate is required on Ubuntu 22/24, Windows and macOS).
 
 ## Releasing
 

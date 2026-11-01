@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { tmpName, tmpRoot } from '../helpers/cli-harness.js';
 import * as fs from 'node:fs/promises';
 import * as zlib from 'node:zlib';
 import { render } from '../../src/commands/render.js';
@@ -17,7 +17,7 @@ afterEach(async () => {
 });
 
 function tmpPath(name: string): string {
-    const p = path.join(os.tmpdir(), `render12-${Date.now()}-${Math.random().toString(36).slice(2)}-${name}`);
+    const p = tmpName(`render12-${name}`);
     tmp.push(p);
     return p;
 }
@@ -418,7 +418,7 @@ describe('render image blocks — src / dataBase64 resolution', () => {
     });
 
     it('resolves a relative src against the --input file directory', async () => {
-        const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'render-img-src-'));
+        const dir = await fs.mkdtemp(path.join(tmpRoot(), 'render-img-src-'));
         tmp.push(dir);
         await fs.writeFile(path.join(dir, 'pixel.png'), makePng1x1());
         const input = path.join(dir, 'doc.json');
@@ -481,9 +481,11 @@ describe('render --chunk-size', () => {
         ]);
         const buffered = tmpPath('buf.pdf');
         const chunked = tmpPath('chunked.pdf');
-        await render(parseArgs(['--input', input, '--output', buffered]));
+        // Pinned: two renders straddling a second boundary differ in /CreationDate (a flake, not a parity failure).
+        const pinned = ['--creation-date', '2026-01-01T00:00:00Z'];
+        await render(parseArgs(['--input', input, '--output', buffered, ...pinned]));
         await render(parseArgs([
-            '--input', input, '--output', chunked, '--stream', '--chunk-size', '512',
+            '--input', input, '--output', chunked, '--stream', '--chunk-size', '512', ...pinned,
         ]));
         const a = await fs.readFile(buffered);
         const b = await fs.readFile(chunked);

@@ -1,0 +1,115 @@
+{
+  "title": "Gujarati, Punjabi, Kannada, Malayalam & Odia — five more Indic scripts",
+  "metadata": {
+    "author": "pdfnative-cli samples",
+    "subject": "The five scripts pdfnative 1.9.0 adds to its Indic engine: reph, subjoined and half forms, two-part vowel signs, chillus, the danda (demonstration content)",
+    "keywords": "gujarati, gurmukhi, punjabi, kannada, malayalam, odia, oriya, indic, opentype, shaping"
+  },
+  "blocks": [
+    {
+      "type": "heading",
+      "text": "Gujarati, Punjabi, Kannada, Malayalam & Odia — five more Indic scripts",
+      "level": 1
+    },
+    {
+      "type": "paragraph",
+      "text": "Rendered with --font gu --font pa --font kn --font ml --font or --font latin --lang gu,pa,kn,ml,or,latin. pdfnative 1.9.0 routes these five scripts through its Indic engine (32 scripts in all): Kannada vowel signs precede the subjoined consonants, a legacy Malayalam chillu (consonant + virama + ZWJ) draws the chillu glyph, every part of a two-part vowel sign names its code point, and a sentence-final danda keeps an Odia or Gurmukhi line on its own shaper. Untagged output carries each reordered run as /ActualText, so extract-text returns the source text without --tagged."
+    },
+    {
+      "type": "heading",
+      "text": "Gujarati (gu) — ગુજરાતી",
+      "level": 2
+    },
+    {
+      "type": "table",
+      "headers": ["What the row exercises", "Sample"],
+      "rows": [
+        { "cells": ["Reph", "ધર્મ કર્મ અર્થ સૂર્ય"], "type": "normal", "pointed": false },
+        { "cells": ["Conjuncts", "પ્રશ્ન વિદ્યા શક્તિ"], "type": "normal", "pointed": false },
+        { "cells": ["Rakar", "પ્રેમ ગ્રામ ક્રમ"], "type": "normal", "pointed": false },
+        { "cells": ["i-matra reordered", "કિતાબ વિકાસ દિવસ"], "type": "normal", "pointed": false },
+        { "cells": ["Above vowel signs", "કેમ તૈયાર ઘોડો મૌસમ"], "type": "normal", "pointed": false },
+        { "cells": ["Below vowel signs", "પુસ્તક ગુરુ મૂળ રૂપ"], "type": "normal", "pointed": false }
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Punjabi (pa) — ਪੰਜਾਬੀ",
+      "level": 2
+    },
+    {
+      "type": "table",
+      "headers": ["What the row exercises", "Sample"],
+      "rows": [
+        { "cells": ["Subjoined consonants", "ਪ੍ਰੇਮ ਸ੍ਵਰ ਚਿੰਨ੍ਹ"], "type": "normal", "pointed": false },
+        { "cells": ["Addak", "ਪੱਕਾ ਸੱਚ ਇੱਕ ਵਿੱਚ"], "type": "normal", "pointed": false },
+        { "cells": ["Bindi and tippi", "ਪੰਜਾਬੀ ਸਿੰਘ ਕਾਂ ਨੂੰ"], "type": "normal", "pointed": false },
+        { "cells": ["Sihari reordered", "ਸਿੱਖ ਕਿਤਾਬ ਦਿਨ"], "type": "normal", "pointed": false },
+        { "cells": ["Above vowel signs", "ਮੇਰਾ ਹੈ ਸੋਹਣਾ ਕੌਰ"], "type": "normal", "pointed": false },
+        { "cells": ["Below vowel signs", "ਗੁਰੂ ਪੁੱਤਰ ਸੂਰਜ"], "type": "normal", "pointed": false },
+        { "cells": ["Sentence-final danda", "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ।"], "type": "normal", "pointed": false }
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Kannada (kn) — ಕನ್ನಡ",
+      "level": 2
+    },
+    {
+      "type": "table",
+      "headers": ["What the row exercises", "Sample"],
+      "rows": [
+        { "cells": ["Vowel signs", "ಕನ್ನಡ ವಿದ್ಯಾ ಪುಸ್ತಕ"], "type": "normal", "pointed": false },
+        { "cells": ["Conjuncts", "ಸ್ತ್ರೀ ಕ್ಷ ರಾಷ್ಟ್ರ"], "type": "normal", "pointed": false },
+        { "cells": ["Reph", "ಕರ್ನಾಟಕ ಧರ್ಮ ಸೂರ್ಯ"], "type": "normal", "pointed": false },
+        { "cells": ["Two-part vowel signs", "ಹೋಗು ಕೈ ಬೇಕು ನೀರು"], "type": "normal", "pointed": false },
+        { "cells": ["Vowel signs before the subjoined consonants", "ಕ್ಕಿ ಸ್ತ್ರೀ ಪ್ರೀತಿ"], "type": "normal", "pointed": false },
+        { "cells": ["Below vowel signs", "ಗುರು ಮೂರು ಹೂವು"], "type": "normal", "pointed": false }
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Malayalam (ml) — മലയാളം",
+      "level": 2
+    },
+    {
+      "type": "table",
+      "headers": ["What the row exercises", "Sample"],
+      "rows": [
+        { "cells": ["Atomic chillus", "അവൻ കാൽ അവർ അവൾ"], "type": "normal", "pointed": false },
+        { "cells": ["Conjuncts", "പുസ്തകം ക്ഷമ കഷ്ടം"], "type": "normal", "pointed": false },
+        { "cells": ["Reph and rakar", "പ്രകാശം ക്രമം സ്ത്രീ"], "type": "normal", "pointed": false },
+        { "cells": ["Subjoined forms", "വിദ്യ സ്വന്തം ദിവ്യ"], "type": "normal", "pointed": false },
+        { "cells": ["Two-part vowel signs", "കോഴി പോയി കൊച്ചി"], "type": "normal", "pointed": false },
+        { "cells": ["Pre-base vowel signs", "കേരളം കൈ വെള്ളം"], "type": "normal", "pointed": false }
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Odia (or) — ଓଡ଼ିଆ",
+      "level": 2
+    },
+    {
+      "type": "table",
+      "headers": ["What the row exercises", "Sample"],
+      "rows": [
+        { "cells": ["Subjoined consonants", "ବିଦ୍ୟା ସ୍ୱର ସତ୍ୟ"], "type": "normal", "pointed": false },
+        { "cells": ["Reph", "ଧର୍ମ କର୍ମ ଅର୍ଥ"], "type": "normal", "pointed": false },
+        { "cells": ["Two-part vowel signs", "ଗୋଟିଏ ଲୋକ ପୌଷ ବୈଠକ"], "type": "normal", "pointed": false },
+        { "cells": ["Pre-base vowel signs", "ଦେଶ ମେଘ ଦେଖ"], "type": "normal", "pointed": false },
+        { "cells": ["Below vowel signs", "ଦିନ ନୀଳ ଗୁରୁ ମୂଳ"], "type": "normal", "pointed": false },
+        { "cells": ["Nukta", "ଓଡ଼ିଆ ପଢ଼ା ବଡ଼"], "type": "normal", "pointed": false },
+        { "cells": ["Sentence-final danda", "ଶିରୋନାମା ଗୋଟିଏ ।"], "type": "normal", "pointed": false }
+      ]
+    },
+    {
+      "type": "list",
+      "style": "bullet",
+      "items": [
+        "Five Noto Sans modules, loaded by their language codes gu, pa, kn, ml, or",
+        "HarfBuzz-referenced Indic configuration rows (reph mode, pre-base vowel placement)",
+        "Logical-order extraction without --tagged (pdfnative 1.9.0 /ActualText)"
+      ]
+    }
+  ]
+}

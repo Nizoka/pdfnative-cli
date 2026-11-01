@@ -1,6 +1,6 @@
 ---
 description: "Use when writing tests, adding test coverage, or debugging test failures in pdfnative-cli. Covers the vitest suites, the CLI test harness, the built-binary and sample-baseline gates, timezone pinning and coverage thresholds."
-applyTo: "tests/**,vitest.config.ts,scripts/generators/**,scripts/lib/sample-plan.ts,scripts/lib/sample-fingerprint.ts"
+applyTo: "tests/**,fuzz/**,vitest.config.ts,scripts/generators/**,scripts/lib/sample-plan.ts,scripts/lib/sample-fingerprint.ts,scripts/run-compat.ts"
 ---
 # Testing
 
@@ -15,7 +15,9 @@ applyTo: "tests/**,vitest.config.ts,scripts/generators/**,scripts/lib/sample-pla
   bundle-probe, release-prepare, guard, workflows), `tests/regression/` (the sample baseline,
   `runIf` on `test-output/samples/`), `tests/fuzz/` (hostile input over `tests/helpers/fuzz.ts`:
   seeded PRNG, "only a CliError with a stable code" invariant, PDF byte builders past the engine
-  limits), `tests/docs/` (English-only prose scan). The two `runIf` suites skip in a plain
+  limits; `targets.test.ts` runs the ClusterFuzzLite targets of `fuzz/` on the seeded corpus of
+  `_fuzz-seeds.ts`), `tests/compat/` (no tests: the previous release's `schema` captures and
+  the allow-list of `npm run compat:previous`), `tests/docs/` (English-only prose scan). The two `runIf` suites skip in a plain
   local run only: the gate's ci / publish profiles build and generate the samples first and
   set `GATE_REQUIRE_ARTIFACTS=1`, under which a missing input fails the file instead of
   skipping it.
@@ -42,6 +44,19 @@ applyTo: "tests/**,vitest.config.ts,scripts/generators/**,scripts/lib/sample-pla
   (`buildObjectsPdf`, `patchBytes` in `tests/helpers/fuzz.ts`) and holds the command output to
   the bridge call on the same bytes.
 
+## The previous release
+
+- `npm run compat:previous` (`scripts/run-compat.ts`) replays the previous release's suite, as
+  tagged, against the current `src/`; a file that cannot pass goes in
+  `tests/compat/allow-<previous>.json` with a reason and, for a behaviour change, the release
+  note's ledger entry (`C1`…). Never edit the archived suite; never exclude a file to hide a
+  regression. `tests/tools/manifest-compat.test.ts` holds the previous `schema manifest`,
+  `status` and `list` captures: a flag, code, subject or envelope field is never removed.
+- A fuzz target (`fuzz/<name>.js`) imports only `#fuzz-surface` and `./_contract.js`, swallows
+  only a `CliError` / `FetchGuardError`, and needs a seed list in `tests/fuzz/_fuzz-seeds.ts`
+  plus a `compile_javascript_fuzzer` line in `.clusterfuzzlite/build.sh`; a parser it needs
+  becomes a pure export of `src/` (`parseConfigText`, `parseFetchUrl`), never a copy.
+
 ## Command test pattern
 
 1. Use `tests/helpers/cli-harness.ts`: `TempFiles` for temp inputs/outputs (cleaned in
@@ -51,6 +66,11 @@ applyTo: "tests/**,vitest.config.ts,scripts/generators/**,scripts/lib/sample-pla
    `pageCount` / `expectCliError`, and the `MINIMAL_DOC`, `SYNTHETIC_CMYK_ICC`,
    `SYNTHETIC_GRAY_ICC` fixtures. Under `captured()` the mocked stdout never calls a write
    callback back: a command that writes its ARTEFACT to stdout hangs — give it `--output`.
+   Every temp file comes from `tmpName()` / `TempFiles` (the extension kept) and every temp
+   directory from `mkdtemp` under `tmpRoot()` — the harness holds the only `os.tmpdir()` call
+   in the tree, and no suite passes a `/tmp/…` literal to a command: a guessable name under
+   the shared temp directory is CodeQL `js/insecure-temporary-file`, and the flow reaches
+   `writeOutput` / `readBinaryFileCapped` in `src/`.
 2. Drive commands through `parseArgs([...])`, e.g. `await render(parseArgs(['--input', tmpIn]))`.
 3. Test error paths with `await expect(fn(...)).rejects.toBeInstanceOf(CliError)` and assert
    `.exitCode` and `.code` (the stable `E_*` value).

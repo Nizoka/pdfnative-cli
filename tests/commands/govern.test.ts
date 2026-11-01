@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { tmpName } from '../helpers/cli-harness.js';
 import * as fs from 'node:fs/promises';
 import { govern } from '../../src/commands/govern.js';
 import { parseArgs } from '../../src/utils/args.js';
@@ -22,7 +22,7 @@ function capture(): { calls: string[]; restore: () => void } {
 }
 
 async function draft(content: string): Promise<string> {
-    const p = path.join(os.tmpdir(), `draft-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
+    const p = tmpName('draft.md');
     tmp.push(p);
     await fs.writeFile(p, content, 'utf8');
     return p;

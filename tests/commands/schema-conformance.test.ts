@@ -44,24 +44,29 @@ describe('schema (v1.5.0 shapes)', () => {
         expect(doc.required).toEqual(['pages', 'encrypted', 'signatures', 'pdfa', 'pdfx']);
     });
 
-    it('status pins the additive pdfx, creationDate and timestamp.timeoutMs fields and the nine diagnostic codes', async () => {
+    it('status pins the additive pdfx, tagged, direction, actualText, creationDate and timestamp.timeoutMs fields and the thirteen diagnostic codes', async () => {
         const doc = await subject('status');
         expect(props(doc, 'properties', 'pdfx').enum).toEqual(['pdfx4']);
+        expect(props(doc, 'properties', 'tagged').enum).toEqual(['pdfa1b', 'pdfa2b', 'pdfa2u', 'pdfa3b']);
+        expect(props(doc, 'properties', 'direction').enum).toEqual(['auto', 'ltr', 'rtl']);
+        expect(props(doc, 'properties', 'actualText').type).toBe('boolean');
         expect(props(doc, 'properties', 'creationDate').format).toBe('date-time');
         expect(props(doc, 'properties', 'timestamp', 'properties')).toHaveProperty('timeoutMs');
         const description = String(props(doc, 'properties', 'diagnostics').description);
-        for (const code of ['PDFA_NO_FONT_ENTRIES', 'PDFA_UNEMBEDDED_FORM_FONT', 'PDFA_DEVICE_CMYK_IMAGE', 'PDFA_DEVICE_CMYK_CONTENT', 'PDFA_ICC_PROFILE_VERSION', 'PDFX_NO_FONT_ENTRIES', 'PDFX_DEVICE_CMYK', 'PDFX_ANNOTATIONS', 'TYPOGRAPHY_FEATURE_INEFFECTIVE']) {
+        for (const code of ['PDFA_NO_FONT_ENTRIES', 'PDFA_UNEMBEDDED_FORM_FONT', 'PDFA_DEVICE_CMYK_IMAGE', 'PDFA_DEVICE_CMYK_CONTENT', 'PDFA_ICC_PROFILE_VERSION', 'PDFX_NO_FONT_ENTRIES', 'PDFX_DEVICE_CMYK', 'PDFX_ANNOTATIONS', 'TYPOGRAPHY_FEATURE_INEFFECTIVE', 'PDFA_GLYPH_WITHOUT_UNICODE', 'PDFA1_JPX_IMAGE', 'PDFA_JPX_IMAGE', 'TEXT_GLYPH_NOT_COVERED']) {
             expect(description).toContain(code);
         }
     });
 
-    it('render documents typography, pdfx, colourBars, creationDate, CMYK colours and the 27 scripts', async () => {
+    it('render documents typography, pdfx, colourBars, creationDate, CMYK and spot colours, direction, JPEG 2000 and the 32 scripts', async () => {
         const doc = await subject('render');
         const document = (doc.oneOf as Doc[])[0] as Doc;
         const layout = String(props(document, 'properties', 'layout').description);
-        for (const token of ['typography', 'pdfx', 'colourBars', 'creationDate', 'hyphenationLanguage', 'punctuationSpacing']) expect(layout).toContain(token);
-        expect(String(props(document, 'properties', 'blocks').description)).toContain('[c, m, y, k]');
+        for (const token of ['typography', 'pdfx', 'colourBars', 'creationDate', 'hyphenationLanguage', 'punctuationSpacing', 'spotColours', 'direction', 'actualText', 'pdfa2u']) expect(layout).toContain(token);
+        const blocks = String(props(document, 'properties', 'blocks').description);
+        for (const token of ['[c, m, y, k]', '{spot', '{inks', 'JPEG 2000', '/JPXDecode', 'direction']) expect(blocks).toContain(token);
         expect(String(props(document, 'properties', 'fontEntries').description)).toContain('cjm');
+        expect(String(props(document, 'properties', 'fontEntries').description)).toContain('ml');
         const table = (doc.oneOf as Doc[])[1] as Doc;
         expect(props(table, 'properties')).toHaveProperty('fontEntries');
     });

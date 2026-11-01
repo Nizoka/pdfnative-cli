@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { tmpName } from '../helpers/cli-harness.js';
 import * as fs from 'node:fs/promises';
 import { render } from '../../src/commands/render.js';
 import { fill } from '../../src/commands/fill.js';
@@ -19,7 +19,7 @@ afterEach(async () => {
 });
 
 function tmpPath(name: string): string {
-    const p = path.join(os.tmpdir(), `fill-${Date.now()}-${Math.random().toString(36).slice(2)}-${name}`);
+    const p = tmpName(`fill-${name}`);
     tmp.push(p);
     return p;
 }

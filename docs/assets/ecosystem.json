@@ -1,38 +1,44 @@
 {
   "$comment": "Single source of every count and version quoted in the docs, the agent files and the release notes. `npm run verify:docs` holds every document to it; `npm run release:prepare` bumps `packages.pdfnative-cli.version` and `verifiedOn`. `declared` holds figures no filesystem walk can derive (measured at release); `derived` holds figures verify:docs recomputes from the source constants (COMMANDS, SUBJECTS, ErrorCode, GLOBAL_FLAGS, MANIFEST_COMMANDS, the corpus table, the samples tree) and fails when they drift. `assertions` are the prose tokens each listed file must carry verbatim.",
-  "verifiedOn": "2026-09-17",
+  "verifiedOn": "2026-11-01",
   "packages": {
     "pdfnative-cli": {
-      "version": "1.5.0",
+      "version": "1.6.0",
       "pinField": null,
       "pin": null,
       "repo": "https://github.com/Nizoka/pdfnative-cli",
       "binary": "pdfnative"
     },
     "pdfnative": {
-      "version": "1.8.0",
+      "version": "1.9.0",
       "pinField": "dependencies",
-      "pin": "^1.8.0",
+      "pin": "^1.9.0",
       "repo": "https://github.com/Nizoka/pdfnative"
     },
     "pdfnative-mcp": {
-      "version": "1.6.0",
+      "version": "1.7.0",
       "pinField": null,
       "pin": null,
       "repo": "https://github.com/Nizoka/pdfnative-mcp"
+    },
+    "pdfnative-react": {
+      "version": "1.3.0",
+      "pinField": null,
+      "pin": null,
+      "repo": "https://github.com/Nizoka/pdfnative-react"
     }
   },
   "declared": {
-    "tests": 1403,
+    "tests": 1555,
     "coverageStatements": 82,
-    "coverageMeasured": 86.06,
+    "coverageMeasured": 86.86,
     "bundleBudgetBytes": 458752,
-    "pdfaSamples": 18,
-    "pdfxSamples": 4,
-    "unicodeScripts": 27,
-    "bundledFontModules": 31,
+    "pdfaSamples": 20,
+    "pdfxSamples": 6,
+    "unicodeScripts": 32,
+    "bundledFontModules": 36,
     "chartTypes": 9,
-    "diagnosticCodes": 9
+    "diagnosticCodes": 13
   },
   "derived": {
     "commands": 21,
@@ -47,12 +53,12 @@
     "errorCodes": 12,
     "globalFlags": 10,
     "manifestCommands": 14,
-    "pdfaCorpus": 22,
+    "pdfaCorpus": 25,
     "fontAliases": 4,
-    "testFiles": 96,
-    "renderSamples": 75,
-    "sampleScripts": 85,
-    "samplePdfs": 91
+    "testFiles": 103,
+    "renderSamples": 82,
+    "sampleScripts": 89,
+    "samplePdfs": 99
   },
   "assertions": [
     {

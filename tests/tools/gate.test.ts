@@ -42,9 +42,9 @@ describe('gate: step table', () => {
         expect(publish).toEqual(STEPS.filter((s) => s.id !== 'test').map((s) => s.id));
     });
 
-    it('the only skippable step is validate:pdfa (veraPDF is external); validate:pdfx never skips', () => {
+    it('the skippable steps are validate:pdfa (veraPDF is external) and compat:previous (the previous tag); validate:pdfx never skips', () => {
         const skippable = STEPS.filter((s) => s.skipWhen !== undefined).map((s) => s.id);
-        expect(skippable).toEqual(['validate:pdfa']);
+        expect(skippable).toEqual(['validate:pdfa', 'compat:previous']);
     });
 
     it('builds before every step that drives dist/cli.cjs — the coverage run included', () => {

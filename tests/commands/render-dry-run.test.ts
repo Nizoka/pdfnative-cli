@@ -44,8 +44,8 @@ describe('render --dry-run pre-flights the engine build', () => {
         await expectCliError(() => render(parseArgs(['--input', input, '--dry-run', '--pdfx', 'pdfx4', ...FONTS, '--trapped', 'false'])), 1, ErrorCode.INPUT, 'requires layout.outputIntent');
     });
 
-    it('inline layout.pdfx + layout.tagged is the engine coherence error → E_INPUT in a dry run', async () => {
-        const input = await tmp.json('in.json', { ...MINIMAL_DOC, layout: { pdfx: 'pdfx4', tagged: 'pdfa2b' } });
+    it('inline layout.pdfx + layout.tagged pdfa1b is the engine coherence error → E_INPUT in a dry run', async () => {
+        const input = await tmp.json('in.json', { ...MINIMAL_DOC, layout: { pdfx: 'pdfx4', tagged: 'pdfa1b' } });
         await expectCliError(() => render(parseArgs(['--input', input, '--dry-run', '--output-intent-icc', SYNTHETIC_CMYK_ICC, ...FONTS])), 1, ErrorCode.INPUT, 'cannot be combined');
     });
 

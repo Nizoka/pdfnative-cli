@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -12,6 +13,13 @@ if (process.env.GITHUB_ACTIONS) reporters.push('github-actions');
 if (process.env.GATE === '1') reporters.push(['json', { outputFile: 'test-output/.gate/vitest.json' }]);
 
 export default defineConfig({
+    // The fuzz targets import `#fuzz-surface`, which package.json resolves to
+    // the built bundle for the ClusterFuzzLite container; here it is the
+    // source file, so tests/fuzz/targets.test.ts proves the targets against
+    // src/ on every gate run.
+    resolve: {
+        alias: { '#fuzz-surface': fileURLToPath(new URL('./fuzz/surface.ts', import.meta.url)) },
+    },
     test: {
         globals: false,
         environment: 'node',

@@ -89,19 +89,33 @@ export function loadConfig(
     }
     if (path === null) return {};
 
+    let raw: Buffer;
+    try {
+        raw = readFileSync(path);
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new CliError(`Failed to read config file ${path}: ${msg}`, 2);
+    }
+    if (raw.length > CONFIG_SIZE_LIMIT) {
+        throw new CliError(`Config file exceeds the 1 MB limit: ${path}`, 2);
+    }
+    return parseConfigText(raw.toString('utf8'), commandName, path);
+}
+
+/**
+ * Parse the text of a config file into the flag defaults for `commandName`
+ * (v1.6.0: the pure half of {@link loadConfig}, which `fuzz/config.js` runs
+ * on arbitrary bytes). `source` names the file in every refusal.
+ */
+export function parseConfigText(text: string, commandName: string, source: string): ConfigDefaults {
     let parsed: unknown;
     try {
-        const raw = readFileSync(path);
-        if (raw.length > CONFIG_SIZE_LIMIT) {
-            throw new CliError(`Config file exceeds the 1 MB limit: ${path}`, 2);
-        }
-        parsed = JSON.parse(raw.toString('utf8'));
-    } catch (e) {
-        if (e instanceof CliError) throw e;
-        throw new CliError(`Failed to parse config file ${path}: invalid JSON.`, 2);
+        parsed = JSON.parse(text);
+    } catch {
+        throw new CliError(`Failed to parse config file ${source}: invalid JSON.`, 2);
     }
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new CliError(`Config file ${path} must contain a JSON object.`, 2);
+        throw new CliError(`Config file ${source} must contain a JSON object.`, 2);
     }
 
     const global: ConfigDefaults = {};

@@ -2,9 +2,9 @@
 
 ## Overview
 
-Official CLI companion to the `pdfnative` library (engine pinned at `^1.8.0`). Exposes 21 commands
-over the document lifecycle: `render` (JSON → PDF, incl. PDF/A, PDF/X-4, typography, 27 Unicode
-scripts, charts, print production, streaming), `fill`, `annotate`, `metadata`, `merge` / `split` /
+Official CLI companion to the `pdfnative` library (engine pinned at `^1.9.0`). Exposes 21 commands
+over the document lifecycle: `render` (JSON → PDF, incl. PDF/A, PDF/X-4 and both at once, typography,
+right-to-left text, 32 Unicode scripts, spot colours, JPEG 2000, charts, print production, streaming), `fill`, `annotate`, `metadata`, `merge` / `split` /
 `extract`, `sign` / `verify` / `ltv` / `doc-timestamp` (the PAdES ladder), `encrypt` / `decrypt`,
 `inspect` / `extract-text` / `compare`, `batch`, `doctor`, `schema`, `completion` and `govern`.
 The agent-facing contract (envelopes, 12 stable error codes, `--dry-run`, schemas, capability
@@ -15,8 +15,7 @@ are in [AGENTS.md](../AGENTS.md).
 logic lives there. The CLI is a thin, composable dispatch layer over it, and every `pdfnative`
 symbol enters through `src/core-bridge/index.ts`.
 
-**Targets:** Node.js ≥ 22 (`.nvmrc` / `.node-version` pin 22; CI matrix 22 and 24), Bun, Deno
-(via `node dist/cli.cjs`).
+**Targets:** Node.js ≥ 22 (`.nvmrc` / `.node-version` pin 22; CI runs 22 and 24 on Linux, 22 on Windows and macOS, all required; 26 advisory). Bun and Deno are not tested.
 
 ## Working Modes & Token Economy
 
@@ -61,7 +60,7 @@ src/
 │   ├── projection.ts          # compact JSON, --summary, --fields
 │   ├── config.ts / colors.ts / version.ts / manifest.ts
 │   ├── layout.ts              # --layout / flags → PdfLayoutOptions (PDF/A, PDF/X-4, output intent, typography)
-│   ├── fonts.ts               # BUNDLED_FONT_MODULES (31 modules / 27 scripts), aliases, --font-file loading
+│   ├── fonts.ts               # BUNDLED_FONT_MODULES (36 modules / 32 scripts), aliases, --font-file loading
 │   ├── reproducible.ts        # --creation-date / SOURCE_DATE_EPOCH resolution
 │   ├── build-errors.ts        # classifies pdfnative's thrown coherence messages into E_INPUT
 │   ├── pages.ts / pdfops.ts / pdfdate.ts                 # page selectors, page-tree/crypto helpers, PDF date → ISO
@@ -69,8 +68,9 @@ src/
 │   ├── fetch-guard.ts         # SSRF-guarded HTTP(S) client for every opt-in network call
 │   └── governance.ts          # AI_GOVERNANCE_POLICY (verbatim mirror of .github/ai-governance.json), AGENT_RULES, draft validator
 └── core-bridge/index.ts       # the single pdfnative import point (selective re-exports, incl. pdfnative/tools)
-scripts/                       # gate, sample generator + baseline, conformance corpus + validators, verify-docs, release-prepare
-tests/                         # commands/ utils/ integration/ tools/ regression/ docs/ (+ helpers/cli-harness.ts, fixtures/)
+scripts/                       # gate, sample generator + baseline, conformance corpus + validators, verify-docs, release-prepare, run-compat
+tests/                         # commands/ utils/ integration/ tools/ regression/ fuzz/ compat/ docs/ (+ helpers/cli-harness.ts, fixtures/)
+fuzz/                          # ClusterFuzzLite targets over the CLI parsers (#fuzz-surface = fuzz/surface.ts; .build/ is generated)
 samples/                       # dual-shell demos (.sh + .ps1) and the JSON documents the generator renders
 ```
 
@@ -132,6 +132,12 @@ samples/                       # dual-shell demos (.sh + .ps1) and the JSON docu
   benchmarking/TEST-NET/NAT64 blocked; no redirects; timeout + size caps). `--dry-run` never does.
 - CRL/OCSP/TSA signatures are always cryptographically verified; unverifiable revocation
   data yields `unknown`, never `good`.
+- A stream over `--max-inflate-size` is a refusal (`PdfStreamLimitError` → `E_INPUT` by instance,
+  `--on-stream-error` decides), never a silently empty page; JPEG 2000 bytes are sniffed by the
+  engine, the CLI checks no extension. `ltv embed` material (`--cert/--ocsp/--crl`) is capped at
+  16 MiB per file and composed by the engine.
+- Within 1.x nothing of the process contract is removed or renamed (SECURITY.md §Compatibility
+  promise): `tests/tools/manifest-compat.test.ts` and `npm run compat:previous` hold it.
 
 ## Build & Test
 

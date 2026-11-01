@@ -1,10 +1,12 @@
-// utils/pdftext.ts + its two consumers: /Info text strings outside Latin-1 are
+// The engine's decodePdfTextString() (pdfnative 1.9.0, #85 — ISO 32000-1
+// §7.9.2.2: UTF-16BE, UTF-8 with a byte-order mark, PDFDocEncoding) through
+// the bridge, and its two consumers: /Info text strings outside Latin-1 are
 // written as UTF-16BE by pdfnative, and `inspect` / `compare` must report the
 // text — before v1.5.0 `inspect` answered `title: null` for any title holding
-// as little as an em dash.
+// as little as an em dash. The decoder the CLI carried in 1.5.0 is gone.
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { decodePdfTextString } from '../../src/utils/pdftext.js';
+import { decodePdfTextString } from '../../src/core-bridge/index.js';
 import { inspect } from '../../src/commands/inspect.js';
 import { compare } from '../../src/commands/compare.js';
 import { parseArgs } from '../../src/utils/args.js';
@@ -41,6 +43,10 @@ describe('decodePdfTextString', () => {
 
     it('never throws on a truncated UTF-16 value', () => {
         expect(() => decodePdfTextString(byteString([0xFE, 0xFF, 0x00]))).not.toThrow();
+    });
+
+    it('decodes PDFDocEncoding (pdfnative 1.9.0): 0x80 is the bullet, 0x83 the ellipsis', () => {
+        expect(decodePdfTextString(byteString([0x80, 0x20, 0x41, 0x83]))).toBe(`${String.fromCodePoint(0x2022)} A${String.fromCodePoint(0x2026)}`);
     });
 });
 

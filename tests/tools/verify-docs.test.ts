@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { basename, join, resolve } from 'node:path';
+import { tmpRoot } from '../helpers/cli-harness.js';
 import {
     MANIFEST_REL,
     OFFLINE_RULES,
+    ciMatrixMajors,
     isSuppressed,
     lineOf,
+    releaseNoteShipped,
     semverLess,
     verifyDocs,
     workflowJobs,
@@ -50,6 +53,49 @@ describe('verify-docs — helpers', () => {
         expect([...jobs].sort()).toEqual(['ci', 'other', 'sample-regression']);
         expect([...matrixValues.get('ci')!]).toEqual(['22', '24']);
     });
+
+    // v1.6.0 — the include form of ci.yml: every entry's name is a status-check
+    // context, `name: ${{ matrix.name }}` on the job delegates to them.
+    it('reads the status-check names and Node majors of an include matrix', () => {
+        const ci = [
+            'jobs:', '  ci:', '    name: ${{ matrix.name }}', '    strategy:', '      matrix:', '        include:',
+            "          - { name: 'ci (22)', os: ubuntu-latest, node-version: 22, slug: linux-node22, audit: true }",
+            "          - { name: 'ci (24)', os: ubuntu-latest, node-version: 24, slug: linux-node24, audit: false }",
+            '          - { name: windows, os: windows-latest, node-version: 22, slug: windows, audit: false }',
+            '    steps: []', '  workflow-lint:', '    name: workflow lint', '    steps: []', '',
+        ].join('\n');
+        const { jobs, matrixValues } = workflowJobs([ci]);
+        expect([...jobs].sort()).toEqual(['ci', 'ci (22)', 'ci (24)', 'windows', 'workflow lint', 'workflow-lint']);
+        expect([...matrixValues.get('ci')!]).toEqual(['22', '24']);
+        expect(ciMatrixMajors(ci)).toEqual([22, 24]);
+        expect(ciMatrixMajors('        node-version: [22, 24]')).toEqual([22, 24]);
+    });
+
+    // v1.6.0 — a shipped release note leaves the count-checked corpus only when
+    // BOTH signals of a release in progress are present: its tag, and text under
+    // `## [Unreleased]`.
+    it('exempts the current release note only once its tag exists and the CHANGELOG has an [Unreleased] entry', () => {
+        const repo = mkdtempSync(join(tmpRoot(), 'verify-docs-shipped-'));
+        try {
+            const git = (...args: string[]): void => {
+                const r = spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8', windowsHide: true });
+                if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
+            };
+            const changelog = (unreleased: string): void => writeFileSync(join(repo, 'CHANGELOG.md'), `# Changelog\n\n## [Unreleased]\n${unreleased}\n## [1.5.0] – 2026-09-17\n\n- shipped\n`);
+            git('init', '-q');
+            git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'init');
+            changelog('');
+            expect(releaseNoteShipped(repo, '1.5.0'), 'no tag yet').toBe(false);
+            git('tag', 'v1.5.0');
+            expect(releaseNoteShipped(repo, '1.5.0'), 'tag, but an empty [Unreleased] (main after a release)').toBe(false);
+            changelog('\n### Added\n\n- the next release\n');
+            expect(releaseNoteShipped(repo, '1.5.0'), 'tag and a non-empty [Unreleased]').toBe(true);
+            expect(releaseNoteShipped(repo, '1.6.0'), 'the version under way has no tag').toBe(false);
+            expect(releaseNoteShipped(repo, ''), 'no version').toBe(false);
+        } finally {
+            rmSync(repo, { recursive: true, force: true });
+        }
+    });
 });
 
 describe('verify-docs — the real tree', () => {
@@ -74,7 +120,7 @@ describe('verify-docs — a corrupted sandbox', () => {
     let problems: Problem[] = [];
 
     beforeAll(async () => {
-        sandbox = mkdtempSync(join(tmpdir(), 'pdfnative-cli-verify-docs-'));
+        sandbox = mkdtempSync(join(tmpRoot(), 'pdfnative-cli-verify-docs-'));
         cpSync(ROOT, sandbox, {
             recursive: true,
             filter: (src) => !SKIP.has(basename(src)),

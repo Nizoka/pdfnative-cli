@@ -119,10 +119,11 @@ async function resolveSafeAddress(hostname: string): Promise<string> {
 }
 
 /**
- * Perform a single guarded HTTP(S) request. Rejects with {@link FetchGuardError}
- * on any policy violation. Never follows redirects.
+ * The admission half of {@link guardedFetch}, before any DNS lookup: a
+ * parseable URL on an http(s) scheme, or a {@link FetchGuardError}
+ * (v1.6.0: separated so that `fuzz/url.js` can run it on arbitrary text).
  */
-export async function guardedFetch(url: string, options: FetchOptions = {}): Promise<FetchResult> {
+export function parseFetchUrl(url: string): URL {
     let parsed: URL;
     try {
         parsed = new URL(url);
@@ -132,6 +133,15 @@ export async function guardedFetch(url: string, options: FetchOptions = {}): Pro
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
         throw new FetchGuardError(`unsupported URL scheme "${parsed.protocol}"`);
     }
+    return parsed;
+}
+
+/**
+ * Perform a single guarded HTTP(S) request. Rejects with {@link FetchGuardError}
+ * on any policy violation. Never follows redirects.
+ */
+export async function guardedFetch(url: string, options: FetchOptions = {}): Promise<FetchResult> {
+    const parsed = parseFetchUrl(url);
 
     const safeAddress = await resolveSafeAddress(parsed.hostname);
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;

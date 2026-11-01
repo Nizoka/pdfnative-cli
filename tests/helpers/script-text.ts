@@ -1,6 +1,6 @@
 // Short native-script strings, one per bundled script code, for the render
 // suites. The text is demonstration content by nature and comes from the
-// engine's vetted language documents (pdfnative 1.8.0
+// engine's vetted language documents (pdfnative 1.9.0
 // `scripts/data/language-docs-data.ts`, same author and licence); `ja` and `zh`
 // use the statement titles of its financial samples. Every record is keyed by
 // its language code, which is its language label.
@@ -36,9 +36,15 @@ export const SCRIPT_TEXT: Readonly<Record<string, string>> = {
     khb: 'ᦂᦱ ᦂᦲ ᦂᦳ ᦂᦴ ᦂᦸ ᦂᦹ', // Tai Lue — Spacing vowels after the consonant
     tdd: 'ᥐᥣ ᥐᥤ ᥐᥥ ᥐᥦ ᥐᥧ ᥐᥨ ᥐᥩ ᥐᥪ ᥐᥫ', // Tai Nüa — Consonant and vowel letters
     cjm: 'ꨀꨯ ꨀꨰ ꨆꨯ ꨓꨯꨩ ꨟꨯꨱ', // Cham — Pre-base vowels
+    // pdfnative 1.9.0 — the five Indic scripts of the Indic engine
+    gu: 'ધર્મ કર્મ અર્થ સૂર્ય', // Gujarati — Reph
+    pa: 'ਪ੍ਰੇਮ ਸ੍ਵਰ ਚਿੰਨ੍ਹ', // Punjabi (Gurmukhi) — Subjoined consonants
+    kn: 'ಕನ್ನಡ ವಿದ್ಯಾ ಪುಸ್ತಕ', // Kannada — Vowel signs and conjuncts
+    ml: 'അവൻ കാൽ അവർ അവൾ', // Malayalam — Atomic chillus
+    or: 'ଗୋଟିଏ ଲୋକ ପୌଷ ବୈଠକ', // Odia — Two-part vowel signs
 };
 
-/** Inputs aimed at a shaping fix of pdfnative 1.8.0: `[script code, text]`. */
+/** Inputs aimed at a shaping fix of pdfnative 1.8.0 or 1.9.0: `[script code, text]`. */
 export const SHAPING_PROBES = {
     hiConjuncts: ['hi', 'क्ष ज्ञ त्र द्य श्र क्त'], // Devanagari conjuncts (one glyph for several letters)
     hiReph: ['hi', 'प्रदर्शन समर्थन कर्म पूर्ण'], // Devanagari reph
@@ -53,4 +59,14 @@ export const SHAPING_PROBES = {
     trDotless: ['tr', 'İstanbul ılık İZMİR ısı IŞIK'], // Turkish dotted / dotless i
     viStacked: ['vi', 'ấ ầ ẩ ẫ ậ ế ề ể ễ ệ ố ồ ổ ỗ ộ'], // Vietnamese stacked diacritics
     koFinals: ['ko', '읽다 흙 값 없다 앉다 젊다 뚫다'], // Hangul complex finals
+    // pdfnative 1.9.0
+    knBeforeSub: ['kn', 'ಕ್ಕಿ ಸ್ತ್ರೀ ಪ್ರೀತಿ'], // Kannada vowel signs before the subjoined consonants (C22)
+    mlLegacyChillu: ['ml', 'ന\u0D4D\u200D ല\u0D4D\u200D ര\u0D4D\u200D'], // Malayalam legacy chillus: consonant + virama + ZWJ (C19)
+    mlSplitVowel: ['ml', 'കോഴി പോയി കൊച്ചി'], // Malayalam two-part vowel signs (each part names its code point, C4)
+    mlWideWord: ['ml', 'അവൻ'], // Malayalam wide glyphs in their own text object (extractText word gaps)
+    orDanda: ['or', 'ଶିରୋନାମା ଗୋଟିଏ ।'], // Odia line ending in a danda stays on the Odia shaper (C26)
+    hiMultiple: ['hi', 'नई दिल्ली इकाई'], // Devanagari ई drawn through a multiple substitution
+    kmTwoPart: ['km', 'ទៅ ដើម្បី'], // Khmer two-part vowels draw their own right piece (C24)
+    myEVowel: ['my', 'ကြေ မြေ ကြွေ'], // Myanmar e-vowel before the medial ra (C23)
+    thToneBelow: ['th', 'ตั้ง'], // Thai above vowel + tone mark pair (extracts in geometric order — known limit)
 } as const satisfies Record<string, readonly [string, string]>;

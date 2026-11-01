@@ -14,9 +14,38 @@ We will acknowledge receipt within 48 hours and aim to provide a fix within 7 da
 
 | Version | Supported |
 |---------|-----------|
-| 1.5.x   | ✅        |
-| 1.4.x   | ✅ (security fixes) |
-| < 1.4   | ❌        |
+| 1.6.x   | ✅        |
+| 1.5.x   | ✅ (security fixes) |
+| < 1.5   | ❌        |
+
+### Supported runtimes
+
+| | 1.x | What a minor may change |
+|---|---|---|
+| Node.js | Every line in Active or Maintenance LTS: Node.js 22 and 24, both run by the `ci` workflow on Linux, and 22 on Windows and macOS, all four as required checks (v1.6.0). The newest LTS line (Node.js 26, in LTS since 2026-10-28) is run by the advisory `node-current` workflow and promised by nothing until it joins `ci.yml` at the first minor after a green history | Drop a line after its end of life (Node 22: 2027-04-30), announced one minor ahead |
+| Operating systems | Ubuntu, Windows and macOS: the full gate (`--ci --require-all`) runs on each, so a path separator, a case-insensitive file system or a CRLF checkout cannot break a release unnoticed | — |
+| Deno, Bun, browsers | Not promised: the CLI is a Node binary (`node:` built-ins throughout — `fs`, `crypto`, `dns`, `http`); `dist/cli.js` (ESM) exists for programmatic consumption and is smoke-tested on Node only | — |
+
+`engines.node` is `>=22`. npm warns, and refuses only under `engine-strict`, when a runtime is outside the range.
+
+## Compatibility promise
+
+From 1.6.0, pdfnative-cli proves its process contract mechanically for the whole 1.x line, on every pull request, so that "no breaking change" is a check and not a sentence:
+
+| Leg | What is promised | Held by |
+|---|---|---|
+| The command surface | Every command, flag, global flag, `E_*` error code, exit code, `schema` subject and envelope field of a 1.x release keeps its name and its type; a minor only adds (a flag, a code, a subject, an additive envelope field) | `tests/compat/manifest-<previous>.json`, `status-<previous>.json` and `subjects-<previous>.json` (the previous release's `schema manifest` / `schema status` / `schema list`, as published) against the current command in `tests/tools/manifest-compat.test.ts` |
+| The behaviour | The previous release's own test suite, exactly as tagged, passes against the current sources; the files it may skip are listed in `tests/compat/allow-<previous>.json`, each with a reason and, for a behaviour change, the ledger entry that justifies it | `npm run compat:previous` (`scripts/run-compat.ts`), the required `compat-previous` check and the publish gate |
+| The bytes | A sample of the baseline emits the bytes its reference release emitted, unless the release note's compatibility ledger says why it moved | `tests/regression/baselines/samples.sha256.json` and the required `sample-regression` check |
+
+What a 1.x minor may change, and how it is declared:
+
+| Change | Semver | Declared in |
+|---|---|---|
+| A command, flag, error code, subject or envelope field removed or renamed; an exit code changed; a default value changed | major | — |
+| Emitted bytes that differ from the previous release's for the same input, because the engine's previous bytes were wrong or its encoding changed (a font subset, a text object per line, a transparency group) | minor | The release note's Compatibility section, one ledger entry (C1, C2, …) per cause, naming which samples of the baseline were re-anchored |
+| A new command, flag, error code, subject, envelope field, script or diagnostic code | minor | The release note's Added section; `schema manifest` and `schema status` carry it |
+| A capability added where the CLI refused before (a joint PDF/A + PDF/X claim, an offline LTV material); a refusal the engine now makes earlier or with another code | minor | The release note's ledger, with the old and the new message |
 
 ## Security Model
 
@@ -65,6 +94,12 @@ The agent-native contract is a **pure local presentation/validation layer** and 
   fully offline: it never contacts GitHub or the network, and `govern verify-issue`
   is a pure local validator. See *Network Access* below.
 - NPM provenance — signed builds via GitHub Actions OIDC (see *Supply chain* below).
+- Parser robustness — the nine ClusterFuzzLite targets under `fuzz/` (argv, the config
+  file, batch manifests, annotation specs, layout JSON, page selectors, dates, the URL guard,
+  `--font-file`) rethrow any engine error (`TypeError`, `RangeError`, …) and swallow only
+  a `CliError` carrying one of the 12 stable codes; `tests/fuzz/targets.test.ts` runs them
+  on a seeded, truncated and mutated corpus at every gate run, next to the deterministic
+  hostile-input suites of `tests/fuzz/`.
 
 ### Network Access (opt-in only)
 
@@ -125,7 +160,7 @@ The `verify` command verifies, with no network access by default:
 
 Sign-side LTV is available since v1.4.0: `sign --timestamp` (PAdES B-T),
 `ltv collect|embed|add` (B-LT, `/DSS` + `/VRI`) and `doc-timestamp` (B-LTA). The
-engine (pdfnative 1.8.0) verifies every TSA token before embedding it and never
+engine (pdfnative 1.9.0) verifies every TSA token before embedding it and never
 opens a socket itself — the CLI injects the SSRF-guarded transport, with the
 `sign --timestamp-timeout <ms>` bound on the TSA round-trip (default 10 s).
 
@@ -191,22 +226,50 @@ as *"Won't fix"* in code scanning with this rationale.
 
 - **Zero extra runtime dependencies** — `pdfnative` is the only one; `npm ci --ignore-scripts`
   everywhere in CI, `.npmrc` sets `ignore-scripts=true` and `audit-level=high`.
-- **Hardened workflows** — every job runs under `step-security/harden-runner` (egress
-  audited), every action is pinned to a commit SHA, checkouts use `persist-credentials: false`,
-  Dependabot and `dependency-review` gate every dependency change, `npm audit` runs weekly.
-- **Trusted Publishing** — `publish.yml` publishes with npm ≥ 11.5.1 through GitHub OIDC
-  (no long-lived token) and `--provenance`; a CycloneDX SBOM (`npm sbom`) and a build
-  attestation for the tarball and the SBOM are attached to the GitHub release. Verify an
+- **Hardened workflows** — every action pinned to a commit SHA and resolved to one SHA across
+  the tree, `persist-credentials: false` on every checkout, `step-security/harden-runner` on
+  every job (block mode with an allow-list where the endpoints are known, audit with a dated
+  reason elsewhere), `npm ci --ignore-scripts` everywhere, write permissions at job level
+  only, Dependency Review on every pull request, a weekly `npm audit`, Dependabot with a
+  seven-day cooldown on all four ecosystems (npm, GitHub Actions, the fuzzing engine, its
+  Docker base image), the workflows themselves linted by zizmor and actionlint on every pull
+  request (`workflow lint`), CodeQL (`security-extended`, the `actions` language included)
+  on every push, and the parser surface fuzzed by ClusterFuzzLite (`fuzz/`, Jazzer.js pinned
+  by lockfile inside the build image, never in the package) — all of it held by
+  `tests/tools/workflows.test.ts`.
+- **Trusted Publishing** — `publish.yml` publishes in four jobs (v1.6.0): a `guard` that
+  refuses anything but a `v*` tag matching `package.json` before any approval is asked; a
+  `build` that runs the publish gate and packs the tarball once, recording its SHA-256 and
+  SHA-512, without the right to mint a token; a `publish` behind the protected `npm-publish`
+  environment that installs nothing, verifies the handed-on tarball against those digests and
+  uploads exactly it through GitHub OIDC (no long-lived token) with an npm client pinned by
+  the SHA-512 of its registry tarball, `npm publish --provenance`; and an `attest` that
+  fetches the published tarball back from the registry, checks it against the same digests
+  and `npm audit signatures`, and attests the bytes npm serves together with the CycloneDX
+  and SPDX SBOMs and a toolchain SBOM, attaching them and the Sigstore bundle to the GitHub
+  release. The provenance is **SLSA Build L2** (hosted platform, signed provenance). Verify an
   install with `npm audit signatures`.
 - **One release gate** — `npx tsx scripts/gate.ts --publish --require-all` runs typecheck,
   lint, the build, the built-binary smoke test, the bundle-size budget, the bundle probe
   (the engine stays external; no font data, PEM block, `console.log` or undeclared
   `require` in `dist/cli.cjs`), the sample generation, the tests with coverage, the docs
   verifier, the sample baseline, the PDF/A corpus (veraPDF 1.30.2, installer SHA-256
-  verified) and the PDF/X corpus; a skipped step fails the publish.
+  verified), the PDF/X corpus and the previous release's suite (`compat:previous`); a skipped
+  step fails the publish.
 - **Branch and tag protection** — `.github/rulesets/main.json` and `tags.json` are the
-  committed copies of the GitHub rulesets (required checks `ci (22)`, `ci (24)`,
-  `sample-regression`; release tags are never deleted or moved).
+  committed copies of the GitHub rulesets (required checks `ci (22)`, `ci (24)`, `windows`,
+  `macos`, `compat-previous`, `workflow lint`, `sample-regression`; release tags are never
+  deleted or moved).
+- **OpenSSF Scorecard** — scanned weekly on `main` (`scorecard.yml`, results in the Security
+  tab). Two findings are deliberate and stay: the `attest` job holds `contents: write` at the
+  job level (the pipeline's only write grant, needed to attach the files to the release), and
+  that job installs `pdfnative-cli@<exact version>` with `--ignore-scripts` into a throwaway
+  project after checking the tarball against the build digests, because `npm audit
+  signatures` verifies an installed tree (Scorecard reads every `npm install` as unpinned).
+  Code review by a second maintainer is not available in a single-maintainer project; the
+  seven required checks, CodeQL, the previous release's suite replayed on every pull request,
+  the fuzzers and the `npm-publish` environment approval stand in for it. The OpenSSF Best
+  Practices badge is in progress.
 - **Agents never publish** — the human-in-the-loop policy (`.github/AGENT_RULES.md`,
   `pdfnative govern`) is enforced in Claude Code sessions by `.claude/hooks/guard.mjs`,
   which refuses `npm publish`, `git push`, `git tag`, `gh pr/issue/release` writes.

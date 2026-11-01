@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { tmpRoot } from '../helpers/cli-harness.js';
 import { diffClaudeRules, main, readInstructionSources, readRuleFiles, writeClaudeRules } from '../../scripts/build-claude-rules.js';
 import { bannerFor } from '../../scripts/lib/agent-config.js';
 
@@ -11,7 +11,7 @@ import { bannerFor } from '../../scripts/lib/agent-config.js';
 const INSTRUCTION = '---\ndescription: "Command rules"\napplyTo: "src/commands/**"\n---\n\n# Commands\n\n- One file per command.\n';
 
 function sandbox(): string {
-    const root = mkdtempSync(join(tmpdir(), 'pdfnative-cli-rules-'));
+    const root = mkdtempSync(join(tmpRoot(), 'pdfnative-cli-rules-'));
     mkdirSync(join(root, '.github', 'instructions'), { recursive: true });
     writeFileSync(join(root, '.github', 'instructions', 'commands.instructions.md'), INSTRUCTION);
     return root;

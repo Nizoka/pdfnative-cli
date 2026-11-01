@@ -1,6 +1,6 @@
 {
-  "$comment": "Copy of pdfnative docs/data/errors.json -> buildErrors with the ${placeholders} substituted by sample values. pdfnative does not ship docs/ in its npm tarball, so this fixture is refreshed by hand at every engine bump (see tests/fixtures/README.md); tests/utils/build-errors.test.ts asserts every message classifies as E_INPUT.",
-  "engine": "1.8.0",
+  "$comment": "Copy of pdfnative docs/data/errors.json -> buildErrors with the ${placeholders} substituted by sample values. pdfnative does not ship docs/ in its npm tarball, so this fixture is refreshed by hand at every engine bump (see tests/fixtures/README.md); tests/utils/build-errors.test.ts asserts every builder message classifies as E_INPUT (the two non-builder entries — the annotation-type check and PdfStreamLimitError — are classified elsewhere).",
+  "engine": "1.9.0",
   "source": "docs/data/errors.json#buildErrors",
   "messages": [
     {
@@ -10,8 +10,48 @@
     },
     {
       "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (resolvePdfXConfig)",
-      "since": "1.8.0",
-      "message": "layout.pdfx and layout.tagged cannot be combined — pdfnative writes one conformance claim per file; drop one of them"
+      "since": "1.9.0",
+      "message": "layout.pdfx cannot be combined with tagged: 'pdfa1b' — PDF/A-1 is PDF 1.4 and PDF/X-4 is PDF 1.6; claim 'pdfa2b' or 'pdfa2u' alongside PDF/X-4"
+    },
+    {
+      "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (resolvePdfXConfig)",
+      "since": "1.9.0",
+      "message": "layout.pdfx cannot be combined with tagged: 'pdfa3b' — PDF/A-3 allows embedded files, which PDF/X-4 forbids; claim 'pdfa2b' or 'pdfa2u' alongside PDF/X-4"
+    },
+    {
+      "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (spotColourResources)",
+      "since": "1.9.0",
+      "message": "Spot colour 'PANTONE 300 C' is not declared — add { name: 'PANTONE 300 C', alternate: [c, m, y, k] } to layout.print.spotColours"
+    },
+    {
+      "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (spotColourResources)",
+      "since": "1.9.0",
+      "message": "Ink mix PANTONE 300 C + Spot Varnish: every ink of a mix needs the same alternate space (all CMYK or all RGB)"
+    },
+    {
+      "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (validatePrintOptions)",
+      "since": "1.9.0",
+      "message": "print.spotColours: every ink needs a non-empty name"
+    },
+    {
+      "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (validatePrintOptions)",
+      "since": "1.9.0",
+      "message": "print.spotColours: 'Varnish' has a CMYK alternate out of range — percentages 0–100"
+    },
+    {
+      "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (validatePrintOptions)",
+      "since": "1.9.0",
+      "message": "print.spotColours: 'Varnish' has an RGB alternate out of range — 0–255"
+    },
+    {
+      "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (validatePrintOptions)",
+      "since": "1.9.0",
+      "message": "print.spotColours: 'Varnish' needs an alternate of four CMYK percentages or three RGB values"
+    },
+    {
+      "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (validatePrintOptions)",
+      "since": "1.9.0",
+      "message": "print.spotColours: ink 'Varnish' is declared twice"
     },
     {
       "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (resolvePdfXConfig)",
@@ -51,7 +91,7 @@
     {
       "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (resolveOutputIntent)",
       "since": "1.8.0",
-      "message": "outputIntent.iccProfile header declares 9968 bytes but 512 were supplied — the profile is truncated or corrupt"
+      "message": "outputIntent.iccProfile header declares 9968 bytes but 4096 were supplied — the profile is truncated or corrupt"
     },
     {
       "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (resolveOutputIntent)",
@@ -91,12 +131,12 @@
     {
       "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (print geometry)",
       "since": "1.7.0",
-      "message": "print.box must be [x0, y0, x1, y1] with x1 > x0 and y1 > y0"
+      "message": "print.trimBox must be [x0, y0, x1, y1] with x1 > x0 and y1 > y0"
     },
     {
       "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (print geometry)",
       "since": "1.7.0",
-      "message": "print.box must lie within the MediaBox [0 0 width height]"
+      "message": "print.trimBox must lie within the MediaBox [0 0 595.28 841.89]"
     },
     {
       "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (print geometry)",
@@ -106,7 +146,7 @@
     {
       "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (print geometry)",
       "since": "1.7.0",
-      "message": "print.userUnit must be between 1 and max"
+      "message": "print.userUnit must be between 1 and 75000"
     },
     {
       "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (watermark)",
@@ -117,6 +157,16 @@
       "thrownBy": "buildDocumentPDFBytes / buildPDFBytes (print geometry)",
       "since": "1.7.0",
       "message": "print.userUnit requires PDF 1.6+ and is not allowed under PDF/A-1 (PDF 1.4) — use pdfa2b or later"
+    },
+    {
+      "thrownBy": "buildAnnotationBody / buildAnnotation",
+      "since": "1.9.0",
+      "message": "Unknown annotation type \"stamp\" — expected one of: highlight, underline, strikeout, squiggly, square, circle, line, text, link"
+    },
+    {
+      "thrownBy": "inflateSync / applyDecodeFilter, rethrown by extractText (onStreamError: 'limit' default), openPdf().decodeStream, validatePdfX, validatePdfUA (class PdfStreamLimitError, code PDF_STREAM_LIMIT)",
+      "since": "1.9.0",
+      "message": "FlateDecode output exceeds the 104857600-byte limit (potential zip bomb) — raise setMaxInflateOutputSize() or pass onStreamError: 'skip'"
     }
   ]
 }
