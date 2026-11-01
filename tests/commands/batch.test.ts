@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { tmpRoot } from '../helpers/cli-harness.js';
 import { batch } from '../../src/commands/batch.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { CliError, ErrorCode } from '../../src/utils/error.js';
@@ -44,7 +44,7 @@ describe('batch', () => {
     });
 
     async function makeInputDir(files: Record<string, string>): Promise<string> {
-        const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'batch-'));
+        const dir = await fs.mkdtemp(path.join(tmpRoot(), 'batch-'));
         dirs.push(dir);
         for (const [name, content] of Object.entries(files)) {
             await fs.writeFile(path.join(dir, name), content);
@@ -232,7 +232,7 @@ describe('batch --manifest', () => {
         manifest: unknown,
         files: Record<string, string> = {},
     ): Promise<{ dir: string; manifestPath: string }> {
-        const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'batch-manifest-'));
+        const dir = await fs.mkdtemp(path.join(tmpRoot(), 'batch-manifest-'));
         dirs.push(dir);
         const manifestPath = path.join(dir, 'tasks.json');
         await fs.writeFile(manifestPath, JSON.stringify(manifest));

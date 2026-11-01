@@ -591,7 +591,9 @@ describe('setup-verapdf composite action', () => {
             expect(text, f).toContain('uses: ./.github/actions/setup-verapdf');
             expect(text, f).toMatch(/id: verapdf\s*\n\s+uses: \.\/\.github\/actions\/setup-verapdf/);
             expect(text, f).toContain('VERAPDF_HOME: ${{ steps.verapdf.outputs.home }}');
-            expect(text, f).not.toMatch(/software\.verapdf\.org\/rel\/[\d.]+\/verapdf/);
+            // A substring check, not a regex: the composite action owns the download URL
+            // (CodeQL js/regex/missing-regexp-anchor reads an unanchored host pattern as a URL check).
+            expect(text, f).not.toContain('software.verapdf.org/rel/');
         }
     });
 

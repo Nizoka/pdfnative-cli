@@ -359,7 +359,7 @@ describe('render', () => {
 
     it('--watch requires --input', async () => {
         await expect(
-            render(parseArgs(['--watch', '--output', '/tmp/out.pdf'])),
+            render(parseArgs(['--watch', '--output', tmpName('out.pdf')])),
         ).rejects.toThrowError(/--input/);
     });
 

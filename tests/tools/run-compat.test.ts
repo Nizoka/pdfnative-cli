@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { tmpRoot } from '../helpers/cli-harness.js';
 import { allowListForTag, findAllowList, parseAllowList, tagAvailable } from '../../scripts/run-compat.js';
 
 /**
@@ -13,7 +13,7 @@ import { allowListForTag, findAllowList, parseAllowList, tagAvailable } from '..
 
 let root: string;
 beforeAll(() => {
-    root = mkdtempSync(join(tmpdir(), 'pdfcli-compat-'));
+    root = mkdtempSync(join(tmpRoot(), 'pdfcli-compat-'));
     mkdirSync(join(root, 'tests', 'compat'), { recursive: true });
     for (const v of ['1.9.0', '1.10.0', '1.2.3']) {
         writeFileSync(join(root, 'tests', 'compat', `allow-${v}.json`), JSON.stringify({ tag: `v${v}`, exclude: [] }));

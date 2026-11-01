@@ -3,14 +3,14 @@
 
 import { describe, it, expect, afterAll, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { tmpRoot } from '../helpers/cli-harness.js';
 import { loadConfig, applyConfigDefaults, KNOWN_COMMANDS } from '../../src/utils/config.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { ErrorCode } from '../../src/utils/error.js';
 import { forEachCase, onlyCliError, randomJson, randomToken, assertPrototypeClean, HOSTILE_KEYS } from '../helpers/fuzz.js';
 
-const dir = mkdtempSync(join(tmpdir(), 'pdfcli-fuzz-config-'));
+const dir = mkdtempSync(join(tmpRoot(), 'pdfcli-fuzz-config-'));
 afterAll(() => { assertPrototypeClean(); rmSync(dir, { recursive: true, force: true }); });
 afterEach(assertPrototypeClean);
 

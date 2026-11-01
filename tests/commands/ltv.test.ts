@@ -7,7 +7,6 @@
 // the in-process mock providers — ZERO network.
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -32,7 +31,7 @@ import {
     createMockTimestampProvider,
     toPem,
 } from '../helpers/mock-pki.js';
-import { withJsonEnvelope } from '../helpers/cli-harness.js';
+import { withJsonEnvelope, tmpRoot } from '../helpers/cli-harness.js';
 
 // ── Fixtures ─────────────────────────────────────────────────────────
 
@@ -60,7 +59,7 @@ let rootCertPem: string;
 
 beforeAll(async () => {
     const pki = createMockPki();
-    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ltv-test-'));
+    dir = await fs.mkdtemp(path.join(tmpRoot(), 'ltv-test-'));
 
     // PEM credentials from the mock signer (AIA/CRL URLs included).
     const keyPath = path.join(dir, 'signer-key.pem');

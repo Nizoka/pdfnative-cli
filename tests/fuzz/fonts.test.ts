@@ -5,14 +5,14 @@
 
 import { describe, it, expect, afterAll, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { tmpRoot } from '../helpers/cli-harness.js';
 import { sniffFontFormat, parseFontFileSpec, loadCustomFonts, resolveFontsDir, BUNDLED_FONT_MODULES, FONT_ALIASES } from '../../src/utils/fonts.js';
 import { ErrorCode } from '../../src/utils/error.js';
 import { forEachCase, forEachCaseAsync, onlyCliError, onlyCliErrorAsync, randomToken, assertPrototypeClean, concatBytes, mulberry32 } from '../helpers/fuzz.js';
 
-const dir = mkdtempSync(join(tmpdir(), 'pdfcli-fuzz-fonts-'));
+const dir = mkdtempSync(join(tmpRoot(), 'pdfcli-fuzz-fonts-'));
 afterAll(() => { assertPrototypeClean(); rmSync(dir, { recursive: true, force: true }); });
 afterEach(assertPrototypeClean);
 

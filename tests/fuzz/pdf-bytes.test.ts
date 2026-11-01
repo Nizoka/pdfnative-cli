@@ -8,7 +8,6 @@
 
 import { describe, it, expect, afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inspect } from '../../src/commands/inspect.js';
 import { extractTextCmd as extractText } from '../../src/commands/extract-text.js';
@@ -16,13 +15,13 @@ import { merge } from '../../src/commands/merge.js';
 import { parseArgs } from '../../src/utils/args.js';
 import { ErrorCode } from '../../src/utils/error.js';
 import { MAX_XREF_CHAIN, MAX_PARSE_DEPTH, setMaxInflateOutputSize, DEFAULT_MAX_INFLATE_OUTPUT } from '../../src/core-bridge/index.js';
-import { captured } from '../helpers/cli-harness.js';
+import { captured, tmpRoot } from '../helpers/cli-harness.js';
 import {
     forEachCaseAsync, onlyCliErrorAsync, assertPrototypeClean, mutatePdf, minimalPdf,
     buildChainedXrefPdf, buildCyclicXrefPdf, buildDeepNestingPdf, buildFlatePdf, textBombPayload, buildObjectsPdf,
 } from '../helpers/fuzz.js';
 
-const dir = mkdtempSync(join(tmpdir(), 'pdfcli-fuzz-pdf-'));
+const dir = mkdtempSync(join(tmpRoot(), 'pdfcli-fuzz-pdf-'));
 afterAll(() => { assertPrototypeClean(); rmSync(dir, { recursive: true, force: true }); });
 afterEach(() => { vi.restoreAllMocks(); setMaxInflateOutputSize(DEFAULT_MAX_INFLATE_OUTPUT); });
 

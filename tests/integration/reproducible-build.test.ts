@@ -12,8 +12,8 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { tmpRoot } from '../helpers/cli-harness.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CLI = join(ROOT, 'dist', 'cli.cjs');
@@ -21,7 +21,7 @@ const haveDist = existsSync(CLI);
 if (!haveDist && process.env.GATE_REQUIRE_ARTIFACTS === '1') {
     throw new Error('dist/cli.cjs is missing but GATE_REQUIRE_ARTIFACTS=1: the gate builds before test:coverage — run `npm run build`');
 }
-const dir = mkdtempSync(join(tmpdir(), 'pdfcli-repro-'));
+const dir = mkdtempSync(join(tmpRoot(), 'pdfcli-repro-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 const sha256 = (p: string): string => createHash('sha256').update(readFileSync(p)).digest('hex');

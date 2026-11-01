@@ -74,10 +74,11 @@ paths:
    `pageCount` / `expectCliError`, and the `MINIMAL_DOC`, `SYNTHETIC_CMYK_ICC`,
    `SYNTHETIC_GRAY_ICC` fixtures. Under `captured()` the mocked stdout never calls a write
    callback back: a command that writes its ARTEFACT to stdout hangs — give it `--output`.
-   Every temp file comes from `tmpName()` / `TempFiles` (a private `mkdtemp` directory, the
-   extension kept) or from a `mkdtemp` directory of the suite's own — never
-   `path.join(os.tmpdir(), …)`: a guessable name straight under the shared temp directory is
-   CodeQL `js/insecure-temporary-file`, and the flow reaches `writeOutput` in `src/`.
+   Every temp file comes from `tmpName()` / `TempFiles` (the extension kept) and every temp
+   directory from `mkdtemp` under `tmpRoot()` — the harness holds the only `os.tmpdir()` call
+   in the tree, and no suite passes a `/tmp/…` literal to a command: a guessable name under
+   the shared temp directory is CodeQL `js/insecure-temporary-file`, and the flow reaches
+   `writeOutput` / `readBinaryFileCapped` in `src/`.
 2. Drive commands through `parseArgs([...])`, e.g. `await render(parseArgs(['--input', tmpIn]))`.
 3. Test error paths with `await expect(fn(...)).rejects.toBeInstanceOf(CliError)` and assert
    `.exitCode` and `.code` (the stable `E_*` value).

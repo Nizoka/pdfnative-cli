@@ -4,8 +4,8 @@
 
 import { describe, it, expect, afterAll, afterEach } from 'vitest';
 import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { tmpRoot } from '../helpers/cli-harness.js';
 import { parseManifest } from '../../src/utils/manifest.js';
 import { ErrorCode } from '../../src/utils/error.js';
 import { forEachCase, onlyCliError, randomJson, randomToken, assertPrototypeClean, HOSTILE_KEYS } from '../helpers/fuzz.js';
@@ -13,7 +13,7 @@ import { forEachCase, onlyCliError, randomJson, randomToken, assertPrototypeClea
 afterAll(assertPrototypeClean);
 afterEach(assertPrototypeClean);
 
-const DIR = mkdtempSync(join(tmpdir(), 'pdfcli-fuzz-manifest-'));
+const DIR = mkdtempSync(join(tmpRoot(), 'pdfcli-fuzz-manifest-'));
 const CODES = [ErrorCode.PARSE, ErrorCode.USAGE, ErrorCode.INPUT];
 
 /** A manifest that is valid except for whatever the caller injects. */

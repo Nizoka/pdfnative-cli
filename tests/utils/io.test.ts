@@ -90,9 +90,9 @@ describe('writeOutput', () => {
         (fs.writeFile as any).mockResolvedValue(undefined);
         const data = new Uint8Array([1, 2, 3, 4]);
 
-        await writeOutput(data, '/tmp/output.pdf');
+        await writeOutput(data, 'output/document.pdf');
 
-        expect(fs.writeFile).toHaveBeenCalledWith('/tmp/output.pdf', data);
+        expect(fs.writeFile).toHaveBeenCalledWith('output/document.pdf', data);
     });
 
     it('throws CliError for path traversal', async () => {

@@ -134,8 +134,9 @@ note's compatibility ledger.
   `readBinaryFileCapped` sized a file with `stat()` and re-opened it by path; it now opens one
   descriptor, takes the size from it and reads at most that many bytes.
   `js/insecure-temporary-file`: the suites created files with guessable names straight under
-  `os.tmpdir()`; every test temp file now comes from `tmpName()` (a private `mkdtemp`
-  directory, the extension kept) or a `mkdtemp` directory of the suite's own.
+  `os.tmpdir()`; every test temp file now comes from `tmpName()` and every temp directory
+  from `mkdtemp` under `tmpRoot()` — the harness holds the only `os.tmpdir()` call in the
+  tree. `js/regex/missing-regexp-anchor`: a workflows assertion is a substring check.
 - **Dependency Review** — BlueOak-1.0.0 (`tar`, `minipass`, `yallist`, `chownr`, `isexe`) and
   CC-BY-4.0 (`caniuse-lite`) are allow-listed with their reason: they reach the tree only
   through the ClusterFuzzLite engine lockfile, never through `package.json`.

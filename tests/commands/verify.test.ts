@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
-import * as os from 'node:os';
 import * as path from 'node:path';
-import { tmpName } from '../helpers/cli-harness.js';
+import { tmpName, tmpRoot } from '../helpers/cli-harness.js';
 import * as fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { verify } from '../../src/commands/verify.js';
@@ -212,7 +211,7 @@ describe('verify — enriched (v1.4.0)', () => {
 
     beforeAll(async () => {
         const pki = createMockPki();
-        dir = await fs.mkdtemp(path.join(os.tmpdir(), 'verify-enriched-'));
+        dir = await fs.mkdtemp(path.join(tmpRoot(), 'verify-enriched-'));
         keyPath = path.join(dir, 'signer-key.pem');
         certPath = path.join(dir, 'signer-cert.pem');
         rootPath = path.join(dir, 'root-cert.pem');

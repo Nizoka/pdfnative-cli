@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { basename, join, resolve } from 'node:path';
+import { tmpRoot } from '../helpers/cli-harness.js';
 import {
     MANIFEST_REL,
     OFFLINE_RULES,
@@ -75,7 +75,7 @@ describe('verify-docs — helpers', () => {
     // BOTH signals of a release in progress are present: its tag, and text under
     // `## [Unreleased]`.
     it('exempts the current release note only once its tag exists and the CHANGELOG has an [Unreleased] entry', () => {
-        const repo = mkdtempSync(join(tmpdir(), 'verify-docs-shipped-'));
+        const repo = mkdtempSync(join(tmpRoot(), 'verify-docs-shipped-'));
         try {
             const git = (...args: string[]): void => {
                 const r = spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8', windowsHide: true });
@@ -120,7 +120,7 @@ describe('verify-docs — a corrupted sandbox', () => {
     let problems: Problem[] = [];
 
     beforeAll(async () => {
-        sandbox = mkdtempSync(join(tmpdir(), 'pdfnative-cli-verify-docs-'));
+        sandbox = mkdtempSync(join(tmpRoot(), 'pdfnative-cli-verify-docs-'));
         cpSync(ROOT, sandbox, {
             recursive: true,
             filter: (src) => !SKIP.has(basename(src)),
